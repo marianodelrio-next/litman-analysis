@@ -1,0 +1,34 @@
+.venv/
+.env
+local-data/
+local-secrets/
+credentials*.json
+service-account*.json
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+runs/
+*.egg-info/
+build/
+dist/
+.local-state/
+auth.json
+
+# Datos y documentos reales de licitaciones (pueden contener información sensible)
+licitaciones/
+
+# Logs locales
+*.log
+
+# Archivos temporales del sistema/editor
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# Documento maestro local situado en la raíz
+/Copy of Plantilla Master.docx
+
+scripts/*
+examples/*

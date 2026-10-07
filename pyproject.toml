@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "litman-analysis"
+version = "0.1.0"
+description = "Módulo de análisis de licitaciones de LitMan"
+requires-python = ">=3.11"
+dependencies = [
+  "google-api-python-client>=2.0",
+  "google-auth>=2.0",
+  "jsonschema>=4.19",
+  "pytest>=8.0",
+  "python-docx>=1.1",
+  "pypdf>=5.0",
+  "openpyxl>=3.1",
+  "PyYAML>=6.0",
+]
+
+[project.scripts]
+litman-analysis = "litman_analysis.cli:main"
+litman-analysis-worker = "litman_analysis.worker:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"litman_analysis.resources" = [
+  "**/*.json", "**/*.yaml", "**/*.md", "**/VERSION", "**/*.docx", "**/*.xlsx",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

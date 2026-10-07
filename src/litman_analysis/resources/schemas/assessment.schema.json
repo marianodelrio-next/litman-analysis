@@ -1,0 +1,156 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "assessment.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["control_documental", "ficha", "clasificacion", "calidad_informacion", "evidencias"],
+  "properties": {
+    "control_documental": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["documentos", "ausencias_relevantes"],
+      "properties": {
+        "documentos": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["documento_id", "tipo", "fase", "procesado", "observaciones"],
+            "properties": {
+              "documento_id": {"type": "string"},
+              "tipo": {"type": "string"},
+              "fase": {"type": "string", "enum": ["preparacion", "licitacion", "valoracion", "adjudicacion", "formalizacion", "desconocida"]},
+              "procesado": {"type": "boolean"},
+              "observaciones": {"type": ["string", "null"]}
+            }
+          }
+        },
+        "ausencias_relevantes": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "ficha": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["objeto_contrato", "numero_expediente", "organismo", "presupuesto", "fecha_limite_presentacion", "duracion_contrato", "certificaciones_exigidas", "equipo", "stack_tecnologico", "presencialidad", "provincia", "subcontratacion", "solvencia_tecnica", "solvencia_economica", "tipo_contrato", "tipo_procedimiento", "tramitacion_urgente", "cpv", "lotes", "resumen"],
+      "properties": {
+        "objeto_contrato": {"type": ["string", "null"]},
+        "numero_expediente": {"type": ["string", "null"]},
+        "organismo": {"type": ["string", "null"]},
+        "presupuesto": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["base_sin_iva", "iva", "base_con_iva", "valor_estimado", "moneda"],
+          "properties": {
+            "base_sin_iva": {"type": ["number", "null"]},
+            "iva": {"type": ["number", "null"]},
+            "base_con_iva": {"type": ["number", "null"]},
+            "valor_estimado": {"type": ["number", "null"]},
+            "moneda": {"type": ["string", "null"]}
+          }
+        },
+        "fecha_limite_presentacion": {"type": ["string", "null"]},
+        "duracion_contrato": {"type": ["string", "null"]},
+        "certificaciones_exigidas": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["nombre", "obligatoria", "nivel", "momento"],
+            "properties": {
+              "nombre": {"type": "string"},
+              "obligatoria": {"type": ["boolean", "null"]},
+              "nivel": {"type": ["string", "null"]},
+              "momento": {"type": ["string", "null"]}
+            }
+          }
+        },
+        "equipo": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["numero_personas_exigido", "perfiles", "otros_colectivos"],
+          "properties": {
+            "numero_personas_exigido": {"type": ["integer", "null"]},
+            "perfiles": {"type": "array", "items": {"type": "string"}},
+            "otros_colectivos": {"type": "array", "items": {"type": "string"}}
+          }
+        },
+        "stack_tecnologico": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["tecnologias", "nuevo_desarrollo", "stack_nuevo_desarrollo"],
+          "properties": {
+            "tecnologias": {"type": "array", "items": {"type": "string"}},
+            "nuevo_desarrollo": {"type": ["boolean", "null"]},
+            "stack_nuevo_desarrollo": {"type": "array", "items": {"type": "string"}}
+          }
+        },
+        "presencialidad": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["exigida", "alcance", "frecuencia", "modalidad"],
+          "properties": {
+            "exigida": {"type": ["boolean", "null"]},
+            "alcance": {"type": ["string", "null"]},
+            "frecuencia": {"type": ["string", "null"]},
+            "modalidad": {"type": "string", "enum": ["no_consta", "remota", "puntual", "habitual", "permanente", "mixta"]}
+          }
+        },
+        "provincia": {"type": ["string", "null"]},
+        "subcontratacion": {"type": ["string", "null"]},
+        "solvencia_tecnica": {"type": ["string", "null"]},
+        "solvencia_economica": {"type": ["string", "null"]},
+        "tipo_contrato": {"type": ["string", "null"]},
+        "tipo_procedimiento": {"type": ["string", "null"]},
+        "tramitacion_urgente": {"type": ["boolean", "null"]},
+        "cpv": {"type": "array", "items": {"type": "string"}},
+        "lotes": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["existen", "descripcion"],
+          "properties": {
+            "existen": {"type": ["boolean", "null"]},
+            "descripcion": {"type": ["string", "null"]}
+          }
+        },
+        "resumen": {"type": ["string", "null"]}
+      }
+    },
+    "clasificacion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tipologias", "tecnologias", "sectores", "senales_positivas", "senales_riesgo"],
+      "properties": {
+        "tipologias": {"type": "array", "items": {"type": "string"}},
+        "tecnologias": {"type": "array", "items": {"type": "string"}},
+        "sectores": {"type": "array", "items": {"type": "string"}},
+        "senales_positivas": {"type": "array", "items": {"type": "string"}},
+        "senales_riesgo": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "calidad_informacion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["estado", "limitaciones", "contradicciones"],
+      "properties": {
+        "estado": {"type": "string", "enum": ["suficiente", "parcial", "insuficiente", "no_procesable"]},
+        "limitaciones": {"type": "array", "items": {"type": "string"}},
+        "contradicciones": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "evidencias": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["campo", "documento_id", "pagina", "seccion", "texto_citado"],
+        "properties": {
+          "campo": {"type": "string"},
+          "documento_id": {"type": "string"},
+          "pagina": {"type": ["integer", "string", "null"]},
+          "seccion": {"type": ["string", "null"]},
+          "texto_citado": {"type": ["string", "null"]}
+        }
+      }
+    }
+  }
+}

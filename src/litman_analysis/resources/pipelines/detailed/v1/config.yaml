@@ -1,0 +1,11 @@
+version: detailed-analysis-config-v1
+
+extraction:
+  objetivos:
+    - "Preparar materia prima para un resumen, una propuesta técnica y una hoja económica."
+    - "Extraer el contrato trazable de puntuación y baja anormal para construir un simulador económico interno."
+    - "Extraer hechos del expediente y señalar claramente lo que debe completar la empresa."
+  pendientes:
+    - "No inventes equipo propuesto, horas, costes, arquitectura ni metodología corporativa."
+    - "No inventes precios de oferta, puntuaciones esperadas, competidores ni ofertas rivales."
+    - "Registra como pendiente_usuario cualquier dato que deba confirmar o aportar la empresa."

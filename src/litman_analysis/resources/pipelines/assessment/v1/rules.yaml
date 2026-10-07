@@ -1,0 +1,48 @@
+version: assessment-rules-v2
+
+thresholds:
+  budget_min: 40000
+  budget_max: 2000000
+  team_max: 15
+
+strategic_customers:
+  - Bilbao TIK
+  - FGC
+  - Ayuntamiento de Madrid
+  - Comunidad de Madrid
+  - ADIF
+  - Instituto Municipal de Mercados de Barcelona
+  - Universidad Complutense de Madrid
+
+discard_title_terms:
+  - licencia
+  - licencias
+  - hosting web
+  - alojamiento web
+  - cpd
+  - sap
+  - software as a service
+  - saas
+  - salesforce
+  - ciberseguridad
+  - cisco
+
+positive_terms:
+  - desarrollo
+  - business intelligence
+  - power bi
+  - cuadro de mando
+  - datos
+  - data
+  - rpa
+  - inteligencia artificial
+
+unwanted_new_development_technologies:
+  - php
+  - wordpress
+  - drupal
+
+notes:
+  - El plazo restante no es criterio de descarte.
+  - La solvencia y el peso del precio se extraen, pero no descartan en v2.
+  - ENS solo descarta si se exige certificación media o alta.

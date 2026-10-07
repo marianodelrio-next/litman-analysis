@@ -1,0 +1,35 @@
+version: assessment-config-v1
+
+extraction:
+  campos_criticos:
+    - ficha.objeto_contrato
+    - ficha.numero_expediente
+    - ficha.organismo
+    - ficha.presupuesto
+    - ficha.fecha_limite_presentacion
+    - ficha.duracion_contrato
+    - ficha.certificaciones_exigidas
+    - ficha.equipo
+    - ficha.stack_tecnologico
+    - ficha.presencialidad
+    - ficha.subcontratacion
+    - ficha.solvencia_tecnica
+    - ficha.solvencia_economica
+
+  definiciones:
+    equipo: "Personas exigidas para ejecutar el contrato; no incluye alumnos, usuarios ni destinatarios."
+    presupuesto: "Distingue base sin IVA, IVA, base con IVA y valor estimado."
+    certificacion: "Distingue certificación obligatoria, cumplimiento de una norma y criterio valorable."
+    stack: "Separa tecnologías existentes, tecnologías exigidas para nuevo desarrollo y tecnologías heredadas."
+    presencialidad: "Distingue trabajo presencial exigido de reuniones presenciales puntuales. Usa modalidad puntual cuando solo puedan celebrarse reuniones presenciales; no marques exigida=true por ese motivo. Indica lugar, frecuencia, alcance, perfiles afectados y desplazamientos cuando consten."
+    lotes: "Describe cada lote por separado y señala si puede funcionar como proyecto independiente."
+
+  instrucciones:
+    - "El plazo restante no es criterio de descarte; extrae la fecha aunque sea próxima."
+    - "Mantenimiento por sí solo no es un motivo de descarte."
+    - "Un suministro puede ser puro o mixto; identifica servicios, desarrollo, RPA, IA y lotes."
+    - "Audiovisual es una señal positiva potencial y no debe descartarse automáticamente."
+    - "ENS media o alta solo es relevante si se exige certificación al adjudicatario."
+    - "Trabajar conforme al ENS no equivale a exigir certificación ENS."
+    - "PHP, WordPress o Drupal heredados no equivalen a nuevo desarrollo en esas tecnologías."
+    - "No confundas lugar de ejecución con provincia ni alumnos con equipo ejecutor."

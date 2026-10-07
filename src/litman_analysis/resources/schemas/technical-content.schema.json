@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "technical-content.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["document_title", "language", "sections", "pending", "warnings"],
+  "properties": {
+    "document_title": {"type": "string"},
+    "language": {"type": "string"},
+    "sections": {"type": "array", "items": {"$ref": "#/$defs/section"}},
+    "pending": {"type": "array", "items": {"$ref": "#/$defs/pending"}},
+    "warnings": {"type": "array", "items": {"type": "string"}}
+  },
+  "$defs": {
+    "block": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "text", "items", "headers", "rows"],
+      "properties": {
+        "type": {"type": "string", "enum": ["paragraph", "bullet_list", "numbered_list", "table", "pending", "subheading"]},
+        "text": {"type": ["string", "null"]},
+        "id": {"type": "string"},
+        "level": {"type": "integer", "minimum": 2, "maximum": 6},
+        "items": {"type": "array", "items": {"type": "string"}},
+        "headers": {"type": "array", "items": {"type": "string"}},
+        "rows": {"type": "array", "items": {"type": "array", "items": {"type": "string"}}}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"type": {"const": "subheading"}}},
+          "then": {
+            "required": ["id", "level"],
+            "properties": {"text": {"type": "string", "minLength": 1}}
+          }
+        }
+      ]
+    },
+    "review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required", "reason"],
+      "properties": {
+        "required": {"type": "boolean"},
+        "reason": {"type": ["string", "null"]}
+      }
+    },
+    "section": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "blocks", "requirements_covered", "evidence_fields", "pending", "review"],
+      "properties": {
+        "id": {"type": "string"},
+        "title": {"type": "string"},
+        "blocks": {"type": "array", "items": {"$ref": "#/$defs/block"}},
+        "requirements_covered": {"type": "array", "items": {"type": "string"}},
+        "evidence_fields": {"type": "array", "items": {"type": "string"}},
+        "pending": {"type": "array", "items": {"type": "string"}},
+        "review": {"$ref": "#/$defs/review"}
+      }
+    },
+    "pending": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["section_id", "description", "reason"],
+      "properties": {
+        "section_id": {"type": ["string", "null"]},
+        "description": {"type": "string"},
+        "reason": {"type": ["string", "null"]}
+      }
+    }
+  }
+}

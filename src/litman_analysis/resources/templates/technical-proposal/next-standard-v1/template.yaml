@@ -1,0 +1,60 @@
+id: next-standard-v1
+version: 1.4.2
+document: template.docx
+reference_document: external-corporate-master
+language: es
+body_marker: "[[DOCUMENT_BODY]]"
+default_format:
+  font: Roboto
+  body_size_pt: 10
+  line_spacing: 1.15
+  margins_cm: 2.0
+headings:
+  numbering_id: 2
+  levels:
+    1:
+      font: Roboto
+      font_size_pt: 16
+      bold: true
+      color: "4FA6DC"
+    2:
+      font: M PLUS Rounded 1c Medium
+      font_size_pt: 13
+      bold: false
+      color: "F2A900"
+    3:
+      font: M PLUS Rounded 1c Medium
+      font_size_pt: 13
+      bold: false
+      color: "A36785"
+table_format:
+  header_fill: "71C5E8"
+  header_text: "000000"
+  border_color: "B7B7B7"
+  border_size: 6
+  cell_margin_twips: 80
+toc:
+  font: Roboto
+  font_size_pt: 13
+  bold: true
+  entry_color: "F2A900"
+  tab_position_twips: 12000
+  spacing_before_twips: 60
+  level_indent_twips: 360
+  leader: none
+  levels:
+    1:
+      font: Roboto
+      font_size_pt: 13
+      bold: true
+      color: "4FA6DC"
+    2:
+      font: Roboto
+      font_size_pt: 11
+      bold: false
+      color: "F2A900"
+policies:
+  company_profile: explicit_only
+  case_studies: explicit_only
+  preserve_tender_section_order: true
+  unresolved_constraints_are_pending: true

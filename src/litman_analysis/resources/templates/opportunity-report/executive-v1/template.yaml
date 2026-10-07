@@ -1,0 +1,14 @@
+id: executive-v1
+version: 1.2.0
+document:
+  format: A4
+  max_pages: 2
+limits:
+  key_facts: 4
+  positive_reasons: 4
+  alerts: 5
+  sources: 8
+colors:
+  primary: "4FA6DC"
+  secondary: "F2A900"
+  accent: "A36785"

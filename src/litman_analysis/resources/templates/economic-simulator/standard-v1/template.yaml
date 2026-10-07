@@ -1,0 +1,18 @@
+id: standard-v1
+version: 1.0.0
+document: template.xlsx
+purpose: internal-economic-simulator
+scenario_names:
+  - Agresivo
+  - Conservador
+competitor_slots: 3
+editable_fill: "FFF2CC"
+header_fill: "002855"
+accent_colors:
+  - "F2A900"
+  - "4FA6DC"
+policies:
+  company_offer_is_input: true
+  competitor_data_is_assumption: true
+  unsupported_formulas_are_pending: true
+  preserve_tender_evidence: true
