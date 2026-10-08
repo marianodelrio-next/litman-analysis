@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import io
-import hashlib
 import logging
 import shutil
 import uuid
@@ -10,6 +8,7 @@ from typing import Any, Callable
 
 from litman_analysis.domain.jobs import JobRequest, JobType, MaterializedCase, PublishedArtifact
 from .common import catalog_digest, detailed_analysis_delivery_catalog, safe_filename, sha256
+from .publication import publication_folder_name
 
 _DRIVE_OPTIONS = {"supportsAllDrives": True}
 _FOLDER_MIME = "application/vnd.google-apps.folder"
@@ -159,16 +158,13 @@ class GoogleDriveArtifactPublisher:
         temporary_suffix: Callable[[], str] | None = None,
         uploader: Callable[[Path], Any] = _upload,
         downloader: Callable[[Any, Any], None] = _download,
+        publication_name_factory: Callable[[str], str] = publication_folder_name,
     ) -> None:
         self.service = service
         self._temporary_suffix = temporary_suffix or (lambda: uuid.uuid4().hex)
         self.uploader = uploader
         self.downloader = downloader
-
-    def _folders(self, name: str, parent: str) -> list[dict]:
-        escaped = name.replace("'", "\\'")
-        query = f"name = '{escaped}' and '{parent}' in parents and mimeType = '{_FOLDER_MIME}' and trashed = false"
-        return self.service.files().list(q=query, spaces="drive", fields="files(id,name,appProperties)", includeItemsFromAllDrives=True, supportsAllDrives=True).execute().get("files", [])
+        self._publication_name_factory = publication_name_factory
 
     def _create_folder(self, name: str, parent: str, app_properties: dict[str, str] | None = None) -> str:
         body: dict[str, Any] = {"name": safe_filename(name), "mimeType": _FOLDER_MIME, "parents": [parent]}
@@ -176,37 +172,10 @@ class GoogleDriveArtifactPublisher:
             body["appProperties"] = app_properties
         return self.service.files().create(body=body, fields="id", **_DRIVE_OPTIONS).execute()["id"]
 
-    def _existing(self, final: list[dict], job: JobRequest, catalog: tuple) -> tuple[PublishedArtifact, ...]:
-        if len(final) > 1:
-            raise FileExistsError(f"Hay más de una carpeta final para el job {job.job_id}")
-        metadata = final[0].get("appProperties")
-        expected_metadata = self._folder_properties(job, catalog)
-        if not isinstance(metadata, dict) or any(metadata.get(key) != value for key, value in expected_metadata.items()):
-            raise FileExistsError("La salida Drive existente no coincide con el job o el catálogo")
-        children = self.service.files().list(
-            q=f"'{final[0]['id']}' in parents and trashed = false", spaces="drive",
-            fields="files(id,name,mimeType,webViewLink,appProperties)",
-            includeItemsFromAllDrives=True, supportsAllDrives=True,
-        ).execute().get("files", [])
-        expected = {item.name: item for item in catalog}
-        if len(children) != len(expected) or {item.get("name") for item in children} != set(expected):
-            raise FileExistsError("La salida Drive existente no contiene el catálogo esperado de documentos")
-        result: list[PublishedArtifact] = []
-        for child in children:
-            name = child.get("name")
-            if not isinstance(name, str) or child.get("mimeType") == _FOLDER_MIME:
-                raise FileExistsError("La salida Drive existente contiene un artefacto inválido")
-            stream = io.BytesIO()
-            self.downloader(self.service.files().get_media(fileId=child["id"], **_DRIVE_OPTIONS), stream)
-            checksum = hashlib.sha256(stream.getvalue()).hexdigest()
-            if checksum != expected[name].checksum:
-                raise FileExistsError("La salida Drive existente no coincide con el catálogo")
-            result.append(PublishedArtifact(name, child.get("webViewLink") or f"drive://{child['id']}", checksum))
-        return tuple(sorted(result, key=lambda item: item.name))
-
     @staticmethod
-    def _folder_properties(job: JobRequest, catalog: tuple) -> dict[str, str]:
+    def _folder_properties(job: JobRequest, publication_id: str, catalog: tuple) -> dict[str, str]:
         return {"job_id": job.job_id, "job_type": str(job.job_type),
+                "publication_id": publication_id,
                 "publication_contract": _DELIVERY_CONTRACT_VERSION,
                 "catalog_sha256": catalog_digest(catalog)}
 
@@ -214,11 +183,9 @@ class GoogleDriveArtifactPublisher:
         if job.job_type is JobType.ASSESSMENT:
             return self._publish_assessment(job, run_dir)
         catalog = detailed_analysis_delivery_catalog(run_dir)
-        final = self._folders(job.job_id, job.output_location)
-        if final:
-            return self._existing(final, job, catalog)
-        temporary_name = f".{job.job_id}.tmp-{self._temporary_suffix()}"
-        temporary = self._create_folder(temporary_name, job.output_location, self._folder_properties(job, catalog))
+        publication_id = self._publication_name_factory(job.job_id)
+        temporary_name = f".{publication_id}.tmp-{self._temporary_suffix()}"
+        temporary = self._create_folder(temporary_name, job.output_location, self._folder_properties(job, publication_id, catalog))
         try:
             published: list[tuple[str, str, str]] = []
             for item in catalog:
@@ -228,18 +195,7 @@ class GoogleDriveArtifactPublisher:
                 published.append((item.name, item.checksum, result.get("webViewLink") or f"drive://{result['id']}"))
             if len(published) != len(catalog):
                 raise RuntimeError("Publicación Drive incompleta")
-            concurrent_final = self._folders(job.job_id, job.output_location)
-            if concurrent_final:
-                existing = self._existing(concurrent_final, job, catalog)
-                self._delete_temporary(temporary)
-                return existing
-            self.service.files().update(fileId=temporary, body={"name": job.job_id}, fields="id", **_DRIVE_OPTIONS).execute()
-            post_promotion = self._folders(job.job_id, job.output_location)
-            competing = [folder for folder in post_promotion if folder.get("id") != temporary]
-            if competing:
-                existing = self._existing(competing, job, catalog)
-                self._delete_temporary(temporary)
-                return existing
+            self.service.files().update(fileId=temporary, body={"name": publication_id}, fields="id", **_DRIVE_OPTIONS).execute()
             return tuple(PublishedArtifact(name, uri, checksum) for name, checksum, uri in published)
         except Exception:
             try:
@@ -257,12 +213,10 @@ class GoogleDriveArtifactPublisher:
         if not pdf.is_file():
             raise ValueError(f"No existe el PDF de assessment requerido: {pdf}")
         checksum = sha256(pdf)
-        final = self._folders(job.job_id, job.output_location)
-        if final:
-            return self._existing_assessment(final, checksum)
+        publication_id = self._publication_name_factory(job.job_id)
         temporary = self._create_folder(
-            f".{job.job_id}.tmp-{self._temporary_suffix()}", job.output_location,
-            {"job_id": job.job_id, "job_type": str(job.job_type),
+            f".{publication_id}.tmp-{self._temporary_suffix()}", job.output_location,
+            {"job_id": job.job_id, "publication_id": publication_id, "job_type": str(job.job_type),
              "publication_contract": _ASSESSMENT_CONTRACT_VERSION, "pdf_sha256": checksum},
         )
         try:
@@ -273,20 +227,9 @@ class GoogleDriveArtifactPublisher:
             ).execute()
             if not result.get("id"):
                 raise RuntimeError("La subida de ficha_oportunidad.pdf a Drive no devolvió un ID")
-            concurrent = self._folders(job.job_id, job.output_location)
-            if concurrent:
-                existing = self._existing_assessment(concurrent, checksum)
-                self._delete_temporary(temporary)
-                return existing
             self.service.files().update(
-                fileId=temporary, body={"name": job.job_id}, fields="id", **_DRIVE_OPTIONS
+                fileId=temporary, body={"name": publication_id}, fields="id", **_DRIVE_OPTIONS
             ).execute()
-            post_promotion = self._folders(job.job_id, job.output_location)
-            competing = [folder for folder in post_promotion if folder.get("id") != temporary]
-            if competing:
-                existing = self._existing_assessment(competing, checksum)
-                self._delete_temporary(temporary)
-                return existing
             uri = result.get("webViewLink") or f"drive://{result['id']}"
             return (PublishedArtifact("ficha_oportunidad.pdf", uri, checksum),)
         except Exception:
@@ -298,30 +241,6 @@ class GoogleDriveArtifactPublisher:
                     job.job_id, temporary, type(cleanup_error).__name__,
                 )
             raise
-
-    def _existing_assessment(self, folders: list[dict], checksum: str) -> tuple[PublishedArtifact, ...]:
-        if len(folders) > 1:
-            raise FileExistsError("Hay más de una carpeta final para el assessment")
-        children = self.service.files().list(
-            q=f"'{folders[0]['id']}' in parents and trashed = false", spaces="drive",
-            fields="files(id,name,mimeType,webViewLink,appProperties)",
-            includeItemsFromAllDrives=True, supportsAllDrives=True,
-        ).execute().get("files", [])
-        if len(children) != 1 or children[0].get("name") != "ficha_oportunidad.pdf" or children[0].get("mimeType") == _FOLDER_MIME:
-            raise FileExistsError(
-                "La carpeta Drive existente de assessment no contiene únicamente ficha_oportunidad.pdf"
-            )
-        child = children[0]
-        stream = io.BytesIO()
-        self.downloader(self.service.files().get_media(fileId=child["id"], **_DRIVE_OPTIONS), stream)
-        remote_checksum = hashlib.sha256(stream.getvalue()).hexdigest()
-        if remote_checksum != checksum:
-            raise FileExistsError(
-                "La carpeta Drive existente contiene ficha_oportunidad.pdf con contenido diferente; no se sobrescribe"
-            )
-        return (PublishedArtifact(
-            "ficha_oportunidad.pdf", child.get("webViewLink") or f"drive://{child['id']}", checksum
-        ),)
 
     def _delete_temporary(self, temporary: str) -> None:
         self.service.files().delete(fileId=temporary, **_DRIVE_OPTIONS).execute()

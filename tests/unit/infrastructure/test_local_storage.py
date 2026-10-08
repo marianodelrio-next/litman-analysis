@@ -39,19 +39,24 @@ def test_local_publisher_copies_run_and_reports_checksums(tmp_path: Path) -> Non
     (run / "output").mkdir(parents=True)
     payload = b'{"valid": true}'
     (run / "output" / "result.json").write_bytes(payload)
-    published = LocalArtifactPublisher().publish(local_job(source, output), run)
-    assert (output / "job-1" / "output" / "result.json").read_bytes() == payload
+    published = LocalArtifactPublisher(publication_name_factory=lambda _: "job-1-20261008T153045.123456Z").publish(local_job(source, output), run)
+    assert (output / "job-1-20261008T153045.123456Z" / "output" / "result.json").read_bytes() == payload
     item = next(value for value in published if value.name == "output/result.json")
     assert item.checksum == hashlib.sha256(payload).hexdigest()
 
 
-def test_local_publication_does_not_overwrite_a_previous_job(tmp_path: Path) -> None:
+def test_local_publication_creates_a_new_folder_for_each_execution(tmp_path: Path) -> None:
     source, output, run = tmp_path / "source", tmp_path / "published", tmp_path / "run"
     source.mkdir()
     run.mkdir()
     job = local_job(source, output)
-    LocalArtifactPublisher().publish(job, run)
-    assert LocalArtifactPublisher().publish(job, run) == LocalArtifactPublisher().publish(job, run)
+    names = iter(("job-1-20261008T153045.123456Z", "job-1-20261008T153046.123456Z"))
+    publisher = LocalArtifactPublisher(publication_name_factory=lambda _: next(names))
+    publisher.publish(job, run)
+    publisher.publish(job, run)
+    folders = sorted(path.name for path in output.iterdir())
+    assert folders == ["job-1-20261008T153045.123456Z", "job-1-20261008T153046.123456Z"]
+    assert all(json.loads((output / folder / "publication-manifest.json").read_text())["job_id"] == "job-1" for folder in folders)
 
 
 

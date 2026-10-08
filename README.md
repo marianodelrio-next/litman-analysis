@@ -38,7 +38,7 @@ uv run litman-analysis analyze ./local-data/input --output ./local-data/output
 
 Los wrappers `assess` y `analyze` son atajos local→local. Para cualquier ruta con Drive usa `run` y un job de `examples/jobs/`; `location` es una ruta del host cuando `kind` es `local` y el ID de una carpeta cuando es `google-drive`.
 
-En una salida Google Drive, `assessment` crea dentro de `output.location` una carpeta con el `job_id` y publica en ella exclusivamente `ficha_oportunidad.pdf`; no crea una carpeta `output` ni un manifiesto remoto. La publicación Drive de `detailed-analysis` conserva su carpeta por job y su catálogo completo. La publicación local no cambia.
+Cada ejecución publica en una carpeta nueva bajo el destino, denominada `<job_id>-<timestamp UTC>`; así, relanzar el mismo job conserva todas sus salidas. En Google Drive, `assessment` publica en ella exclusivamente `ficha_oportunidad.pdf`, sin crear una carpeta `output` ni un manifiesto remoto. `detailed-analysis` publica su catálogo completo; en local se conserva además el manifiesto de publicación.
 
 Un análisis detallado completo publica cuatro entregables: `resumen_tecnico.docx` para la revisión técnica del expediente, `guia_preparacion_oferta.docx` para coordinar la preparación de la oferta, `propuesta_tecnica_base.docx` y `simulador_economico.xlsx`. La generación completa usa los artefactos `technical-summary`, `summary`, `technical-document` y `economic-simulator`, en ese orden.
 

@@ -175,62 +175,31 @@ def test_detailed_analysis_requires_all_documents_before_temporary_folder(tmp_pa
         GoogleDriveArtifactPublisher(DeliveryService(files)).publish(job(StorageKind.GOOGLE_DRIVE, JobType.DETAILED_ANALYSIS),run)
     assert files.created == []
 
-def test_existing_compatible_delivery_is_reused(tmp_path):
+def test_existing_job_folder_does_not_block_a_new_detailed_publication(tmp_path):
     files=DeliveryFiles(); run=delivery_run(tmp_path)
-    catalog=__import__("litman_analysis.infrastructure.storage.common",fromlist=["detailed_analysis_delivery_catalog"]).detailed_analysis_delivery_catalog(run)
-    props=GoogleDriveArtifactPublisher._folder_properties(job(StorageKind.GOOGLE_DRIVE, JobType.DETAILED_ANALYSIS),catalog)
-    final=files._add("job","destination-folder",mime="application/vnd.google-apps.folder",props=props)
-    for item in catalog: files._add(item.name,final,item.source.read_bytes())
-    result=GoogleDriveArtifactPublisher(DeliveryService(files),downloader=delivery_downloader(files)).publish(job(StorageKind.GOOGLE_DRIVE, JobType.DETAILED_ANALYSIS),run)
-    assert len(result) == 4 and files.created == []
-
-def test_existing_v1_delivery_is_not_reused_as_v2(tmp_path):
-    files=DeliveryFiles(); run=delivery_run(tmp_path)
-    catalog=detailed_analysis_delivery_catalog(run)
-    props=GoogleDriveArtifactPublisher._folder_properties(job(StorageKind.GOOGLE_DRIVE, JobType.DETAILED_ANALYSIS),catalog)
-    props["publication_contract"]="detailed-analysis-drive-v1"
-    final=files._add("job","destination-folder",mime="application/vnd.google-apps.folder",props=props)
-    for item in catalog: files._add(item.name,final,item.source.read_bytes())
-    with pytest.raises(FileExistsError, match="no coincide"):
-        GoogleDriveArtifactPublisher(DeliveryService(files),downloader=delivery_downloader(files)).publish(job(StorageKind.GOOGLE_DRIVE, JobType.DETAILED_ANALYSIS),run)
-
-@pytest.mark.parametrize("mutation", ["metadata", "missing", "duplicate", "extra"])
-def test_existing_incompatible_delivery_fails_without_overwrite(tmp_path, mutation):
-    files=DeliveryFiles(); run=delivery_run(tmp_path); catalog=__import__("litman_analysis.infrastructure.storage.common",fromlist=["detailed_analysis_delivery_catalog"]).detailed_analysis_delivery_catalog(run)
-    props=GoogleDriveArtifactPublisher._folder_properties(job(StorageKind.GOOGLE_DRIVE, JobType.DETAILED_ANALYSIS),catalog)
-    if mutation == "metadata": props["job_id"]="other"
-    final=files._add("job","destination-folder",mime="application/vnd.google-apps.folder",props=props)
-    for item in catalog: files._add(item.name,final,item.source.read_bytes())
-    if mutation == "missing": files.items.pop(next(key for key, value in files.items.items() if value["name"] == DELIVERABLES[0]))
-    if mutation == "duplicate": files._add(DELIVERABLES[0],final,b"duplicate")
-    if mutation == "extra": files._add("extra.txt",final,b"extra")
-    with pytest.raises(FileExistsError): GoogleDriveArtifactPublisher(DeliveryService(files),downloader=delivery_downloader(files)).publish(job(StorageKind.GOOGLE_DRIVE, JobType.DETAILED_ANALYSIS),run)
-    assert files.created == [] and files.updated == []
+    files._add("job", "destination-folder", mime="application/vnd.google-apps.folder")
+    result=GoogleDriveArtifactPublisher(
+        DeliveryService(files), temporary_suffix=lambda: "fixed", uploader=lambda p: str(p),
+        publication_name_factory=lambda _: "job-20261008T153045.123456Z",
+    ).publish(job(StorageKind.GOOGLE_DRIVE, JobType.DETAILED_ANALYSIS), run)
+    assert len(result) == 4
+    assert {item["name"] for item in files.items.values() if item["mimeType"] == "application/vnd.google-apps.folder"} == {"job", "job-20261008T153045.123456Z"}
+    final = next(item for item in files.items.values() if item["name"].endswith("123456Z"))
+    assert final["appProperties"]["job_id"] == "job"
+    assert final["appProperties"]["publication_id"] == final["name"]
 
 def test_upload_failure_cleans_temporary_folder(tmp_path):
     files=DeliveryFiles(); files.fail_name=DELIVERABLES[1]
     with pytest.raises(RuntimeError): GoogleDriveArtifactPublisher(DeliveryService(files),uploader=lambda p:str(p)).publish(job(StorageKind.GOOGLE_DRIVE, JobType.DETAILED_ANALYSIS),delivery_run(tmp_path))
     assert files.deleted and not files.items
 
-def test_compatible_concurrent_delivery_is_reused_and_temporary_is_removed(tmp_path):
+def test_detailed_publications_with_the_same_job_id_have_distinct_folders(tmp_path):
     files=DeliveryFiles(); run=delivery_run(tmp_path)
-    catalog=__import__("litman_analysis.infrastructure.storage.common",fromlist=["detailed_analysis_delivery_catalog"]).detailed_analysis_delivery_catalog(run)
-    request=job(StorageKind.GOOGLE_DRIVE, JobType.DETAILED_ANALYSIS)
-    def winner():
-        final=files._add("job","destination-folder",mime="application/vnd.google-apps.folder",props=GoogleDriveArtifactPublisher._folder_properties(request,catalog))
-        for item in catalog: files._add(item.name,final,item.source.read_bytes())
-    files.race=winner
-    result=GoogleDriveArtifactPublisher(DeliveryService(files),temporary_suffix=lambda:"x",uploader=lambda p:str(p),downloader=delivery_downloader(files)).publish(request,run)
-    assert len(result) == 4 and files.deleted
-    assert len([item for item in files.items.values() if item["name"] == "job"]) == 1
-
-def test_incompatible_concurrent_delivery_fails_and_temporary_is_removed(tmp_path):
-    files=DeliveryFiles(); run=delivery_run(tmp_path)
-    def winner(): files._add("job","destination-folder",mime="application/vnd.google-apps.folder",props={"job_id":"other"})
-    files.race=winner
-    with pytest.raises(FileExistsError):
-        GoogleDriveArtifactPublisher(DeliveryService(files),temporary_suffix=lambda:"x",uploader=lambda p:str(p),downloader=delivery_downloader(files)).publish(job(StorageKind.GOOGLE_DRIVE, JobType.DETAILED_ANALYSIS),run)
-    assert files.deleted
+    names=iter(("job-20261008T153045.123456Z", "job-20261008T153046.123456Z"))
+    publisher=GoogleDriveArtifactPublisher(DeliveryService(files), temporary_suffix=lambda:"x", uploader=lambda p:str(p), publication_name_factory=lambda _: next(names))
+    publisher.publish(job(StorageKind.GOOGLE_DRIVE, JobType.DETAILED_ANALYSIS), run)
+    publisher.publish(job(StorageKind.GOOGLE_DRIVE, JobType.DETAILED_ANALYSIS), run)
+    assert {item["name"] for item in files.items.values() if item["mimeType"] == "application/vnd.google-apps.folder"} == {"job-20261008T153045.123456Z", "job-20261008T153046.123456Z"}
 
 
 def assessment_run(tmp_path, payload=b"pdf"):
@@ -242,14 +211,14 @@ def assessment_run(tmp_path, payload=b"pdf"):
     return run
 
 
-def test_assessment_creates_job_folder_containing_only_pdf(tmp_path):
+def test_assessment_creates_unique_folder_containing_only_pdf(tmp_path):
     files = DeliveryFiles()
     result = GoogleDriveArtifactPublisher(DeliveryService(files), temporary_suffix=lambda: "fixed",
-                                          uploader=lambda path: str(path)).publish(
+                                          uploader=lambda path: str(path), publication_name_factory=lambda _: "job-20261008T153045.123456Z").publish(
         job(StorageKind.GOOGLE_DRIVE), assessment_run(tmp_path)
     )
     assert [item.name for item in result] == ["ficha_oportunidad.pdf"]
-    final = [item for item in files.items.values() if item["name"] == "job"]
+    final = [item for item in files.items.values() if item["name"] == "job-20261008T153045.123456Z"]
     assert len(final) == 1
     children = [item for item in files.items.values() if final[0]["id"] in item["parents"]]
     assert [item["name"] for item in children] == ["ficha_oportunidad.pdf"]
@@ -257,43 +226,15 @@ def test_assessment_creates_job_folder_containing_only_pdf(tmp_path):
     assert files.updated
 
 
-def test_assessment_reuses_one_identical_pdf(tmp_path):
+def test_assessment_creates_a_new_folder_despite_an_existing_job_folder(tmp_path):
     files = DeliveryFiles()
     folder = files._add("job", "destination-folder", mime="application/vnd.google-apps.folder")
     files._add("ficha_oportunidad.pdf", folder, b"same", item_id="pdf-id")
-    publisher = GoogleDriveArtifactPublisher(DeliveryService(files), downloader=delivery_downloader(files))
+    publisher = GoogleDriveArtifactPublisher(DeliveryService(files), downloader=delivery_downloader(files), uploader=lambda path: str(path), publication_name_factory=lambda _: "job-20261008T153045.123456Z")
     result = publisher.publish(job(StorageKind.GOOGLE_DRIVE), assessment_run(tmp_path, b"same"))
     assert result[0].name == "ficha_oportunidad.pdf"
-    assert result[0].uri == "drive://pdf-id"
-    assert files.created == []
-
-
-def test_assessment_rejects_different_or_duplicate_pdf(tmp_path):
-    different = DeliveryFiles()
-    folder = different._add("job", "destination-folder", mime="application/vnd.google-apps.folder")
-    different._add("ficha_oportunidad.pdf", folder, b"other")
-    with pytest.raises(FileExistsError, match="contenido diferente"):
-        GoogleDriveArtifactPublisher(DeliveryService(different), downloader=delivery_downloader(different)).publish(
-            job(StorageKind.GOOGLE_DRIVE), assessment_run(tmp_path, b"local")
-        )
-    duplicates = DeliveryFiles()
-    duplicates._add("job", "destination-folder", mime="application/vnd.google-apps.folder")
-    duplicates._add("job", "destination-folder", mime="application/vnd.google-apps.folder")
-    with pytest.raises(FileExistsError, match="más de una carpeta"):
-        GoogleDriveArtifactPublisher(DeliveryService(duplicates)).publish(
-            job(StorageKind.GOOGLE_DRIVE), assessment_run(tmp_path, b"local")
-        )
-
-
-def test_assessment_rejects_existing_job_folder_with_extra_files(tmp_path):
-    files = DeliveryFiles()
-    folder = files._add("job", "destination-folder", mime="application/vnd.google-apps.folder")
-    files._add("ficha_oportunidad.pdf", folder, b"same")
-    files._add("result.json", folder, b"{}")
-    with pytest.raises(FileExistsError, match="únicamente ficha_oportunidad.pdf"):
-        GoogleDriveArtifactPublisher(DeliveryService(files)).publish(
-            job(StorageKind.GOOGLE_DRIVE), assessment_run(tmp_path, b"same")
-        )
+    assert result[0].uri != "drive://pdf-id"
+    assert {item["name"] for item in files.items.values() if item["mimeType"] == "application/vnd.google-apps.folder"} == {"job", "job-20261008T153045.123456Z"}
 
 
 def test_assessment_requires_pdf_before_drive_publication(tmp_path):

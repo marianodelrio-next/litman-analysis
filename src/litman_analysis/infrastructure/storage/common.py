@@ -113,34 +113,10 @@ def catalog_digest(catalog: Iterable[CatalogArtifact]) -> str:
     return digest.hexdigest()
 
 
-def manifest(job_id: str, job_type: str, artifacts: Iterable[tuple[str, str, str]]) -> dict:
-    return {"schema_version": 1, "job_id": job_id, "job_type": str(job_type),
+def manifest(job_id: str, publication_id: str, job_type: str, artifacts: Iterable[tuple[str, str, str]]) -> dict:
+    return {"schema_version": 1, "job_id": job_id, "publication_id": publication_id, "job_type": str(job_type),
             "artifacts": [{"name": n, "sha256": h, "uri": u} for n, h, u in artifacts]}
 
 
 def write_manifest(path: Path, value: dict) -> None:
     path.write_text(json.dumps(value, ensure_ascii=False, sort_keys=True, indent=2) + "\n", encoding="utf-8")
-
-
-def compatible_manifest(value: object, job_id: str, job_type: str, catalog: tuple[CatalogArtifact, ...]) -> bool:
-    if not isinstance(value, dict) or value.get("schema_version") != 1:
-        return False
-    artifacts = value.get("artifacts")
-    if not isinstance(artifacts, list):
-        return False
-    actual: dict[str, str] = {}
-    for item in artifacts:
-        if not isinstance(item, dict):
-            return False
-        name, checksum, uri = item.get("name"), item.get("sha256"), item.get("uri")
-        if not isinstance(name, str) or not isinstance(checksum, str) or not isinstance(uri, str):
-            return False
-        if name in actual:
-            return False
-        actual[name] = checksum.lower()
-    expected = {item.name: item.checksum for item in catalog}
-    return (
-        value.get("job_id") == job_id
-        and value.get("job_type") == str(job_type)
-        and actual == expected
-    )

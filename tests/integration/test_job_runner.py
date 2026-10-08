@@ -87,10 +87,10 @@ def test_launcher_calls_compose_once_and_translates(tmp_path):
     def execute(command,**kwargs):
         calls.append(command); contract=json.loads((Path(kwargs["env"]["LITMAN_ANALYSIS_JOB_DIR"])/"job.json").read_text())
         assert contract["input"]["location"]=="/input" and contract["output"]["location"]=="/output" and contract["options"]["generation"]
-        return subprocess.CompletedProcess(command,0,json.dumps({"status":"succeeded","run_dir":"/data/runs/job-1/assessment/run","diagnostics_dir":"/data/runs/job-1/assessment/run","artifacts":[{"name":"output/result.json","uri":"file:///output/job-1/output/result.json","checksum":"x"}]}))
+        return subprocess.CompletedProcess(command,0,json.dumps({"status":"succeeded","run_dir":"/data/runs/job-1/assessment/run","diagnostics_dir":"/data/runs/job-1/assessment/run","artifacts":[{"name":"output/result.json","uri":"file:///output/job-1-20261008T153045.123456Z/output/result.json","checksum":"x"}]}))
     payload=ContainerJobLauncher(project_root=tmp_path,runner=execute).run(job(tmp_path)).payload
     assert payload["status"]=="succeeded" and payload["run_dir"]==str(tmp_path/"runs/job-1/assessment/run")
-    assert payload["artifacts"][0]["uri"]==(tmp_path/"published/job-1/output/result.json").as_uri()
+    assert payload["artifacts"][0]["uri"]==(tmp_path/"published/job-1-20261008T153045.123456Z/output/result.json").as_uri()
     assert calls==[["docker","compose","run","--rm","litman-analysis","run","/job/job.json"]]
 def test_launcher_preserves_drive_ids_and_exit_code(tmp_path):
     seen={}
