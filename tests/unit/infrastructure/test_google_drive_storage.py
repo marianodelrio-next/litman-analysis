@@ -60,8 +60,24 @@ def test_my_drive_uses_user_corpus(tmp_path):
 def test_folder_validation(tmp_path, folder, pages, message):
     with pytest.raises(ValueError, match=message): GoogleDriveDocumentSource(Service(folder,pages),downloader=downloader()).materialize(job(),tmp_path)
 
+def test_ignores_direct_subfolders_and_materializes_files(tmp_path):
+    subfolder = file("folder", "analisis-inicial", "application/vnd.google-apps.folder")
+    document = file("document", "pliego.pdf")
+    result = GoogleDriveDocumentSource(
+        Service(pages={None: {"files": [subfolder, document]}}), downloader=downloader()
+    ).materialize(job(), tmp_path)
+    assert [path.name for path in result.directory.iterdir()] == ["pliego.pdf"]
+
+
+def test_only_subfolders_are_treated_as_an_empty_input_folder(tmp_path):
+    subfolder = file("folder", "analisis-inicial", "application/vnd.google-apps.folder")
+    with pytest.raises(ValueError, match="no contiene archivos"):
+        GoogleDriveDocumentSource(
+            Service(pages={None: {"files": [subfolder]}}), downloader=downloader()
+        ).materialize(job(), tmp_path)
+
+
 @pytest.mark.parametrize("item,message", [
- (file("x","sub","application/vnd.google-apps.folder"),"subcarpeta"),
  (file("x","link","application/vnd.google-apps.shortcut"),"acceso directo"),
  (file("x","doc","application/vnd.google-apps.document"),"nativo"),
  (file("x","../bad.pdf"),"inválido"),

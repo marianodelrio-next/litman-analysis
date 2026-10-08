@@ -115,7 +115,8 @@ class GoogleDriveDocumentSource:
         for item in files:
             name = item.get("name")
             if item.get("mimeType") == _FOLDER_MIME:
-                raise ValueError(f"La carpeta de entrada contiene una subcarpeta: {name}")
+                _LOGGER.info("Se ignora la subcarpeta de entrada de Google Drive: %s", name)
+                continue
             if item.get("mimeType") == "application/vnd.google-apps.shortcut":
                 raise ValueError(f"La carpeta de entrada contiene un acceso directo: {name}")
             if str(item.get("mimeType", "")).startswith(_NATIVE_PREFIX):
