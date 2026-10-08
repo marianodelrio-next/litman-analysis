@@ -9,9 +9,9 @@ def dossier(**overrides) -> dict:
         "objetivos": ["Mejorar la calidad del dato"],
         "alcance": ["Diseño e implantación"],
         "trabajos": ["Analizar las fuentes", "Construir cuadros de mando"],
-        "fases": [{"nombre": "Diseño", "descripcion": "Definición", "plazo": "2 semanas", "entregables": []}],
+        "fases": [{"nombre": "Diseño", "descripcion": "Definición", "plazo": "2 semanas", "entregables": ["Plan de trabajo"]}],
         "entregables_contrato": [{"nombre": "Diseño", "descripcion": "Documento técnico"}],
-        "documentos_oferta": [], "equipo": [], "tecnologias": ["Power BI"],
+        "documentos_oferta": [{"nombre": "Memoria", "sobre": "B", "obligatorio": True, "descripcion": "Propuesta técnica"}], "equipo": [{"nombre": "Jefe de proyecto", "descripcion": "Coordinación"}], "tecnologias": ["Power BI"],
         "requisitos_oferta": [{"descripcion": "Explicar la metodología", "tipo": "técnico", "obligatorio": True, "donde_responder": "Metodología"}],
         "criterios_adjudicacion": [{"nombre": "Metodología", "puntuacion_maxima": 20, "tipo": "juicio", "donde_responder": "Metodología", "descripcion": None}],
         "simulador_economico": {
@@ -22,8 +22,8 @@ def dossier(**overrides) -> dict:
             "restricciones": [], "advertencias": [],
         },
         "estructura_documento_tecnico": [],
-        "memoria_tecnica": {"requerida": True, "nombre_documento": "Memoria técnica", "idioma": "es", "estructura_impuesta": True, "secciones": [{"orden": 1, "titulo": "Metodología", "descripcion": "Forma de prestación", "obligatoria": True, "puntuacion": 20, "limite_paginas": 2, "requisitos_relacionados": ["Explicar la metodología"], "evidencias": []}], "formato": {"paginas_maximas": 10, "fuente": "Arial", "tamano_pt": 11, "interlineado": 1.5, "margen_superior_cm": 2, "margen_inferior_cm": 2, "margen_izquierdo_cm": 2, "margen_derecho_cm": 2}, "reglas": [], "portada_computa_limite": False, "indice_computa_limite": False, "anexos_computan_limite": None},
-        "pendientes": [], "evidencias": [], "calidad": {"estado": "suficiente", "limitaciones": []},
+        "memoria_tecnica": {"requerida": True, "nombre_documento": "Memoria técnica", "idioma": "es", "estructura_impuesta": True, "secciones": [{"orden": 1, "titulo": "Metodología", "descripcion": "Forma de prestación", "obligatoria": True, "puntuacion": 20, "limite_paginas": 2, "requisitos_relacionados": ["Explicar la metodología"], "evidencias": []}], "formato": {"paginas_maximas": 10, "fuente": "Arial", "tamano_pt": 11, "interlineado": 1.5, "margen_superior_cm": 2, "margen_inferior_cm": 2, "margen_izquierdo_cm": 2, "margen_derecho_cm": 2}, "reglas": [{"tipo": "prohibicion", "descripcion": "No incluir precio", "consecuencia": "Exclusión", "evidencia": None}], "portada_computa_limite": False, "indice_computa_limite": False, "anexos_computan_limite": None},
+        "pendientes": [{"descripcion": "Validar metodología", "motivo": "Falta información", "destino": "documento_tecnico"}, {"descripcion": "Confirmar precio", "motivo": "Pendiente comercial", "destino": "economico"}, {"descripcion": "Revisar guía", "motivo": "Coordinación", "destino": "resumen"}, {"descripcion": "Confirmar plazo", "motivo": "Dato ausente", "destino": "general"}], "evidencias": [{"campo": "alcance", "documento_id": "PPT", "pagina": 4, "texto_citado": "El alcance incluye la implantación."}], "calidad": {"estado": "suficiente", "limitaciones": ["No consta la fecha límite"]},
     }
     value.update(overrides)
     return value

@@ -84,7 +84,7 @@ def test_incomplete_search_and_download_failure_clean_case(tmp_path):
     with pytest.raises(RuntimeError): GoogleDriveDocumentSource(Service(pages={None:{"files":[file("a","a.pdf")]}}),downloader=broken).materialize(job(),tmp_path)
     assert not (tmp_path/"case").exists()
 
-DELIVERABLES = ("resumen.docx", "propuesta_tecnica_base.docx", "simulador_economico.xlsx")
+DELIVERABLES = ("resumen_tecnico.docx", "guia_preparacion_oferta.docx", "propuesta_tecnica_base.docx", "simulador_economico.xlsx")
 
 class DeliveryFiles(Files):
     def __init__(self):
@@ -127,7 +127,7 @@ class FailingRequest:
 def delivery_run(tmp_path):
     run=tmp_path/"run"; output=run/"output"; output.mkdir(parents=True)
     for name in DELIVERABLES: (output/name).write_bytes(name.encode())
-    (output/"generation_manifest.json").write_text(json.dumps({"artifacts":[{"id":"technical-document","documents":[str(output/"propuesta_tecnica_base.docx")]}]}))
+    (output/"generation_manifest.json").write_text(json.dumps({"artifacts":[{"id":"technical-summary","documents":[str(output/"resumen_tecnico.docx")]},{"id":"summary","documents":[str(output/"guia_preparacion_oferta.docx")]},{"id":"technical-document","documents":[str(output/"propuesta_tecnica_base.docx")]}]}))
     (run/"lineage.json").write_text("{}")
     (run/"logs").mkdir(); (run/"logs/x.log").write_text("x")
     return run
@@ -143,7 +143,7 @@ def delivery_downloader(files):
     def write(request, stream): stream.write(files.items[request["fileId"]]["data"])
     return write
 
-def test_detailed_analysis_publishes_exactly_three_flat_documents(tmp_path):
+def test_detailed_analysis_publishes_expected_flat_catalog(tmp_path):
     files=DeliveryFiles(); run=delivery_run(tmp_path)
     result=GoogleDriveArtifactPublisher(DeliveryService(files),temporary_suffix=lambda:"fixed",uploader=lambda p:str(p)).publish(job(StorageKind.GOOGLE_DRIVE, JobType.DETAILED_ANALYSIS),run)
     assert [item.name for item in result] == list(DELIVERABLES)
@@ -166,7 +166,17 @@ def test_existing_compatible_delivery_is_reused(tmp_path):
     final=files._add("job","destination-folder",mime="application/vnd.google-apps.folder",props=props)
     for item in catalog: files._add(item.name,final,item.source.read_bytes())
     result=GoogleDriveArtifactPublisher(DeliveryService(files),downloader=delivery_downloader(files)).publish(job(StorageKind.GOOGLE_DRIVE, JobType.DETAILED_ANALYSIS),run)
-    assert len(result) == 3 and files.created == []
+    assert len(result) == 4 and files.created == []
+
+def test_existing_v1_delivery_is_not_reused_as_v2(tmp_path):
+    files=DeliveryFiles(); run=delivery_run(tmp_path)
+    catalog=detailed_analysis_delivery_catalog(run)
+    props=GoogleDriveArtifactPublisher._folder_properties(job(StorageKind.GOOGLE_DRIVE, JobType.DETAILED_ANALYSIS),catalog)
+    props["publication_contract"]="detailed-analysis-drive-v1"
+    final=files._add("job","destination-folder",mime="application/vnd.google-apps.folder",props=props)
+    for item in catalog: files._add(item.name,final,item.source.read_bytes())
+    with pytest.raises(FileExistsError, match="no coincide"):
+        GoogleDriveArtifactPublisher(DeliveryService(files),downloader=delivery_downloader(files)).publish(job(StorageKind.GOOGLE_DRIVE, JobType.DETAILED_ANALYSIS),run)
 
 @pytest.mark.parametrize("mutation", ["metadata", "missing", "duplicate", "extra"])
 def test_existing_incompatible_delivery_fails_without_overwrite(tmp_path, mutation):
@@ -195,7 +205,7 @@ def test_compatible_concurrent_delivery_is_reused_and_temporary_is_removed(tmp_p
         for item in catalog: files._add(item.name,final,item.source.read_bytes())
     files.race=winner
     result=GoogleDriveArtifactPublisher(DeliveryService(files),temporary_suffix=lambda:"x",uploader=lambda p:str(p),downloader=delivery_downloader(files)).publish(request,run)
-    assert len(result) == 3 and files.deleted
+    assert len(result) == 4 and files.deleted
     assert len([item for item in files.items.values() if item["name"] == "job"]) == 1
 
 def test_incompatible_concurrent_delivery_fails_and_temporary_is_removed(tmp_path):

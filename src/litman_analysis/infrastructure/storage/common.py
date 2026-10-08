@@ -52,7 +52,7 @@ def publication_catalog(run_dir: Path) -> tuple[CatalogArtifact, ...]:
     return tuple(files)
 
 
-_DETAILED_ANALYSIS_DELIVERABLES = ("resumen.docx",)
+_DETAILED_ANALYSIS_DELIVERABLES = ("resumen_tecnico.docx", "guia_preparacion_oferta.docx")
 
 
 def detailed_analysis_delivery_catalog(run_dir: Path) -> tuple[CatalogArtifact, ...]:
@@ -74,14 +74,23 @@ def detailed_analysis_delivery_catalog(run_dir: Path) -> tuple[CatalogArtifact, 
             raise ValueError("generation_manifest.json no contiene una lista de artefactos válida")
         if not all(isinstance(item, dict) for item in manifest["artifacts"]):
             raise ValueError("generation_manifest.json contiene artefactos inválidos")
+        summaries = {item.get("id"): item for item in manifest["artifacts"] if item.get("id") in {"technical-summary", "summary"}}
+        if set(summaries) != {"technical-summary", "summary"}:
+            raise ValueError("generation_manifest.json debe declarar los dos resúmenes requeridos")
+        expected_summaries = {"technical-summary": "resumen_tecnico.docx", "summary": "guia_preparacion_oferta.docx"}
+        for artifact_id, expected_name in expected_summaries.items():
+            documents = summaries[artifact_id].get("documents")
+            declared_summary = [Path(path).name for path in documents] if isinstance(documents, list) else []
+            if declared_summary != [expected_name]:
+                raise ValueError(f"generation_manifest.json debe declarar {expected_name} para {artifact_id}")
         technical = [item for item in manifest["artifacts"] if item.get("id") == "technical-document"]
         if len(technical) != 1 or not isinstance(technical[0].get("documents"), list):
             raise ValueError("generation_manifest.json debe declarar exactamente un artefacto technical-document")
         declared = [Path(path).name for path in technical[0]["documents"] if str(path).lower().endswith(".docx")]
-        if len(declared) != 1 or declared[0] == "resumen.docx":
+        if len(declared) != 1 or declared[0] in _DETAILED_ANALYSIS_DELIVERABLES:
             raise ValueError("generation_manifest.json debe declarar exactamente un DOCX técnico")
         names.extend(declared)
-    if not any(name.lower().endswith(".docx") and name != "resumen.docx" for name in names):
+    if not any(name.lower().endswith(".docx") and name not in _DETAILED_ANALYSIS_DELIVERABLES for name in names):
         # Compatibilidad con runs previos; no reconstruye un nombre nuevo.
         names.append("propuesta_tecnica_base.docx")
     names.append("simulador_economico.xlsx")

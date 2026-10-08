@@ -70,6 +70,16 @@ def test_invalid_result_not_published_and_run_preserved(tmp_path):
     publisher=Publisher()
     with pytest.raises(ValueError,match="no validado"): make_runner(tmp_path,publisher=publisher,pipeline=Invalid).run(job(tmp_path))
     assert publisher.calls==[] and any((tmp_path/"runs").rglob("validation.json"))
+def test_job_runner_recognizes_technical_summary_artifact(tmp_path):
+    request=job(tmp_path,jt=JobType.DETAILED_ANALYSIS)
+    request = JobRequest(request.job_id, request.job_type, request.input_kind, request.output_kind, request.input_location, request.output_location, {"generation":{"artifacts":["technical-summary"]}})
+    class TechnicalSummaryPipeline(Pipeline):
+        def execute(self,case,*,case_id,bundle,generation=None):
+            run,_=super().execute(case,case_id=case_id,bundle=bundle,generation=generation)
+            output=run/"output"; (output/"resumen_tecnico.docx").write_bytes(b"docx")
+            (output/"generation_manifest.json").write_text(json.dumps({"documents":[str(output/"resumen_tecnico.docx")],"artifacts":[{"id":"technical-summary"}]}))
+            return run,{}
+    assert make_runner(tmp_path,pipeline=TechnicalSummaryPipeline).run(request).status=="succeeded"
 def test_quota_error_translated(tmp_path):
     with pytest.raises(RuntimeError,match="Shared Drive"): make_runner(tmp_path,Source(True),Publisher("storageQuotaExceeded")).run(job(tmp_path,StorageKind.GOOGLE_DRIVE,StorageKind.GOOGLE_DRIVE))
 def test_launcher_calls_compose_once_and_translates(tmp_path):

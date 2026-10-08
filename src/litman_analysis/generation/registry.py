@@ -1,10 +1,12 @@
 from .models import ArtifactGenerator
 from .economic_simulator.generator import EconomicSimulatorGenerator
-from .summary import SummaryGenerator
+from .bid_preparation_guide import BidPreparationGuideGenerator
+from .technical_summary import TechnicalSummaryGenerator
 from .technical_proposal.generator import TechnicalDocumentGenerator
 
 ARTIFACT_GENERATORS: dict[str, ArtifactGenerator] = {
-    "summary": SummaryGenerator(), "technical-document": TechnicalDocumentGenerator(),
+    # Insertion order defines the deterministic default; explicit requests retain caller order.
+    "technical-summary": TechnicalSummaryGenerator(), "summary": BidPreparationGuideGenerator(), "technical-document": TechnicalDocumentGenerator(),
     "economic-simulator": EconomicSimulatorGenerator(),
 }
 

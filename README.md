@@ -40,6 +40,8 @@ Los wrappers `assess` y `analyze` son atajos local→local. Para cualquier ruta 
 
 En una salida Google Drive, `assessment` crea dentro de `output.location` una carpeta con el `job_id` y publica en ella exclusivamente `ficha_oportunidad.pdf`; no crea una carpeta `output` ni un manifiesto remoto. La publicación Drive de `detailed-analysis` conserva su carpeta por job y su catálogo completo. La publicación local no cambia.
 
+Un análisis detallado completo publica cuatro entregables: `resumen_tecnico.docx` para la revisión técnica del expediente, `guia_preparacion_oferta.docx` para coordinar la preparación de la oferta, `propuesta_tecnica_base.docx` y `simulador_economico.xlsx`. La generación completa usa los artefactos `technical-summary`, `summary`, `technical-document` y `economic-simulator`, en ese orden.
+
 El contenedor monta el job en `/job` (solo lectura), la entrada en `/input` (solo lectura), la salida en `/output`, los runs en `/data/runs`, las credenciales en `/run/secrets` (solo lectura) y el estado Codex persistente en `/var/lib/litman-analysis/codex`. Codex comparte el contenedor y puede ver el mount de secretos; ningún prompt le solicita leerlo. El workspace efímero vive en `/tmp/litman-analysis` y se elimina siempre. Los runs y diagnósticos se conservan aunque falle el análisis.
 
 Las citas se verifican primero literalmente y, para PDFs, con una segunda comparación que ignora únicamente espacios de maquetación. Las evidencias no verificables quedan señaladas como advertencias en el informe; los errores estructurales, referencias a documentos inexistentes y errores semánticos siguen impidiendo la publicación.

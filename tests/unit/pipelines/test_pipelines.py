@@ -219,7 +219,7 @@ def test_registries_declare_all_runtime_components() -> None:
         "assessment", "detailed-analysis",
     }
     assert set(ARTIFACT_GENERATORS) == {
-        "summary", "technical-document", "economic-simulator",
+        "technical-summary", "summary", "technical-document", "economic-simulator",
     }
 
 

@@ -15,7 +15,7 @@ _DRIVE_OPTIONS = {"supportsAllDrives": True}
 _FOLDER_MIME = "application/vnd.google-apps.folder"
 _NATIVE_PREFIX = "application/vnd.google-apps."
 _LOGGER = logging.getLogger(__name__)
-_DELIVERY_CONTRACT_VERSION = "detailed-analysis-drive-v1"
+_DELIVERY_CONTRACT_VERSION = "detailed-analysis-drive-v2"
 _ASSESSMENT_CONTRACT_VERSION = "assessment-drive-v1"
 
 
@@ -189,7 +189,7 @@ class GoogleDriveArtifactPublisher:
         ).execute().get("files", [])
         expected = {item.name: item for item in catalog}
         if len(children) != len(expected) or {item.get("name") for item in children} != set(expected):
-            raise FileExistsError("La salida Drive existente no contiene exactamente los tres documentos requeridos")
+            raise FileExistsError("La salida Drive existente no contiene el catálogo esperado de documentos")
         result: list[PublishedArtifact] = []
         for child in children:
             name = child.get("name")

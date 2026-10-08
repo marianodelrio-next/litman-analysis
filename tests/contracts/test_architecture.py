@@ -34,3 +34,14 @@ def test_job_loader_rejects_unknown_fields(tmp_path: Path) -> None:
     }), encoding="utf-8")
     with pytest.raises(ValueError, match="Contrato de job inválido"):
         load_job(path)
+def test_summary_artifacts_remain_independent_components() -> None:
+    from litman_analysis.generation.bid_preparation_guide import BidPreparationGuideGenerator
+    from litman_analysis.generation.registry import ARTIFACT_GENERATORS
+    from litman_analysis.generation.technical_summary import TechnicalSummaryGenerator
+
+    root = Path(__file__).resolve().parents[2] / "src" / "litman_analysis" / "generation"
+    assert not (root / "summary").exists()
+    assert isinstance(ARTIFACT_GENERATORS["technical-summary"], TechnicalSummaryGenerator)
+    assert isinstance(ARTIFACT_GENERATORS["summary"], BidPreparationGuideGenerator)
+    assert ARTIFACT_GENERATORS["technical-summary"].id != ARTIFACT_GENERATORS["summary"].id
+    assert ARTIFACT_GENERATORS["technical-summary"].filename != ARTIFACT_GENERATORS["summary"].filename
