@@ -24,6 +24,23 @@ def test_detailed_analysis_fixture_matches_schema() -> None:
     }
 
 
+def test_detailed_analysis_schema_is_compatible_with_codex_structured_output() -> None:
+    schema = json.loads((RESOURCES / "schemas" / "detailed-analysis.schema.json").read_text())
+
+    def objects(value):
+        if isinstance(value, dict):
+            if "properties" in value:
+                yield value
+            for child in value.values():
+                yield from objects(child)
+        elif isinstance(value, list):
+            for child in value:
+                yield from objects(child)
+
+    for object_schema in objects(schema):
+        assert set(object_schema["properties"]) == set(object_schema.get("required", []))
+
+
 def test_plan_preserves_tender_order_and_constraints() -> None:
     plan = build_document_plan(dossier())
     assert plan["structure_source"] == "tender"
