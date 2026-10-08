@@ -8,6 +8,8 @@ from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.datavalidation import DataValidation
 
+from .planner import technical_max_points
+
 
 NAVY = "002855"
 BLUE = "4FA6DC"
@@ -44,8 +46,8 @@ def create_clean_template(path: Path) -> None:
         "scenarios": [{
             "id": "scenario-01", "name": "Escenario configurable",
             "bidders": [
-                {"name": "NUESTRA OFERTA", "price": None, "criterion_scores": {}},
-                {"name": "LICITADOR 1", "price": None, "criterion_scores": {}},
+                {"name": "NUESTRA OFERTA", "price": None, "technical_score": None},
+                {"name": "LICITADOR 1", "price": None, "technical_score": None},
             ],
         }],
         "notes": ["Completar al generar una licitación concreta."],
@@ -94,35 +96,60 @@ def validate_rendered_workbook(path: Path, plan: dict, inputs: dict) -> dict:
         errors.append("Las hojas del simulador no coinciden con la plantilla")
     if not plan.get("price_formula", {}).get("supported"):
         warnings.append("La puntuación económica requiere implementación o revisión manual.")
-    criterion_ids = {item["id"] for item in plan.get("criteria", [])}
+    technical_maximum = technical_max_points(plan.get("criteria", []))
+    input_version = inputs.get("version")
     for scenario in inputs.get("scenarios", []):
         for bidder in scenario.get("bidders", []):
-            unknown = set(bidder.get("criterion_scores", {})) - criterion_ids
-            if unknown:
-                errors.append(f"{scenario['id']}/{bidder['name']}: criterios inexistentes: {sorted(unknown)}")
-            for item in plan.get("criteria", []):
-                value = bidder.get("criterion_scores", {}).get(item["id"])
-                maximum = item.get("max_points")
-                if value is not None and (value < 0 or (maximum is not None and value > maximum)):
-                    errors.append(f"{scenario['id']}/{bidder['name']}: puntuación fuera de rango en {item['name']}")
+            label = f"{scenario.get('id', '?')}/{bidder.get('name', '?')}"
+            has_aggregate = "technical_score" in bidder
+            has_legacy = "criterion_scores" in bidder
+            if has_aggregate and has_legacy:
+                errors.append(f"{label}: mezcla ambigua de technical_score y criterion_scores")
+                continue
+            if input_version == "economic-inputs-v2" and not has_aggregate:
+                errors.append(f"{label}: economic-inputs-v2 requiere technical_score")
+                continue
+            if input_version == "economic-inputs-v1" and not has_legacy:
+                errors.append(f"{label}: economic-inputs-v1 requiere criterion_scores")
+                continue
+            if has_aggregate:
+                value = bidder.get("technical_score")
+                if value is not None and (not isinstance(value, (int, float)) or isinstance(value, bool)):
+                    errors.append(f"{label}: technical_score debe ser numérica")
+                elif value is not None and (value < 0 or value > technical_maximum):
+                    errors.append(f"{label}: puntuación técnica fuera de rango (0–{technical_maximum})")
+            elif has_legacy:
+                criterion_ids = {item["id"] for item in plan.get("criteria", [])}
+                unknown = set(bidder.get("criterion_scores", {})) - criterion_ids
+                if unknown:
+                    errors.append(f"{label}: criterios inexistentes: {sorted(unknown)}")
+                for item in plan.get("criteria", []):
+                    value = bidder.get("criterion_scores", {}).get(item["id"])
+                    maximum = item.get("max_points")
+                    if value is not None and (not isinstance(value, (int, float)) or isinstance(value, bool)
+                                              or value < 0 or (maximum is not None and value > maximum)):
+                        errors.append(f"{label}: puntuación fuera de rango en {item['name']}")
+            else:
+                errors.append(f"{label}: falta technical_score o criterion_scores")
     return {"valid": not errors, "errors": errors,
             "warnings": list(dict.fromkeys(warnings)), "recalculation": "on_open"}
 
 
 def _render_simulator(sheet, plan: dict, inputs: dict) -> None:
     criteria = plan.get("criteria", [])
+    technical_maximum = technical_max_points(criteria)
     sheet.sheet_view.showGridLines = False
-    sheet.merge_cells(start_row=1, start_column=1, end_row=2, end_column=max(8, 10 + len(criteria)))
+    sheet.merge_cells(start_row=1, start_column=1, end_row=2, end_column=10)
     sheet["A1"] = "SIMULADOR ECONÓMICO INTERNO"
     _title(sheet["A1"])
-    sheet.merge_cells(start_row=3, start_column=1, end_row=3, end_column=max(8, 10 + len(criteria)))
+    sheet.merge_cells(start_row=3, start_column=1, end_row=3, end_column=10)
     tender_name = plan.get("tender", {}).get("name") or "Licitación"
     sheet["A3"] = (f"{tender_name} · Inputs amarillos · Importes sin IVA · "
                    "Las ofertas rivales son hipótesis internas")
     sheet["A3"].fill = PatternFill("solid", fgColor="DDEBF7")
     sheet["A3"].font = Font(italic=True, color=NAVY)
 
-    _section(sheet, 5, "1. PARÁMETROS DEL PLIEGO", max(8, 10 + len(criteria)), NAVY)
+    _section(sheet, 5, "1. PARÁMETROS DEL PLIEGO", 10, NAVY)
     labels = [
         (6, "Expediente", plan.get("tender", {}).get("reference")),
         (7, "Presupuesto máximo (sin IVA)", plan.get("tender", {}).get("budget_without_tax")),
@@ -135,7 +162,7 @@ def _render_simulator(sheet, plan: dict, inputs: dict) -> None:
         sheet.cell(row, 3).font = Font(color=GREEN)
         sheet.cell(row, 3).fill = PatternFill("solid", fgColor=GREY)
     sheet["E6"] = "Máximo no económico modelado"
-    sheet["G6"] = sum(item.get("max_points") or 0 for item in criteria)
+    sheet["G6"] = technical_maximum
     sheet["E7"] = "Máximo cualitativo para umbral"
     sheet["G7"] = plan.get("abnormally_low", {}).get("maximo_cualitativo")
     sheet["E8"] = "Modelo de precio"
@@ -148,26 +175,21 @@ def _render_simulator(sheet, plan: dict, inputs: dict) -> None:
 
     current = 12
     for scenario_index, scenario in enumerate(inputs.get("scenarios", []), 1):
-        end_column = 10 + len(criteria)
+        end_column = 10
         _section(sheet, current, f"{scenario_index + 1}. ESCENARIO · {scenario['name'].upper()}", end_column,
                  ORANGE if scenario_index % 2 else BLUE)
         header_row = current + 2
-        headers = ["Licitador", "Precio ofertado", "% bajada"]
-        headers.extend(f"{item['name']}\n(0–{_display(item.get('max_points'))} p)" for item in criteria)
-        headers.extend(["Puntos precio", "Puntuación total", "Puntos no económicos",
-                        "C cualitativo", "Umbral baja anormal", "Estado", "Posición"])
+        headers = ["Licitador", "Precio ofertado", "% bajada",
+                   f"Puntuación técnica\n(0–{_display(technical_maximum)} p)",
+                   "Puntos precio", "Puntuación total", "C cualitativo",
+                   "Umbral baja anormal", "Estado", "Posición"]
         for column, header in enumerate(headers, 1):
             cell = sheet.cell(header_row, column, header)
             _header(cell)
         first_bidder = header_row + 1
         last_bidder = first_bidder + len(scenario.get("bidders", [])) - 1
-        price_col = 4 + len(criteria)
-        total_col = price_col + 1
-        qualitative_col = price_col + 2
-        coefficient_col = price_col + 3
-        threshold_col = price_col + 4
-        state_col = price_col + 5
-        position_col = price_col + 6
+        technical_col = 4
+        price_col, total_col, coefficient_col, threshold_col, state_col, position_col = 5, 6, 7, 8, 9, 10
         price_range = f"$B${first_bidder}:$B${last_bidder}"
         total_range = f"${get_column_letter(total_col)}${first_bidder}:${get_column_letter(total_col)}${last_bidder}"
         for offset, bidder in enumerate(scenario.get("bidders", [])):
@@ -185,35 +207,32 @@ def _render_simulator(sheet, plan: dict, inputs: dict) -> None:
             sheet.add_data_validation(price_validation)
             price_validation.add(sheet.cell(row, 2))
             sheet.cell(row, 3, f'=IF(B{row}="","",1-B{row}/$C$7)')
-            for criterion_index, criterion in enumerate(criteria, 4):
-                value = bidder.get("criterion_scores", {}).get(criterion["id"])
-                sheet.cell(row, criterion_index, value)
-                _input(sheet.cell(row, criterion_index))
-                if criterion.get("type") == "automatico_binario":
-                    validation = DataValidation(
-                        type="list", formula1=f'"0,{criterion.get("max_points") or 0}"', allow_blank=True)
-                else:
-                    validation = DataValidation(type="decimal", operator="between", formula1="0",
-                                                formula2=str(criterion.get("max_points") or 0), allow_blank=True)
-                validation.error = "La puntuación debe estar dentro del rango del criterio."
-                validation.errorTitle = "Puntuación no válida"
-                sheet.add_data_validation(validation)
-                validation.add(sheet.cell(row, criterion_index))
+            value = _bidder_technical_score(bidder, criteria)
+            sheet.cell(row, technical_col, value)
+            _input(sheet.cell(row, technical_col))
+            if technical_maximum == 0:
+                # Excel's decimal-between validation with equal bounds is unreliable.
+                validation = DataValidation(type="list", formula1='"0"', allow_blank=True)
+            else:
+                validation = DataValidation(type="decimal", operator="between", formula1="0",
+                                            formula2=str(technical_maximum), allow_blank=True)
+            validation.error = "La puntuación técnica debe estar dentro del rango permitido."
+            validation.errorTitle = "Puntuación técnica no válida"
+            sheet.add_data_validation(validation)
+            validation.add(sheet.cell(row, technical_col))
             price_letter = get_column_letter(price_col)
             if plan.get("price_formula", {}).get("supported"):
                 formula = f'=IF(B{row}="","",IFERROR(MIN({price_range})/B{row}*$C$8,0))'
             else:
                 formula = '="PENDIENTE"'
             sheet.cell(row, price_col, formula)
-            first_score = get_column_letter(4)
-            last_score = get_column_letter(3 + len(criteria))
-            sheet.cell(row, qualitative_col,
-                       f'=IF(B{row}="","",SUM({first_score}{row}:{last_score}{row}))' if criteria else f'=IF(B{row}="","",0)')
             if plan.get("price_formula", {}).get("supported"):
-                sheet.cell(row, total_col, f'=IF(B{row}="","",SUM({price_letter}{row},{get_column_letter(qualitative_col)}{row}))')
+                sheet.cell(row, total_col,
+                           f'=IF(OR(B{row}="",D{row}=""),"",SUM({price_letter}{row},D{row}))')
             else:
                 sheet.cell(row, total_col, '=""')
-            sheet.cell(row, coefficient_col, f'=IF(B{row}="","",IFERROR({get_column_letter(qualitative_col)}{row}/$G$7,0))')
+            sheet.cell(row, coefficient_col,
+                       f'=IF(OR(B{row}="",D{row}=""),"",IFERROR(D{row}/$G$7,0))')
             sheet.cell(row, threshold_col, _threshold_formula(plan, row, price_range, coefficient_col))
             comparator = "<" if plan.get("abnormally_low", {}).get("comparador") == "menor" else "<="
             sheet.cell(row, state_col,
@@ -247,7 +266,22 @@ def _threshold_formula(plan: dict, row: int, price_range: str, coefficient_col: 
             reference = f"AVERAGE({price_range})" if rule.get("referencia") == "media_ofertas" else "$C$7"
             expression = f"({rule['base']}+{coefficient}*{rule.get('peso_calidad') or 0})*{reference}"
         fallback = f"IF({condition},{expression},{fallback})"
-    return f'=IF(B{row}="","",IFERROR({fallback},""))'
+    return f'=IF(OR(B{row}="",{coefficient}=""),"",IFERROR({fallback},""))'
+
+
+def _bidder_technical_score(bidder: dict, criteria: list[dict]):
+    """Use v2 aggregate input, or derive it for legacy v1 rerendering only."""
+    if "technical_score" in bidder and "criterion_scores" in bidder:
+        raise ValueError("Un licitador no puede mezclar technical_score y criterion_scores.")
+    if "technical_score" in bidder:
+        return bidder.get("technical_score")
+    if "criterion_scores" in bidder:
+        scores = bidder.get("criterion_scores") or {}
+        values = [scores.get(item["id"]) for item in criteria]
+        if not any(value is not None for value in values):
+            return None
+        return sum(float(value or 0) for value in values)
+    return None
 
 
 def _render_criteria(sheet, plan: dict) -> None:
@@ -291,7 +325,7 @@ def _render_checks(sheet, plan: dict, inputs: dict) -> None:
     headers = ["Control", "Actual", "Esperado", "Diferencia", "Estado", "Observaciones"]
     for column, header in enumerate(headers, 1):
         _header(sheet.cell(4, column, header))
-    qualitative = sum(item.get("max_points") or 0 for item in plan.get("criteria", []))
+    qualitative = technical_max_points(plan.get("criteria", []))
     modeled = qualitative + (plan.get("price_formula", {}).get("max_points") or 0)
     checks = [
         ("Total máximo modelado", modeled, plan.get("total_points"), "La suma debe coincidir con el pliego."),

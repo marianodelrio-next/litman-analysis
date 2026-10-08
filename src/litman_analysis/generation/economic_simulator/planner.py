@@ -40,13 +40,13 @@ def build_economic_plan(dossier: dict, template_id: str = "standard-v1") -> dict
             "La fórmula económica no está soportada para cálculo automático; "
             "se conserva como texto y queda pendiente de implementación."
         )
-    modeled = sum(item.get("max_points") or 0 for item in criteria) + (formula.get("puntuacion_maxima") or 0)
+    modeled = technical_max_points(criteria) + (formula.get("puntuacion_maxima") or 0)
     declared = source.get("puntuacion_total")
     if declared is not None and abs(modeled - declared) > 1e-9:
         warnings.append(
             f"La puntuación declarada ({declared}) no coincide con la suma modelada ({modeled})."
         )
-    qualitative = sum(item.get("max_points") or 0 for item in criteria)
+    qualitative = technical_max_points(criteria)
     threshold_maximum = abnormal.get("maximo_cualitativo")
     if threshold_maximum is not None and abs(qualitative - threshold_maximum) > 1e-9:
         warnings.append(
@@ -72,25 +72,35 @@ def build_economic_plan(dossier: dict, template_id: str = "standard-v1") -> dict
             "supported": price_supported,
         },
         "criteria": criteria,
+        "technical_max_points": qualitative,
         "abnormally_low": abnormal,
         "restrictions": source.get("restricciones", []),
         "warnings": list(dict.fromkeys(warnings)),
     }
 
 
+def technical_max_points(criteria: list[dict]) -> float:
+    """Maximum aggregate technical score, retaining criterion-level traceability."""
+    return sum(item.get("max_points") or 0 for item in criteria)
+
+
 def skeleton_economic_inputs(plan: dict, scenario_names: list[str], competitor_slots: int) -> dict:
-    bidders = [{"name": "NEXT", "price": None, "criterion_scores": {}}]
-    bidders.extend({"name": f"LICITADOR {index}", "price": None, "criterion_scores": {}}
+    technical_score = 0 if technical_max_points(plan.get("criteria", [])) == 0 else None
+    bidders = [{"name": "NEXT", "price": None, "technical_score": technical_score}]
+    bidders.extend({"name": f"LICITADOR {index}", "price": None, "technical_score": technical_score}
                    for index in range(1, competitor_slots + 1))
+    next_note = ("Completar el precio previsto de NEXT."
+                 if technical_score == 0
+                 else "Completar el precio y la puntuación técnica prevista de NEXT.")
     return {
-        "version": "economic-inputs-v1",
+        "version": "economic-inputs-v2",
         "scenarios": [
             {"id": f"scenario-{index:02d}", "name": name,
-             "bidders": [dict(item, criterion_scores={}) for item in bidders]}
+             "bidders": [dict(item) for item in bidders]}
             for index, name in enumerate(scenario_names, 1)
         ],
         "notes": [
-            "Completar el precio y las puntuaciones previstas de NEXT.",
+            next_note,
             "Los datos de otros licitadores son hipótesis internas, no hechos del expediente.",
         ],
     }

@@ -11,10 +11,7 @@ def calculate_scenario(plan: dict, scenario: dict) -> list[dict]:
     for bidder in bidders:
         price = bidder.get("price")
         price_points = _price_points(plan, price, minimum)
-        qualitative = sum(
-            float(bidder.get("criterion_scores", {}).get(item["id"]) or 0)
-            for item in plan.get("criteria", [])
-        ) if _positive(price) else None
+        qualitative = _technical_score(plan, bidder) if _positive(price) else None
         threshold = _abnormal_threshold(plan, len(prices), average, qualitative)
         abnormal = None
         if _positive(price) and threshold is not None:
@@ -38,6 +35,31 @@ def _price_points(plan: dict, price, minimum):
     points = minimum * float(formula.get("max_points") or 0) / price
     decimals = formula.get("rounding_decimals")
     return round(points, decimals) if decimals is not None else points
+
+
+def _technical_score(plan: dict, bidder: dict):
+    """Read exactly one input contract; v1 is retained for old run rerenders."""
+    has_aggregate = "technical_score" in bidder
+    has_legacy = "criterion_scores" in bidder
+    if has_aggregate and has_legacy:
+        raise ValueError("Un licitador no puede mezclar technical_score y criterion_scores.")
+    if has_aggregate:
+        value = bidder.get("technical_score")
+        if value is None:
+            return None
+        if not isinstance(value, (int, float)) or isinstance(value, bool):
+            raise ValueError("technical_score debe ser numérica.")
+        return float(value)
+    if has_legacy:
+        scores = bidder.get("criterion_scores") or {}
+        values = [scores.get(item["id"]) for item in plan.get("criteria", [])]
+        if not any(value is not None for value in values):
+            return None
+        if any(not isinstance(value, (int, float)) or isinstance(value, bool)
+               for value in values if value is not None):
+            raise ValueError("criterion_scores debe contener valores numéricos.")
+        return sum(float(value or 0) for value in values)
+    return None
 
 
 def _abnormal_threshold(plan: dict, bidder_count: int, average, qualitative):

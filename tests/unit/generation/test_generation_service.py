@@ -110,7 +110,7 @@ def test_multiple_artifacts_are_consolidated_with_versions(tmp_path: Path) -> No
     assert len(manifest["documents"]) == 2
     assert {item["id"] for item in manifest["artifacts"]} == {"summary", "economic-simulator"}
     assert all(item["generator_version"] for item in manifest["artifacts"])
-    assert manifest["artifacts"][1]["metadata"]["template_version"] == "1.0.0"
+    assert manifest["artifacts"][1]["metadata"]["template_version"] == "1.1.0"
 
 
 def test_artifact_failure_identifies_generator(tmp_path: Path, monkeypatch) -> None:

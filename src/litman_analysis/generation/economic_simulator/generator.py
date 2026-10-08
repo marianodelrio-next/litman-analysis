@@ -83,12 +83,17 @@ def _pending(plan: dict, inputs: dict) -> list[dict]:
             items.append({"type": "company_input", "scenario_id": scenario["id"],
                           "description": "Definir el precio ofertado por NEXT."})
         if next_bidder:
-            missing = [item["id"] for item in plan.get("criteria", [])
-                       if next_bidder.get("criterion_scores", {}).get(item["id"]) is None]
-            if missing:
-                items.append({"type": "company_input", "scenario_id": scenario["id"],
-                              "description": "Definir las puntuaciones esperadas de NEXT.",
-                              "criterion_ids": missing})
+            if "technical_score" in next_bidder:
+                if next_bidder.get("technical_score") is None:
+                    items.append({"type": "company_input", "scenario_id": scenario["id"],
+                                  "description": "Definir la puntuación técnica esperada de NEXT."})
+            else:  # v1 compatibility: retain the old criterion-specific pending information.
+                missing = [item["id"] for item in plan.get("criteria", [])
+                           if next_bidder.get("criterion_scores", {}).get(item["id"]) is None]
+                if missing:
+                    items.append({"type": "company_input", "scenario_id": scenario["id"],
+                                  "description": "Definir las puntuaciones esperadas de NEXT.",
+                                  "criterion_ids": missing})
     return items
 
 
@@ -97,7 +102,7 @@ def _write_json(path: Path, data: object) -> None:
 
 class EconomicSimulatorGenerator:
     id = "economic-simulator"
-    version = "economic-simulator-generator-v1"
+    version = "economic-simulator-generator-v2"
 
     def generate(self, context: ArtifactContext) -> dict:
         return self._result(generate_economic_artifact(context.dossier, context.run_dir, context.economic_template_id), context.run_dir)
