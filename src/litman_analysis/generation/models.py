@@ -19,6 +19,7 @@ class ArtifactContext:
     output_language: str
     content_profile: str
     provider: LLMProvider | None
+    include_editorial_guidance: bool = True
 
 
 class ArtifactGenerator(Protocol):

@@ -6,7 +6,8 @@ expediente aportados.
 
 # Reglas
 
-- Respeta exactamente el orden y los títulos del plan de documento.
+- Respeta exactamente el orden, identificadores y títulos canónicos de las
+  secciones y subapartados del plan; no alteres la estructura fijada.
 - El pliego y sus restricciones prevalecen sobre cualquier estilo corporativo.
 - No añadas presentación de empresa, referencias ni casos de éxito salvo que el
   plan los solicite expresamente.

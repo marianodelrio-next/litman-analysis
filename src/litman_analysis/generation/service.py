@@ -17,7 +17,7 @@ def generate_documents(dossier_path: Path, output_dir: Path | None = None,
                        artifacts: list[str] | None = None, provider: LLMProvider | None = None,
                        template_id: str = "next-standard-v1", economic_template_id: str = "standard-v1",
                        include_internal_pending: bool = True, output_language: str = "auto",
-                       content_profile: str = "skeleton-v1") -> dict:
+                       content_profile: str = "skeleton-v1", include_editorial_guidance: bool = True) -> dict:
     dossier_path = dossier_path.resolve()
     dossier = json.loads(dossier_path.read_text(encoding="utf-8"))
     lineage = _resolve_dossier_lineage(dossier_path)
@@ -32,7 +32,7 @@ def generate_documents(dossier_path: Path, output_dir: Path | None = None,
     context = ArtifactContext(dossier=dossier, run_dir=run_dir, source_run=source_run, case_dir=case_root,
         template_id=template_id, economic_template_id=economic_template_id,
         include_internal_pending=include_internal_pending, output_language=output_language,
-        content_profile=content_profile, provider=provider)
+        content_profile=content_profile, provider=provider, include_editorial_guidance=include_editorial_guidance)
     results = [_generate(generator, context) for generator in resolve_artifact_generators(artifacts)]
     # El snapshot conserva exactamente la entrada utilizada para generar los entregables.
     output_lineage = dict(lineage)
@@ -45,11 +45,11 @@ def generate_documents(dossier_path: Path, output_dir: Path | None = None,
 
 
 def render_existing_run(run_dir: Path, *, include_internal_pending: bool = True,
-                        refresh_skeleton: bool = False) -> dict:
+                        include_editorial_guidance: bool = True, refresh_skeleton: bool = False) -> dict:
     generator = ARTIFACT_GENERATORS["technical-document"]
     try:
         return generator.rerender(run_dir.resolve(), include_internal_pending=include_internal_pending,
-                                  refresh_skeleton=refresh_skeleton)
+                                  include_editorial_guidance=include_editorial_guidance, refresh_skeleton=refresh_skeleton)
     except Exception as error:
         raise ValueError(f"Error al rerenderizar el artefacto '{generator.id}': {error}") from error
 

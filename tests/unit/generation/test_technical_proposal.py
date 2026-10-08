@@ -58,6 +58,67 @@ def test_old_dossier_gets_safe_fallback_plan() -> None:
     assert plan["pending_decisions"]
 
 
+def test_plan_uses_distinct_contextual_subsections_and_fallback_score() -> None:
+    value = dossier()
+    value["memoria_tecnica"]["secciones"] = []
+    value["estructura_documento_tecnico"] = ["Metodología", "Equipo requerido"]
+    value["criterios_adjudicacion"] = [
+        {"nombre": "Metodología", "puntuacion_maxima": 5, "tipo": "juicio", "donde_responder": "Metodología", "descripcion": None},
+        {"nombre": "Equipo requerido", "puntuacion_maxima": 1, "tipo": "juicio", "donde_responder": "Equipo requerido", "descripcion": None},
+    ]
+    plan = build_document_plan(value)
+    assert [x["title"] for x in plan["sections"][0]["subsections"]] == ["Principios metodológicos", "Organización de las actividades", "Validación y control de calidad", "Seguimiento y mejora continua"]
+    assert [x["title"] for x in plan["sections"][1]["subsections"]] == ["Organización del equipo", "Perfiles y responsabilidades", "Modelo de coordinación", "Disponibilidad y continuidad pendiente de confirmar"]
+    assert plan["sections"][0]["display_title"] == "Metodología (5 puntos)"
+    assert plan["sections"][1]["display_title"] == "Equipo requerido (1 punto)"
+    assert plan["sections"][0]["score_source"] == "criterion"
+
+
+def test_short_filename_preserves_acronyms_and_meaningful_terms(tmp_path: Path) -> None:
+    value = dossier()
+    value["cabecera"].update(nombre="Aplicaciones de Inteligencia Artificial (IA) aplicada a expedientes de Compras (CARMEN)", expediente="5100073845")
+    dossier_path = tmp_path / "dossier.json"; dossier_path.write_text(json.dumps(value), encoding="utf-8")
+    manifest = generate_documents(dossier_path, output_dir=tmp_path / "run", artifacts=["technical-document"], provider=None)
+    assert Path(manifest["documents"][0]).name == "Propuesta técnica 5100073845 Inteligencia Artificial IA aplicada expedientes Compras CARMEN.docx"
+
+
+def test_english_plan_localizes_generated_structure_and_nested_evidence() -> None:
+    value = dossier()
+    value["memoria_tecnica"]["idioma"] = "en"
+    section = value["memoria_tecnica"]["secciones"][0]
+    section.update(titulo="Methodology", descripcion=None, evidencias=[{
+        "campo": "methodology", "documento_id": "PPT", "pagina": 12,
+        "texto_citado": "The methodology must be described.",
+    }])
+    plan = build_document_plan(value)
+    planned = plan["sections"][0]
+    assert planned["display_title"] == "Methodology (20 points)"
+    assert planned["subsections"][0]["title"] == "Methodological principles"
+    assert planned["guidance"]["evidence_summary"][0]["document_id"] == "PPT"
+    assert "Explain verifiably" in planned["guidance"]["purpose"]
+
+
+def test_filename_does_not_repeat_compound_reference(tmp_path: Path) -> None:
+    value = dossier()
+    value["cabecera"].update(nombre="Servicio de análisis EXP-1", expediente="EXP-1")
+    dossier_path = tmp_path / "dossier.json"; dossier_path.write_text(json.dumps(value), encoding="utf-8")
+    manifest = generate_documents(dossier_path, output_dir=tmp_path / "run", artifacts=["technical-document"], provider=None)
+    assert Path(manifest["documents"][0]).name == "Propuesta técnica EXP-1 análisis.docx"
+
+
+def test_identity_pending_and_guidance_toggle_are_rendered_from_plan(tmp_path: Path) -> None:
+    value = dossier(); value["cabecera"].update(nombre=None, expediente=None)
+    dossier_path = tmp_path / "dossier.json"; dossier_path.write_text(json.dumps(value), encoding="utf-8")
+    run = tmp_path / "run"
+    generate_documents(dossier_path, output_dir=run, artifacts=["technical-document"], provider=None)
+    pending = json.loads((run / "output/pending.json").read_text(encoding="utf-8"))
+    assert sum("nombre ni expediente" in item["description"] for item in pending) == 1
+    result = render_existing_run(run, include_editorial_guidance=False)
+    clean = Document(result["document"])
+    assert not any("Guía de redacción" in p.text for p in clean.paragraphs)
+    assert all("EEF5F8" not in str(table._tbl.xml) for table in clean.tables)
+
+
 def test_render_uses_clean_template_and_keeps_dynamic_section(tmp_path: Path) -> None:
     plan = build_document_plan(dossier())
     content = fallback_content(dossier(), plan)
@@ -82,14 +143,14 @@ def test_render_uses_clean_template_and_keeps_dynamic_section(tmp_path: Path) ->
     assert validation["page_limit_validation"] == "not_performed"
     rendered = Document(output)
     assert [paragraph.text for paragraph in rendered.paragraphs[:8]] == [
-        "", "", "", "", "", "", "Propuesta técnica", "Memoria técnica",
+        "", "", "", "", "", "", "Propuesta técnica", "Servicio de analítica\nExpte. EXP-1",
     ]
     assert rendered.tables
     shading = rendered.tables[0].rows[0].cells[0]._tc.tcPr.find(
         "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}shd"
     )
     assert shading is not None
-    assert shading.get("{http://schemas.openxmlformats.org/wordprocessingml/2006/main}fill") == "71C5E8"
+    assert shading.get("{http://schemas.openxmlformats.org/wordprocessingml/2006/main}fill") == "EEF5F8"
 
     source = RESOURCES / "templates" / "technical-proposal" / "next-standard-v1" / "template.docx"
     with zipfile.ZipFile(source) as template_archive, zipfile.ZipFile(output) as output_archive:
@@ -103,8 +164,8 @@ def test_render_uses_clean_template_and_keeps_dynamic_section(tmp_path: Path) ->
                  if (node.get(word + "name") or "").startswith("litman_analysis_")]
     blue_runs = [node for node in root.iter(word + "color") if node.get(word + "val") == "4FA6DC"]
     assert toc
-    assert len(pagerefs) == 1
-    assert len(bookmarks) == 1
+    assert len(pagerefs) >= 1
+    assert len(bookmarks) >= 1
     assert blue_runs
 
 
@@ -133,7 +194,7 @@ def test_clean_template_contains_no_historical_body() -> None:
         assert marker in xml
 
 
-def test_skeleton_content_is_brief_and_contains_only_editorial_guidance() -> None:
+def test_skeleton_content_has_contextual_subsections_and_editorial_guidance() -> None:
     plan = build_document_plan(dossier())
     content = skeleton_content(dossier(), plan)
     section = content["sections"][0]
@@ -142,9 +203,10 @@ def test_skeleton_content_is_brief_and_contains_only_editorial_guidance() -> Non
     assert section["requirements_covered"] == []
     assert section["pending"]
     subheading = next(block for block in section["blocks"] if block["type"] == "subheading")
-    assert subheading["text"] == "Ejemplo de subapartado"
+    assert subheading["text"] != "Ejemplo de subapartado"
     assert subheading["level"] == 2
     assert subheading["id"].startswith(section["id"])
+    assert plan["sections"][0]["guidance"]["purpose"]
     assert content["warnings"] == ["Documento esqueleto: no contiene una propuesta técnica redactada."]
 def test_existing_run_can_refresh_skeleton_without_provider(tmp_path: Path) -> None:
     dossier_path = tmp_path / "case" / "detailed-analysis" / "run-1" / "output" / "dossier.json"
@@ -160,7 +222,7 @@ def test_existing_run_can_refresh_skeleton_without_provider(tmp_path: Path) -> N
     refreshed = json.loads(content_path.read_text(encoding="utf-8"))
     assert result["content_refreshed"]
     assert any(block["type"] == "subheading" for block in refreshed["sections"][0]["blocks"])
-    assert "1.1. Ejemplo de subapartado" in "\n".join(
+    assert "Ejemplo de subapartado" not in "\n".join(
         paragraph.text for paragraph in Document(result["document"]).paragraphs
     )
 

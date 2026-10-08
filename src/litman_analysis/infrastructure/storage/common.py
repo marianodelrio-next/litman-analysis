@@ -52,11 +52,7 @@ def publication_catalog(run_dir: Path) -> tuple[CatalogArtifact, ...]:
     return tuple(files)
 
 
-_DETAILED_ANALYSIS_DELIVERABLES = (
-    "resumen.docx",
-    "propuesta_tecnica_base.docx",
-    "simulador_economico.xlsx",
-)
+_DETAILED_ANALYSIS_DELIVERABLES = ("resumen.docx",)
 
 
 def detailed_analysis_delivery_catalog(run_dir: Path) -> tuple[CatalogArtifact, ...]:
@@ -67,7 +63,29 @@ def detailed_analysis_delivery_catalog(run_dir: Path) -> tuple[CatalogArtifact, 
     """
     output = run_dir / "output"
     artifacts: list[CatalogArtifact] = []
-    for name in _DETAILED_ANALYSIS_DELIVERABLES:
+    names = list(_DETAILED_ANALYSIS_DELIVERABLES)
+    manifest_path = output / "generation_manifest.json"
+    if manifest_path.is_file():
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise ValueError("generation_manifest.json no es legible o contiene JSON inválido") from exc
+        if not isinstance(manifest, dict) or not isinstance(manifest.get("artifacts"), list):
+            raise ValueError("generation_manifest.json no contiene una lista de artefactos válida")
+        if not all(isinstance(item, dict) for item in manifest["artifacts"]):
+            raise ValueError("generation_manifest.json contiene artefactos inválidos")
+        technical = [item for item in manifest["artifacts"] if item.get("id") == "technical-document"]
+        if len(technical) != 1 or not isinstance(technical[0].get("documents"), list):
+            raise ValueError("generation_manifest.json debe declarar exactamente un artefacto technical-document")
+        declared = [Path(path).name for path in technical[0]["documents"] if str(path).lower().endswith(".docx")]
+        if len(declared) != 1 or declared[0] == "resumen.docx":
+            raise ValueError("generation_manifest.json debe declarar exactamente un DOCX técnico")
+        names.extend(declared)
+    if not any(name.lower().endswith(".docx") and name != "resumen.docx" for name in names):
+        # Compatibilidad con runs previos; no reconstruye un nombre nuevo.
+        names.append("propuesta_tecnica_base.docx")
+    names.append("simulador_economico.xlsx")
+    for name in dict.fromkeys(names):
         path = output / name
         if not path.is_file():
             raise ValueError(f"No existe el artefacto de entrega requerido: {path}")

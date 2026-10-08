@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from pathlib import Path
 import pytest
 
 from litman_analysis.domain.jobs import JobRequest, JobType, StorageKind
 from litman_analysis.infrastructure.storage.google_drive import GoogleDriveArtifactPublisher, GoogleDriveDocumentSource
+from litman_analysis.infrastructure.storage.common import detailed_analysis_delivery_catalog
 
 class Request:
     def __init__(self, value): self.value = value
@@ -125,10 +127,17 @@ class FailingRequest:
 def delivery_run(tmp_path):
     run=tmp_path/"run"; output=run/"output"; output.mkdir(parents=True)
     for name in DELIVERABLES: (output/name).write_bytes(name.encode())
-    (output/"generation_manifest.json").write_text("{}")
+    (output/"generation_manifest.json").write_text(json.dumps({"artifacts":[{"id":"technical-document","documents":[str(output/"propuesta_tecnica_base.docx")]}]}))
     (run/"lineage.json").write_text("{}")
     (run/"logs").mkdir(); (run/"logs/x.log").write_text("x")
     return run
+
+
+def test_delivery_catalog_rejects_malformed_generation_manifest(tmp_path):
+    run = delivery_run(tmp_path)
+    (run / "output/generation_manifest.json").write_text('{"artifacts":["invalid"]}')
+    with pytest.raises(ValueError, match="artefactos inválidos"):
+        detailed_analysis_delivery_catalog(run)
 
 def delivery_downloader(files):
     def write(request, stream): stream.write(files.items[request["fileId"]]["data"])

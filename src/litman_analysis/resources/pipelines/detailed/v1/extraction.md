@@ -16,6 +16,15 @@ consecuencias de incumplimiento. Indica también, cuando conste, si portada,
 índice y anexos computan en el límite. Usa `null` cuando no esté indicado; no
 conviertas una ausencia de información en libertad confirmada.
 
+En `cabecera.nombre` conserva la denominación oficial completa del contrato y
+en `cabecera.expediente` la referencia oficial. No confundas el título de la
+licitación con la denominación del documento exigido (por ejemplo, «Memoria
+técnica») ni dupliques un expediente ya incluido en el nombre. Añade evidencias
+localizables para ambos datos. Cuando el pliego imponga subapartados de una
+sección de la memoria, extráelos en `memoria_tecnica.secciones[].subapartados`
+con título, nivel, orden implícito, descripción, requisitos y evidencias; no
+inventes subapartados que el pliego no imponga.
+
 No mezcles los entregables que se producirán durante el contrato con los
 documentos que se presentan para licitar. Tampoco mezcles criterios de
 adjudicación con requisitos obligatorios.

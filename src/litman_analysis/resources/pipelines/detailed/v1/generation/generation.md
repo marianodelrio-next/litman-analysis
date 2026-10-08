@@ -12,4 +12,7 @@ al objetivo indicado en el plan, priorizando las secciones puntuables.
 
 El dossier conserva `memoria_tecnica` completo como fuente de estructura,
 formato y restricciones. El plan es el contrato de salida: no crees, elimines,
-renombres ni reordenes sus secciones.
+renombres ni reordenes sus secciones ni sus subapartados. Devuelve cada
+subapartado del plan como un bloque `subheading` con exactamente el mismo id,
+título y nivel. La guía editorial pertenece al plan y no se devuelve en el
+contenido: no la alteres ni intentes reproducirla como contenido de oferta.

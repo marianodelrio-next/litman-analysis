@@ -23,22 +23,14 @@ def build_generation_prompt(task: str, dossier: dict, plan: dict) -> str:
 def fallback_content(dossier: dict, plan: dict) -> dict:
     sections = []
     for section in plan["sections"]:
-        entries = _entries_for_title(section["title"], dossier)
-        blocks = []
-        if entries:
-            if len(entries) == 1:
-                blocks.append(_block("paragraph", text=entries[0]))
-            else:
-                blocks.append(_block("bullet_list", items=entries))
-        else:
-            blocks.append(_block("pending", text="Completar y validar esta sección con el equipo responsable."))
+        blocks = _subsection_blocks(section, dossier, draft=True)
         sections.append({
             "id": section["id"],
             "title": section["title"],
             "blocks": blocks,
-            "requirements_covered": section["requirements"],
+            "requirements_covered": [],
             "evidence_fields": [],
-            "pending": [] if entries else ["Contenido específico pendiente de elaboración."],
+            "pending": ["Validar y completar el contenido específico antes de presentar la oferta."],
             "review": {"required": True, "reason": "Borrador automático sin redacción LLM."},
         })
     pending = [{"section_id": None, "description": item, "reason": "Restricción no localizada"}
@@ -50,36 +42,14 @@ def fallback_content(dossier: dict, plan: dict) -> dict:
 
 
 def skeleton_content(dossier: dict, plan: dict) -> dict:
-    """Crea una guía breve y trazable, sin redactar contenido de oferta."""
+    """Crea una estructura editorial trazable, sin redactar una oferta."""
     sections = []
     language = plan.get("language", "es")
-    placeholder_title = "Example subsection" if language == "en" else "Ejemplo de subapartado"
-    placeholder_text = (
-        "[PLACEHOLDER] Replace this example with the necessary subsection and add its content."
-        if language == "en" else
-        "[PLACEHOLDER] Sustituya este ejemplo por el subapartado necesario y añada su contenido."
-    )
     for section in plan["sections"]:
-        guidance = []
-        if section.get("purpose"):
-            guidance.append(f"Finalidad: {section['purpose']}")
-        guidance.extend(f"Requisito del pliego: {item}" for item in section.get("requirements", []))
-        guidance.extend(f"Criterio de evaluación: {item}" for item in section.get("criteria", []))
-        if section.get("score") is not None:
-            guidance.append(f"Puntuación máxima: {section['score']}")
-        if section.get("page_limit") is not None:
-            guidance.append(f"Límite del apartado: {section['page_limit']} páginas")
-        if not guidance:
-            guidance.append("Revisar el pliego y concretar el objetivo de este apartado.")
         sections.append({
             "id": section["id"],
             "title": section["title"],
-            "blocks": [
-                _block("bullet_list", items=guidance),
-                _block("subheading", text=placeholder_title,
-                       block_id=f"{section['id']}-example-subsection", level=2),
-                _block("paragraph", text=placeholder_text),
-            ],
+            "blocks": _subsection_blocks(section, dossier, draft=False),
             "requirements_covered": [],
             "evidence_fields": [],
             "pending": ["Completar la respuesta de este apartado y validarla antes de presentar la oferta."],
@@ -95,6 +65,22 @@ def skeleton_content(dossier: dict, plan: dict) -> dict:
         "pending": pending,
         "warnings": ["Documento esqueleto: no contiene una propuesta técnica redactada."],
     }
+
+
+def _subsection_blocks(section: dict, dossier: dict, *, draft: bool) -> list[dict]:
+    blocks = []
+    subsections = section.get("subsections") or []
+    for index, subsection in enumerate(subsections):
+        blocks.append(_block("subheading", text=subsection["title"], block_id=subsection["id"], level=subsection.get("level", 2)))
+        entries = _entries_for_title(subsection["title"], dossier)
+        if draft and entries:
+            blocks.append(_block("paragraph", text=entries[0]) if len(entries) == 1 else _block("bullet_list", items=entries))
+        else:
+            purpose = subsection.get("purpose") or section.get("purpose") or "Concretar la respuesta requerida."
+            blocks.append(_block("pending", text=f"[PLACEHOLDER] {purpose}"))
+    if not blocks:
+        blocks.append(_block("pending", text="[PLACEHOLDER] Completar y validar esta sección con el equipo responsable."))
+    return blocks
 
 
 def _entries_for_title(title: str, dossier: dict) -> list[str]:

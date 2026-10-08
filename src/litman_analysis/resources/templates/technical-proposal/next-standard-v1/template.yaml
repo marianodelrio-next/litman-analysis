@@ -1,5 +1,5 @@
 id: next-standard-v1
-version: 1.4.2
+version: 1.7.0
 document: template.docx
 reference_document: external-corporate-master
 language: es
@@ -34,25 +34,28 @@ table_format:
   border_size: 6
   cell_margin_twips: 80
 toc:
-  font: Roboto
-  font_size_pt: 13
-  bold: true
-  entry_color: "F2A900"
+  font: Roboto Light
+  font_size_pt: 11
+  bold: false
+  italic: false
+  entry_color: "000000"
   tab_position_twips: 12000
   spacing_before_twips: 60
   level_indent_twips: 360
   leader: none
   levels:
     1:
-      font: Roboto
-      font_size_pt: 13
-      bold: true
-      color: "4FA6DC"
-    2:
-      font: Roboto
+      font: Roboto Light
       font_size_pt: 11
       bold: false
-      color: "F2A900"
+      italic: false
+      color: "000000"
+    2:
+      font: Roboto Light
+      font_size_pt: 11
+      bold: false
+      italic: false
+      color: "000000"
 policies:
   company_profile: explicit_only
   case_studies: explicit_only

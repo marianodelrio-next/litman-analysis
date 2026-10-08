@@ -18,7 +18,7 @@ from litman_analysis.resource_paths import resource_path
 
 class TechnicalDocumentGenerator:
     id = "technical-document"
-    version = "technical-document-generator-v1"
+    version = "technical-document-generator-v3"
 
     def generate(self, context: ArtifactContext) -> dict:
         template_path, manifest = _template(context.template_id)
@@ -30,12 +30,17 @@ class TechnicalDocumentGenerator:
         content, generation = _generate_content(context, plan)
         _write_json(context.run_dir / "output" / "content.json", content)
         return self._render(context.run_dir, context.dossier, plan, content, manifest,
-                            context.include_internal_pending, generation)
+                            context.include_internal_pending, context.include_editorial_guidance, generation)
 
     def rerender(self, run_dir: Path, **options: object) -> dict:
         run_dir = run_dir.resolve()
         dossier = json.loads((run_dir / "input" / "dossier.json").read_text(encoding="utf-8"))
         plan = json.loads((run_dir / "input" / "document_plan.json").read_text(encoding="utf-8"))
+        # Un refresh explícito es la única ocasión en que se migra el esqueleto
+        # histórico; queda persistido y no altera rerenders ordinarios.
+        if bool(options.get("refresh_skeleton", False)) and plan.get("version") != "document-plan-v2":
+            plan = build_document_plan(dossier, plan.get("template_id", "next-standard-v1"))
+            _write_json(run_dir / "input" / "document_plan.json", plan)
         plan["language"] = normalize_output_language(plan.get("language"))
         content_path = run_dir / "output" / "content.json"
         refresh = bool(options.get("refresh_skeleton", False))
@@ -43,24 +48,26 @@ class TechnicalDocumentGenerator:
         if refresh: _write_json(content_path, content)
         _, manifest = _template(plan.get("template_id", "next-standard-v1"))
         result = self._render(run_dir, dossier, plan, content, manifest,
-                              bool(options.get("include_internal_pending", True)), None)
+                              bool(options.get("include_internal_pending", True)),
+                              bool(options.get("include_editorial_guidance", True)), None)
         return dict(result, status="completed", run_dir=str(run_dir), content_refreshed=refresh,
                     document=result["documents"][0])
 
-    def _render(self, run_dir, dossier, plan, content, manifest, include_pending, generation):
+    def _render(self, run_dir, dossier, plan, content, manifest, include_pending, include_guidance, generation):
         validation = _validate_content(content, plan)
         if not validation["valid"]:
             _write_json(run_dir / "output" / "validation.json", {"valid": False, "content": validation,
                 "errors": ["El contenido generado no respeta el plan del documento"], "warnings": [],
                 "page_limit_validation": "not_performed"})
             raise ValueError("El contenido generado no respeta el plan del documento")
-        pending = _all_pending(content)
+        pending = _all_pending(content, plan)
         _write_json(run_dir / "output" / "pending.json", pending)
         _write_json(run_dir / "output" / "coverage.json", _coverage(plan, content))
         template_path, _ = _template(plan.get("template_id", "next-standard-v1"))
-        output = run_dir / "output" / "propuesta_tecnica_base.docx"
+        output = run_dir / "output" / _document_filename(plan)
         rendered = render_technical_document(template_path, content, plan, output,
-            include_internal_pending=include_pending, body_marker=manifest.get("body_marker", "[[DOCUMENT_BODY]]"),
+            include_internal_pending=include_pending, include_editorial_guidance=include_guidance,
+            body_marker=manifest.get("body_marker", "[[DOCUMENT_BODY]]"),
             table_format=manifest.get("table_format", {}), toc_format=manifest.get("toc", {}),
             heading_format=manifest.get("headings", {}))
         rendered["content"] = validation
@@ -107,19 +114,46 @@ def _validate_content(content, plan):
     planned = {x["id"]: x for x in plan["sections"]}
     for section in content.get("sections", []):
         expected = planned.get(section.get("id"), {})
+        actual_subsections = [(b.get("id"), b.get("text"), b.get("level")) for b in section.get("blocks", []) if b.get("type") == "subheading"]
+        planned_subsections = [(b.get("id"), b.get("title"), b.get("level", 2)) for b in expected.get("subsections", [])]
+        if actual_subsections != planned_subsections:
+            errors.append({"path": f"sections.{section.get('id')}.blocks", "message": "Los subapartados no respetan el plan y su orden"})
         for key, label in (("requirements_covered", "Declara requisitos no asignados al apartado"), ("evidence_fields", "Declara evidencias no trazables al plan")):
             if set(section.get(key, [])) - set(expected.get("requirements" if key == "requirements_covered" else key, [])): errors.append({"path": f"sections.{section.get('id')}.{key}", "message": label})
     if any(x.get("section_id") is not None and x["section_id"] not in planned for x in content.get("pending", [])): errors.append({"path": "pending", "message": "Un pendiente referencia una sección inexistente"})
     return {"valid": not errors, "errors": errors}
 
 
-def _all_pending(content):
-    items = list(content.get("pending", [])) + [{"section_id": s["id"], "description": x, "reason": s.get("review", {}).get("reason")} for s in content.get("sections", []) for x in s.get("pending", [])]
+def _document_filename(plan: dict) -> str:
+    import re
+    identity = plan.get("identity")
+    # Rerender v1 preserves the historical public name rather than adding a
+    # second generic document to an existing run.
+    if not identity:
+        return "propuesta_tecnica_base.docx"
+    reference = identity.get("tender_reference") or ""
+    title = identity.get("short_title") or ""
+    pieces = ["Propuesta técnica", str(reference), str(title)]
+    value = " ".join(x.strip() for x in pieces if x and x.strip())
+    value = re.sub(r'[\\/:*?"<>|]+', " ", value)
+    value = re.sub(r"\s+", " ", value).strip(" .")
+    # Límite portable sin cortar la última palabra.
+    if len(value) > 180:
+        shortened = value[:181].rsplit(" ", 1)[0].rstrip(" .")
+        value = shortened or value[:180].rstrip(" .")
+    return (value or "Propuesta técnica") + ".docx"
+
+
+def _all_pending(content, plan):
+    items = list(content.get("pending", []))
+    existing = {x.get("description") for x in items}
+    items += [{"section_id": None, "description": x, "reason": "Decisión o dato no localizado en el expediente"} for x in plan.get("pending_decisions", []) if x not in existing]
+    items += [{"section_id": s["id"], "description": x, "reason": s.get("review", {}).get("reason")} for s in content.get("sections", []) for x in s.get("pending", [])]
     return list({(x.get("section_id"), x.get("description"), x.get("reason")): x for x in items}.values())
 def _coverage(plan, content):
     sections = {x["id"]: x for x in content.get("sections", [])}; details = []
     for item in plan["sections"]:
         value = sections.get(item["id"], {}); complete = bool(value.get("blocks")) and not value.get("pending")
-        details.append({"section_id": item["id"], "title": item["title"], "requirements": item["requirements"], "criteria": item["criteria"], "generated": bool(value.get("blocks")), "requirements_covered": value.get("requirements_covered", []), "response_complete": complete, "pending": value.get("pending", []), "evidence_fields": value.get("evidence_fields", [])})
+        details.append({"section_id": item["id"], "title": item["title"], "requirements": item["requirements"], "criteria": item["criteria"], "generated": bool(value.get("blocks")), "requirements_covered": value.get("requirements_covered", []), "response_complete": complete, "pending": value.get("pending", []), "evidence_fields": value.get("evidence_fields", []), "subsections": item.get("subsections", [])})
     return {"sections": details, "complete": all(x["response_complete"] for x in details)}
 def _write_json(path, data): path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")

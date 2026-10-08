@@ -25,18 +25,19 @@ def test_generation_service_writes_traceable_artifacts(tmp_path: Path) -> None:
     assert not coverage["complete"]
     assert not coverage["sections"][0]["response_complete"]
     generated_content = json.loads((run_dir / "output" / "content.json").read_text(encoding="utf-8"))
-    generated_document = Document(run_dir / "output" / "propuesta_tecnica_base.docx")
+    generated_path = Path(manifest["documents"][0])
+    generated_document = Document(generated_path)
     assert any(block["type"] == "subheading" for block in generated_content["sections"][0]["blocks"])
-    assert any(paragraph.text == "Ejemplo de subapartado" and paragraph.style.name == "Heading 2"
+    assert any(paragraph.text != "Ejemplo de subapartado" and paragraph.style.name == "Heading 2"
                for paragraph in generated_document.paragraphs)
-    with zipfile.ZipFile(run_dir / "output" / "propuesta_tecnica_base.docx") as archive:
+    with zipfile.ZipFile(generated_path) as archive:
         root = ElementTree.fromstring(archive.read("word/document.xml"))
     word = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
     body_subheading = next(
         paragraph for paragraph in root.iter(word + "p")
         if paragraph.find(f"{word}pPr/{word}pStyle") is not None
         and paragraph.find(f"{word}pPr/{word}pStyle").get(word + "val") == "Heading2"
-        and "Ejemplo de subapartado" in "".join(node.text or "" for node in paragraph.iter(word + "t"))
+        and "Ejemplo de subapartado" not in "".join(node.text or "" for node in paragraph.iter(word + "t"))
     )
     assert body_subheading.find(f"{word}pPr/{word}numPr/{word}ilvl").get(word + "val") == "1"
     assert body_subheading.find(f"{word}pPr/{word}numPr/{word}numId").get(word + "val") == "2"
@@ -46,17 +47,22 @@ def test_generation_service_writes_traceable_artifacts(tmp_path: Path) -> None:
     toc_subheading = next(
         paragraph for paragraph in root.iter(word + "p")
         if paragraph.find(f"{word}pPr/{word}pStyle") is None
-        and "1.1. Ejemplo de subapartado" in "".join(node.text or "" for node in paragraph.iter(word + "t"))
+        and "1.1." in "".join(node.text or "" for node in paragraph.iter(word + "t"))
     )
     assert any(node.get(word + "val") == "22" for node in toc_subheading.iter(word + "sz"))
     assert any(node.get(word + "val") == "0" for node in toc_subheading.iter(word + "b"))
-    assert any(node.get(word + "val") == "F2A900" for node in toc_subheading.iter(word + "color"))
+    assert any(node.get(word + "val") == "0" for node in toc_subheading.iter(word + "i"))
+    assert any(node.get(word + "val") == "000000" for node in toc_subheading.iter(word + "color"))
+    assert any(node.get(word + "ascii") == "Roboto Light" for node in toc_subheading.iter(word + "rFonts"))
     toc_heading = next(
         paragraph for paragraph in root.iter(word + "p")
         if paragraph.find(f"{word}pPr/{word}pStyle") is None
         and "1. Metodología" in "".join(node.text or "" for node in paragraph.iter(word + "t"))
     )
-    assert any(node.get(word + "val") == "4FA6DC" for node in toc_heading.iter(word + "color"))
+    assert any(node.get(word + "val") == "22" for node in toc_heading.iter(word + "sz"))
+    assert any(node.get(word + "val") == "0" for node in toc_heading.iter(word + "b"))
+    assert any(node.get(word + "val") == "000000" for node in toc_heading.iter(word + "color"))
+    assert any(node.get(word + "ascii") == "Roboto Light" for node in toc_heading.iter(word + "rFonts"))
     body_heading = next(
         paragraph for paragraph in root.iter(word + "p")
         if paragraph.find(f"{word}pPr/{word}pStyle") is not None

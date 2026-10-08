@@ -15,8 +15,8 @@ from docx.shared import Cm, Pt
 HISTORICAL_TERMS = ("OCS", "DDnA", "Olympic Data")
 
 UI_TEXT = {
-    "es": {"cover_label": "Propuesta técnica", "index_title": "Índice"},
-    "en": {"cover_label": "Technical proposal", "index_title": "Contents"},
+    "es": {"cover_label": "Propuesta técnica", "index_title": "Índice", "guidance": "Guía de redacción", "labels": ["Finalidad", "Qué espera encontrar el evaluador", "Preguntas que debe responder", "Requisitos obligatorios", "Criterios de valoración", "Información disponible en el expediente", "Información que debe aportar la empresa", "Evidencias", "Evitar", "Puntuación máxima", "Extensión máxima", "Extensión orientativa"]},
+    "en": {"cover_label": "Technical proposal", "index_title": "Contents", "guidance": "Writing guide", "labels": ["Purpose", "What the evaluator should find", "Questions to answer", "Mandatory requirements", "Evaluation criteria", "Information available in the tender", "Information to be provided by the company", "Evidence", "Avoid", "Maximum score", "Maximum length", "Suggested length"]},
 }
 
 DEFAULT_HEADING_LEVELS = {
@@ -26,13 +26,14 @@ DEFAULT_HEADING_LEVELS = {
 }
 
 DEFAULT_TOC_LEVELS = {
-    1: {"font": "Roboto", "font_size_pt": 13, "bold": True, "color": "4FA6DC"},
-    2: {"font": "Roboto", "font_size_pt": 11, "bold": False, "color": "F2A900"},
+    1: {"font": "Roboto Light", "font_size_pt": 11, "bold": False, "italic": False, "color": "000000"},
+    2: {"font": "Roboto Light", "font_size_pt": 11, "bold": False, "italic": False, "color": "000000"},
 }
 
 
 def render_technical_document(template_path: Path, content: dict, plan: dict, output_path: Path,
                               *, include_internal_pending: bool = True,
+                              include_editorial_guidance: bool = True,
                               body_marker: str = "[[DOCUMENT_BODY]]",
                               table_format: dict | None = None,
                               toc_format: dict | None = None,
@@ -45,12 +46,17 @@ def render_technical_document(template_path: Path, content: dict, plan: dict, ou
         raise ValueError(f"La plantilla no contiene el marcador de cuerpo {body_marker}")
 
     toc_entries = []
+    planned_sections = {item["id"]: item for item in plan.get("sections", [])}
     for index, section in enumerate(content["sections"], 1):
-        heading = _insert_paragraph_before(marker, section["title"], "Heading 1")
+        planned = planned_sections.get(section["id"], section)
+        visible_title = planned.get("display_title") or _display_title(planned, plan.get("language", "es"))
+        heading = _insert_paragraph_before(marker, visible_title, "Heading 1")
         _apply_heading_format(document, heading, 1, heading_format or {},
                               plan.get("formal_constraints", {}))
         _add_bookmark(heading, _bookmark_name(section["id"]), index)
-        toc_entries.append({"id": section["id"], "title": f"{index}. {section['title']}", "level": 1})
+        toc_entries.append({"id": section["id"], "title": f"{index}. {visible_title}", "level": 1})
+        if include_editorial_guidance:
+            _insert_editorial_guidance(document, marker, planned.get("guidance", {}), plan.get("language", "es"))
         heading_counts = {level: 0 for level in range(2, 7)}
         for block in section["blocks"]:
             if block["type"] == "subheading":
@@ -205,7 +211,7 @@ def _toc_run_properties(config: dict, level: int = 1):
     level_config = {**DEFAULT_TOC_LEVELS.get(level, {}),
                     **(config.get("levels") or {}).get(level, {})}
     fonts = OxmlElement("w:rFonts")
-    font = level_config.get("font", config.get("font", "Roboto"))
+    font = level_config.get("font", config.get("font", "Roboto Light"))
     for attribute in ("ascii", "cs", "eastAsia", "hAnsi"):
         fonts.set(qn(f"w:{attribute}"), font)
     properties.append(fonts)
@@ -214,8 +220,16 @@ def _toc_run_properties(config: dict, level: int = 1):
     if not bold:
         bold_element.set(qn("w:val"), "0")
     properties.append(bold_element)
+    italic = level_config.get("italic", config.get("italic", False))
+    italic_element = OxmlElement("w:i")
+    if not italic:
+        italic_element.set(qn("w:val"), "0")
+    properties.append(italic_element)
+    underline = OxmlElement("w:u")
+    underline.set(qn("w:val"), "none")
+    properties.append(underline)
     color = OxmlElement("w:color")
-    color.set(qn("w:val"), level_config.get("color", config.get("entry_color", "F2A900")))
+    color.set(qn("w:val"), level_config.get("color", config.get("entry_color", "000000")))
     properties.append(color)
     size = OxmlElement("w:sz")
     font_size = level_config.get("font_size_pt", config.get("font_size_pt", 13))
@@ -371,6 +385,55 @@ def _ensure_pending_style(document: Document) -> None:
     style = document.styles.add_style("LitMan Analysis Pending", WD_STYLE_TYPE.PARAGRAPH)
     style.base_style = next(item for item in document.styles if item.name.lower() == "normal")
     style.font.italic = True
+
+
+def _ensure_guidance_style(document: Document) -> None:
+    if "LitMan Analysis Guidance" in [style.name for style in document.styles]: return
+    style = document.styles.add_style("LitMan Analysis Guidance", WD_STYLE_TYPE.PARAGRAPH)
+    style.base_style = next(item for item in document.styles if item.name.lower() == "normal")
+    style.font.size = Pt(9)
+    style.font.italic = True
+
+
+def _insert_editorial_guidance(document, marker, guidance: dict, language: str) -> None:
+    if not guidance: return
+    _ensure_guidance_style(document)
+    labels = UI_TEXT.get(language, UI_TEXT["es"])["labels"]
+    table = document.add_table(rows=1, cols=1)
+    cell = table.cell(0, 0)
+    shade = OxmlElement("w:shd"); shade.set(qn("w:fill"), "EEF5F8"); cell._tc.get_or_add_tcPr().append(shade)
+    cell.paragraphs[0].style = "LitMan Analysis Guidance"
+    cell.paragraphs[0].add_run(UI_TEXT.get(language, UI_TEXT["es"])["guidance"]).bold = True
+    pairs = ((labels[0], "purpose"), (labels[1], "evaluation_intent"), (labels[2], "questions_to_answer"), (labels[3], "mandatory_content"), (labels[4], "criteria"), (labels[5], "available_information"), (labels[6], "company_inputs_required"), (labels[7], "evidence_summary"), (labels[8], "avoid"))
+    for label, key in pairs:
+        value = guidance.get(key)
+        if value:
+            rendered = _guidance_value(value, language)
+            paragraph = cell.add_paragraph(style="LitMan Analysis Guidance"); paragraph.add_run(f"{label}: ").bold = True; paragraph.add_run(rendered)
+    if guidance.get("score_confirmed"):
+        cell.add_paragraph(f"{labels[9]}: {_format_score(guidance.get('score'), language)}", "LitMan Analysis Guidance")
+    if guidance.get("target_pages") is not None:
+        cell.add_paragraph(f"{labels[10]}: {guidance['target_pages']} {'pages' if language == 'en' else 'páginas'}", "LitMan Analysis Guidance")
+    elif guidance.get("target_words"):
+        cell.add_paragraph(f"{labels[11]}: {guidance['target_words']} {'words' if language == 'en' else 'palabras'}", "LitMan Analysis Guidance")
+    marker._element.addprevious(table._element)
+
+
+def _guidance_value(value, language: str = "es") -> str:
+    if not isinstance(value, list): return str(value)
+    page = "page" if language == "en" else "página"
+    return "; ".join(f"{x.get('document_id')}, {page} {x.get('page')}" if isinstance(x, dict) else str(x) for x in value)
+
+
+def _format_score(value, language: str = "es"):
+    if value is None: return "pendiente de confirmar"
+    number = float(value); rendered = str(int(number)) if number.is_integer() else str(number).replace('.', ',')
+    unit = ("point" if number == 1 else "points") if language == "en" else ("punto" if number == 1 else "puntos")
+    return f"{rendered} {unit}"
+
+
+def _display_title(section: dict, language: str = "es") -> str:
+    return section["title"] if section.get("score") is None else f"{section['title']} ({_format_score(section['score'], language)})"
 
 
 def _insert_block(document: Document, marker, block: dict, include_internal_pending: bool,
