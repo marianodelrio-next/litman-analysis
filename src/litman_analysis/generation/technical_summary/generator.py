@@ -9,7 +9,7 @@ from .renderer import write_technical_summary
 
 class TechnicalSummaryGenerator:
     id = "technical-summary"
-    version = "technical-summary-generator-v1"
+    version = "technical-summary-generator-v2"
     filename = "resumen_tecnico.docx"
 
     def generate(self, context: ArtifactContext) -> dict:
