@@ -9,7 +9,7 @@ import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import TextIO
+from typing import Literal, TextIO
 
 from litman_analysis.application.ports.llm import LLMOutputPaths, LLMResult
 from .codex_events import CodexEventSummary
@@ -36,11 +36,18 @@ class CodexUnexpectedToolUseError(CodexExecutionError):
     pass
 
 
+ToolFailurePolicy = Literal["warn", "strict"]
+
+
 class CodexProvider:
     """Ejecuta Codex CLI y conserva su stream JSONL estructurado."""
 
     def __init__(self, *, binary: str = "codex", model: str | None = None,
-                 timeout_seconds: int = 1800, authentication: CodexAuthentication | None = None, home: Path | None = None, codex_home: Path | None = None, no_tools: bool = False, require_successful_tools: bool = False) -> None:
+                 timeout_seconds: int = 1800, authentication: CodexAuthentication | None = None,
+                 home: Path | None = None, codex_home: Path | None = None, no_tools: bool = False,
+                 tool_failure_policy: ToolFailurePolicy = "warn") -> None:
+        if tool_failure_policy not in {"warn", "strict"}:
+            raise ValueError("tool_failure_policy debe ser 'warn' o 'strict'")
         self.binary = binary
         self.model = model
         self.timeout_seconds = timeout_seconds
@@ -48,7 +55,7 @@ class CodexProvider:
         self.home = home
         self.codex_home = codex_home
         self.no_tools = no_tools
-        self.require_successful_tools = require_successful_tools
+        self.tool_failure_policy = tool_failure_policy
 
     def generate(self, *, instructions: str, prompt: str, schema_path: Path,
                  case_dir: Path, output_paths: LLMOutputPaths) -> LLMResult:
@@ -186,18 +193,30 @@ class CodexProvider:
             _write_json(output_paths.summary, summary)
             raise
         summary["response"]["valid_json"] = True
-        if self.require_successful_tools and event_summary.failed_tool_calls:
-            summary["status"] = "tool_execution_error"
-            summary["failure_reason"] = "required_tool_failed"
-            _write_json(output_paths.summary, summary)
+        if event_summary.failed_tool_calls:
+            summary["tool_failure_policy"] = self.tool_failure_policy
             failures = ", ".join(
                 f"programa={item.get('program') or 'desconocido'} exit_code={item.get('exit_code')}"
                 for item in event_summary.command_failures[:3]
             )
+            if self.tool_failure_policy == "strict":
+                summary["status"] = "tool_execution_error"
+                summary["failure_reason"] = "required_tool_failed"
+                _write_json(output_paths.summary, summary)
+                detail = f" ({failures})" if failures else ""
+                raise CodexToolExecutionError(
+                    "Falló una herramienta requerida para el análisis"
+                    f"{detail}; se conservaron los diagnósticos en {output_paths.summary.name}.")
+            summary["status"] = "completed_with_tool_errors"
+            summary["failure_reason"] = "tool_errors_recovered"
+            summary["tool_failures"] = event_summary.command_failures
             detail = f" ({failures})" if failures else ""
-            raise CodexToolExecutionError(
-                "Falló una herramienta requerida para el análisis"
-                f"{detail}; se conservaron los diagnósticos en {output_paths.summary.name}.")
+            print(
+                "[codex] se recuperó de errores de herramientas"
+                f"{detail}; el resultado pasará las validaciones del pipeline",
+                file=sys.stderr,
+                flush=True,
+            )
         _write_json(output_paths.summary, summary)
         print(
             f"[codex] completado en {duration:.1f}s · "
@@ -219,6 +238,7 @@ class CodexProvider:
                 "tool_call_count": event_summary.tool_calls,
                 "failed_tool_call_count": event_summary.failed_tool_calls,
                 "empty_search_count": event_summary.empty_searches,
+                "tool_failure_policy": self.tool_failure_policy,
                 "summary_path": str(output_paths.summary),
             },
         )

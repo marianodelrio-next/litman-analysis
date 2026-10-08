@@ -79,7 +79,7 @@ class JobRunner:
             authentication = self.authentication_factory(codex_home=settings.codex_home_dir)
             provider = self.provider_factory(binary=settings.codex_binary, model=settings.codex_model,
                 timeout_seconds=settings.codex_timeout_seconds, authentication=authentication,
-                home=settings.home_dir, codex_home=settings.codex_home_dir, require_successful_tools=True)
+                home=settings.home_dir, codex_home=settings.codex_home_dir, tool_failure_policy="warn")
             if job.job_type is JobType.ASSESSMENT:
                 run_dir, _ = self.assessment_factory(settings, provider).execute(materialized.directory, case_id=job.job_id, bundle=bundle)
             else:

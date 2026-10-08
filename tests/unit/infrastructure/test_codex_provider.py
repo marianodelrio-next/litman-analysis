@@ -91,13 +91,13 @@ def test_provider_enforces_timeout_and_keeps_summary(tmp_path: Path, monkeypatch
     assert paths.stderr.exists()
 
 
-def test_provider_can_require_successful_tools_and_preserves_diagnostics(tmp_path: Path) -> None:
+def test_provider_strict_policy_rejects_failed_tools_and_preserves_diagnostics(tmp_path: Path) -> None:
     executable = _fake_codex(tmp_path)
     content = executable.read_text(encoding="utf-8").replace('"exit_code": 0', '"exit_code": 23')
     executable.write_text(content, encoding="utf-8")
     paths = output_paths_for_run(tmp_path / "run")
     with pytest.raises(CodexToolExecutionError, match="herramienta requerida"):
-        CodexProvider(binary=str(executable), require_successful_tools=True).generate(
+        CodexProvider(binary=str(executable), tool_failure_policy="strict").generate(
             instructions="instructions", prompt="prompt", schema_path=_schema(tmp_path),
             case_dir=tmp_path, output_paths=paths,
         )
@@ -107,7 +107,24 @@ def test_provider_can_require_successful_tools_and_preserves_diagnostics(tmp_pat
     assert summary["response"]["valid_json"] is True
 
 
-def test_provider_accepts_search_without_matches(tmp_path: Path) -> None:
+def test_provider_warn_policy_returns_valid_response_with_tool_failures(tmp_path: Path) -> None:
+    executable = _fake_codex(tmp_path)
+    content = executable.read_text(encoding="utf-8").replace('"exit_code": 0', '"exit_code": 23')
+    executable.write_text(content, encoding="utf-8")
+    paths = output_paths_for_run(tmp_path / "run")
+    result = CodexProvider(binary=str(executable), tool_failure_policy="warn").generate(
+        instructions="instructions", prompt="prompt", schema_path=_schema(tmp_path),
+        case_dir=tmp_path, output_paths=paths,
+    )
+    assert result.data == {"ok": True}
+    assert result.execution["failed_tool_call_count"] == 1
+    assert result.execution["tool_failure_policy"] == "warn"
+    summary = json.loads(paths.summary.read_text(encoding="utf-8"))
+    assert summary["status"] == "completed_with_tool_errors"
+    assert summary["tool_failures"][0]["exit_code"] == 23
+
+
+def test_provider_accepts_search_without_matches_in_strict_mode(tmp_path: Path) -> None:
     executable = _fake_codex(tmp_path)
     content = executable.read_text(encoding="utf-8").replace(
         '"status": "completed", "exit_code": 0',
@@ -115,7 +132,7 @@ def test_provider_accepts_search_without_matches(tmp_path: Path) -> None:
     )
     executable.write_text(content, encoding="utf-8")
     paths = output_paths_for_run(tmp_path / "run")
-    result = CodexProvider(binary=str(executable), require_successful_tools=True).generate(
+    result = CodexProvider(binary=str(executable), tool_failure_policy="strict").generate(
         instructions="instructions", prompt="prompt", schema_path=_schema(tmp_path),
         case_dir=tmp_path, output_paths=paths,
     )
