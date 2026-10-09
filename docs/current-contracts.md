@@ -1,4 +1,4 @@
-# Contratos vigentes de LitMan Analysis
+# Contratos vigentes de LitMan Core
 
 Este documento fija la línea base de la fase 0. Describe el comportamiento
 actual, no una API futura.
@@ -7,13 +7,14 @@ actual, no una API futura.
 
 | Comando | Audiencia | Ciclo | Estado |
 |---|---|---|---|
-| `litman-analysis run JOB` | integración/operación | carga un job y delega al launcher | vigente |
-| `litman-analysis assess CASE` | usuario local | construye un job assessment y delega | vigente |
-| `litman-analysis analyze CASE` | usuario local | construye un job detailed-analysis y delega | vigente |
-| `litman-analysis-worker run JOB` | contenedor interno | carga el job y ejecuta `JobRunner` | vigente, interno |
-| `litman-analysis-worker preflight [runtime\|container]` | operación interna | comprueba aislamiento y Codex | vigente, interno |
+| `litman-core run JOB` | integración/operación | carga un job y delega al launcher; `--native` ejecuta Core directamente | canónico |
+| `litman-core assess CASE` | usuario local | construye un job assessment y delega | canónico |
+| `litman-core analyze CASE` | usuario local | construye un job detailed-analysis y delega | canónico |
+| `litman-core-worker run JOB` | contenedor interno | carga el job y ejecuta `JobRunner` | canónico, interno |
+| `litman-core-worker preflight [runtime\|container]` | operación interna | comprueba aislamiento y Codex | canónico, interno |
+| `litman-analysis`, `litman-analysis-worker` | compatibilidad | aliases de los módulos de `litman_core` | temporal |
 
-`litman-core` es una CLI pública futura; no existe en esta línea base.
+Toda la implementación pertenece al paquete `litman_core`; no existe un paquete Python `litman_analysis` de compatibilidad.
 
 ## Job y run
 
@@ -51,6 +52,6 @@ no usa red, credenciales ni servicios externos en tests.
 
 ## Transición
 
-La CLI actual y el worker seguirán siendo las superficies vigentes durante la
-transición. `litman-core` queda reservado para una futura separación de Core y
-Harness; no se debe inferir equivalencia de sus contratos hasta implementarlo.
+Los nombres de comando históricos se conservan temporalmente como aliases de
+los mismos entry points de Core. Su retirada futura no afecta al namespace
+Python ni implica mantener una segunda implementación.

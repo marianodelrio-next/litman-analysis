@@ -3,9 +3,9 @@ import json, subprocess
 from pathlib import Path
 from types import SimpleNamespace
 import pytest
-from litman_analysis.config import Settings
-from litman_analysis.domain.jobs import JobRequest, JobType, MaterializedCase, StorageKind
-from litman_analysis.execution import ContainerJobLauncher, JobRunner
+from litman_core.config import Settings
+from litman_core.domain.jobs import JobRequest, JobType, MaterializedCase, StorageKind
+from litman_core.execution import ContainerJobLauncher, JobRunner
 
 def job(tmp_path, ik=StorageKind.LOCAL, ok=StorageKind.LOCAL, jt=JobType.ASSESSMENT):
     source=tmp_path/"source"; source.mkdir(exist_ok=True); (source/"pliego.md").write_text("# Pliego")
@@ -110,7 +110,7 @@ def test_launcher_translates_local_input_and_preserves_drive_destination(tmp_pat
     assert seen["output"]["location"]=="drive-target"
 
 def test_public_commands_delegate_to_same_launcher(tmp_path,monkeypatch,capsys):
-    from litman_analysis import cli
+    from litman_core import cli
     source=tmp_path/"cli-source"; source.mkdir(); output=tmp_path/"cli-output"
     path=tmp_path/"job.json"; path.write_text(json.dumps({"job_id":"run-id","job_type":"assessment","input":{"kind":"local","location":str(source)},"output":{"kind":"local","location":str(output)}}))
     observed=[]
@@ -123,7 +123,7 @@ def test_public_commands_delegate_to_same_launcher(tmp_path,monkeypatch,capsys):
     assert capsys.readouterr().out.count('"status": "succeeded"')==3
 
 def test_cli_propagates_container_exit_code(tmp_path,monkeypatch):
-    from litman_analysis import cli
+    from litman_core import cli
     source=tmp_path/"cli-source"; source.mkdir()
     class Launcher:
         def run(self,_request): raise subprocess.CalledProcessError(41,"docker compose run")

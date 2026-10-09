@@ -3,9 +3,9 @@ import stat
 from pathlib import Path
 from types import SimpleNamespace
 import pytest, yaml
-from litman_analysis import worker
-from litman_analysis.config import Settings
-from litman_analysis.execution import JobRunnerResult
+from litman_core import worker
+from litman_core.config import Settings
+from litman_core.execution import JobRunnerResult
 
 def test_worker_exposes_only_run_and_preflight(capsys):
     with pytest.raises(SystemExit): worker.main(["--help"])
@@ -28,6 +28,7 @@ def test_image_has_no_nested_privilege_binary():
     dockerfile=(Path(__file__).parents[2]/"Dockerfile").read_text().lower()
     assert "bubblewrap" not in dockerfile and "bwrap" not in dockerfile
     assert "chromium" in dockerfile and "ripgrep" in dockerfile and "@openai/codex@${codex_version}" in dockerfile
+    assert 'entrypoint ["litman-core-worker"]' in dockerfile
 
 def test_container_preflight_exercises_codex_in_container(tmp_path,monkeypatch):
     input_dir=tmp_path/"input"; input_dir.mkdir(); (input_dir/"fixture.md").write_text("fixture")

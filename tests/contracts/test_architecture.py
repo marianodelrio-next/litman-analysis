@@ -7,11 +7,11 @@ from pathlib import Path
 import pytest
 from jsonschema import Draft202012Validator
 
-from litman_analysis.application.job_loader import load_job
-from litman_analysis.config import Settings
-from litman_analysis.domain.jobs import JobRequest, JobType, StorageKind
-from litman_analysis.infrastructure.storage.local import LocalArtifactPublisher, LocalDocumentSource
-from litman_analysis.resource_paths import resource_path
+from litman_core.application.job_loader import load_job
+from litman_core.config import Settings
+from litman_core.domain.jobs import JobRequest, JobType, StorageKind
+from litman_core.infrastructure.storage.local import LocalArtifactPublisher, LocalDocumentSource
+from litman_core.resource_paths import resource_path
 
 ROOT = Path(__file__).parents[2]
 
@@ -35,11 +35,11 @@ def test_job_loader_rejects_unknown_fields(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="Contrato de job inválido"):
         load_job(path)
 def test_summary_artifacts_remain_independent_components() -> None:
-    from litman_analysis.generation.bid_preparation_guide import BidPreparationGuideGenerator
-    from litman_analysis.generation.registry import ARTIFACT_GENERATORS
-    from litman_analysis.generation.technical_summary import TechnicalSummaryGenerator
+    from litman_core.generation.bid_preparation_guide import BidPreparationGuideGenerator
+    from litman_core.generation.registry import ARTIFACT_GENERATORS
+    from litman_core.generation.technical_summary import TechnicalSummaryGenerator
 
-    root = Path(__file__).resolve().parents[2] / "src" / "litman_analysis" / "generation"
+    root = Path(__file__).resolve().parents[2] / "src" / "litman_core" / "generation"
     assert not (root / "summary").exists()
     assert isinstance(ARTIFACT_GENERATORS["technical-summary"], TechnicalSummaryGenerator)
     assert isinstance(ARTIFACT_GENERATORS["summary"], BidPreparationGuideGenerator)

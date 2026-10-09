@@ -3,7 +3,7 @@ requires = ["setuptools>=69"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "litman-analysis"
+name = "litman-core"
 version = "0.1.0"
 description = "Módulo de análisis de licitaciones de LitMan"
 requires-python = ">=3.11"
@@ -19,14 +19,16 @@ dependencies = [
 ]
 
 [project.scripts]
-litman-analysis = "litman_analysis.cli:main"
-litman-analysis-worker = "litman_analysis.worker:main"
+litman-core = "litman_core.cli:main"
+litman-core-worker = "litman_core.worker:main"
+litman-analysis = "litman_core.cli:main"
+litman-analysis-worker = "litman_core.worker:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.setuptools.package-data]
-"litman_analysis.resources" = [
+"litman_core.resources" = [
   "**/*.json", "**/*.yaml", "**/*.md", "**/VERSION", "**/*.docx", "**/*.xlsx",
 ]
 

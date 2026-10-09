@@ -8,13 +8,13 @@ import pytest
 from docx import Document
 from jsonschema import Draft202012Validator
 
-from litman_analysis.generation.technical_proposal.content import fallback_content, skeleton_content
-from litman_analysis.generation.technical_proposal.planner import build_document_plan, normalize_output_language
-from litman_analysis.generation.technical_proposal.renderer import render_technical_document
-from litman_analysis.generation.technical_proposal.generator import _validate_content
-from litman_analysis.generation.service import generate_documents, render_existing_run
-from litman_analysis.cli import main
-from litman_analysis.resource_paths import RESOURCE_ROOT
+from litman_core.generation.technical_proposal.content import fallback_content, skeleton_content
+from litman_core.generation.technical_proposal.planner import build_document_plan, normalize_output_language
+from litman_core.generation.technical_proposal.renderer import render_technical_document
+from litman_core.generation.technical_proposal.generator import _validate_content
+from litman_core.generation.service import generate_documents, render_existing_run
+from litman_core.cli import main
+from litman_core.resource_paths import RESOURCE_ROOT
 
 from conftest import dossier
 RESOURCES = RESOURCE_ROOT
@@ -185,7 +185,7 @@ def test_render_uses_clean_template_and_keeps_dynamic_section(tmp_path: Path) ->
     toc = [node.text or "" for node in root.iter(word + "instrText") if "TOC" in (node.text or "")]
     pagerefs = [node for node in root.iter(word + "fldSimple") if "PAGEREF" in node.get(word + "instr", "")]
     bookmarks = [node.get(word + "name") for node in root.iter(word + "bookmarkStart")
-                 if (node.get(word + "name") or "").startswith("litman_analysis_")]
+                 if (node.get(word + "name") or "").startswith("litman_core_")]
     blue_runs = [node for node in root.iter(word + "color") if node.get(word + "val") == "4FA6DC"]
     assert toc
     assert len(pagerefs) >= 1

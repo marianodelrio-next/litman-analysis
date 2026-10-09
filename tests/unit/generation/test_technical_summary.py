@@ -6,8 +6,8 @@ from docx import Document
 from docx.shared import Cm
 
 from conftest import dossier
-from litman_analysis.generation.technical_summary import TechnicalSummaryGenerator
-from litman_analysis.generation.technical_summary.renderer import write_technical_summary
+from litman_core.generation.technical_summary import TechnicalSummaryGenerator
+from litman_core.generation.technical_summary.renderer import write_technical_summary
 
 
 def _text(path: Path) -> str:

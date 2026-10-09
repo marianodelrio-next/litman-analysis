@@ -6,9 +6,9 @@ from pathlib import Path
 from docx import Document
 from openpyxl import load_workbook
 from jsonschema import Draft202012Validator
-from litman_analysis.generation import ARTIFACT_GENERATORS, resolve_artifact_generators
-from litman_analysis.generation.service import generate_documents
-from litman_analysis.resource_paths import RESOURCE_ROOT
+from litman_core.generation import ARTIFACT_GENERATORS, resolve_artifact_generators
+from litman_core.generation.service import generate_documents
+from litman_core.resource_paths import RESOURCE_ROOT
 
 from conftest import dossier
 

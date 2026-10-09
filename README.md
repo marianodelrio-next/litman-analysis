@@ -1,4 +1,4 @@
-# LitMan Analysis
+# LitMan Core
 
 LitMan Analysis ejecuta cada job completo en un único contenedor: materializa un expediente local o de Google Drive, normaliza sus documentos, ejecuta Codex, valida el resultado y lo publica en local o Drive.
 
@@ -24,7 +24,7 @@ Para API key, guarda la clave en un archivo con permisos restringidos dentro de 
 Los jobs públicos conservan rutas del host. El launcher las traduce a `/input` y `/output`, monta únicamente esas rutas y ejecuta exactamente:
 
 ```bash
-uv run litman-analysis run examples/jobs/assessment.local.json
+uv run litman-core run examples/jobs/assessment.local.json
 # llamada resultante:
 docker compose run --rm litman-analysis run /job/job.json
 ```
@@ -32,8 +32,8 @@ docker compose run --rm litman-analysis run /job/job.json
 También siguen disponibles:
 
 ```bash
-uv run litman-analysis assess ./local-data/input --output ./local-data/output
-uv run litman-analysis analyze ./local-data/input --output ./local-data/output
+uv run litman-core assess ./local-data/input --output ./local-data/output
+uv run litman-core analyze ./local-data/input --output ./local-data/output
 ```
 
 Los wrappers `assess` y `analyze` son atajos local→local. Para cualquier ruta con Drive usa `run` y un job de `examples/jobs/`; `location` es una ruta del host cuando `kind` es `local` y el ID de una carpeta cuando es `google-drive`.

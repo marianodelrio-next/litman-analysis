@@ -11,18 +11,18 @@ from types import SimpleNamespace
 
 import pytest
 
-from litman_analysis.application.ports.llm import LLMResult
-from litman_analysis.config import Settings
-from litman_analysis.pipelines.assessment.extraction import prepare_assessment, run_assessment
-from litman_analysis.pipelines.assessment.stage import definition as assessment_definition
-from litman_analysis.pipelines.detailed_analysis.extraction import (
+from litman_core.application.ports.llm import LLMResult
+from litman_core.config import Settings
+from litman_core.pipelines.assessment.extraction import prepare_assessment, run_assessment
+from litman_core.pipelines.assessment.stage import definition as assessment_definition
+from litman_core.pipelines.detailed_analysis.extraction import (
     prepare_detailed_analysis,
     run_detailed_analysis,
 )
-from litman_analysis.pipelines.detailed_analysis.stage import definition as detailed_analysis_definition
-from litman_analysis.pipelines.models import StageDefinition, StageOutcome, StagePreparation, StageResources
-from litman_analysis.pipelines.runner import prepare_stage, run_stage
-from litman_analysis.resource_paths import RESOURCE_ROOT
+from litman_core.pipelines.detailed_analysis.stage import definition as detailed_analysis_definition
+from litman_core.pipelines.models import StageDefinition, StageOutcome, StagePreparation, StageResources
+from litman_core.pipelines.runner import prepare_stage, run_stage
+from litman_core.resource_paths import RESOURCE_ROOT
 
 
 class FakeProvider:
@@ -128,8 +128,8 @@ def test_pipeline_definitions_keep_their_domain_hooks_and_facades() -> None:
 
 
 @pytest.mark.parametrize("module_name", [
-    "litman_analysis.pipelines.assessment.stage",
-    "litman_analysis.pipelines.detailed_analysis.stage",
+    "litman_core.pipelines.assessment.stage",
+    "litman_core.pipelines.detailed_analysis.stage",
 ])
 def test_unverified_quotes_are_warnings_not_fatal(module_name, monkeypatch) -> None:
     module = importlib.import_module(module_name)
@@ -149,7 +149,7 @@ def test_unverified_quotes_are_warnings_not_fatal(module_name, monkeypatch) -> N
 
 
 def test_registered_pipelines_resolve_and_expose_version_bundles() -> None:
-    from litman_analysis.pipelines.registry import PIPELINES
+    from litman_core.pipelines.registry import PIPELINES
 
     assessment = PIPELINES.get("assessment").resolve(RESOURCE_ROOT)
     detailed = PIPELINES.get("detailed-analysis").resolve(RESOURCE_ROOT)
@@ -161,7 +161,7 @@ def test_registered_pipelines_resolve_and_expose_version_bundles() -> None:
 
 
 def test_incomplete_pipeline_definition_fails_with_clear_error(tmp_path: Path) -> None:
-    from litman_analysis.pipelines.registry import PipelineDefinition
+    from litman_core.pipelines.registry import PipelineDefinition
 
     definition = PipelineDefinition(
         "broken", "1", Path("missing-system.md"), Path("missing-task.md"),
@@ -199,7 +199,7 @@ def test_prepare_assessment_persists_version_bundle(tmp_path: Path) -> None:
 
 @pytest.mark.parametrize("command", ["assess", "analyze"])
 def test_public_commands_are_available(monkeypatch, capsys, command: str) -> None:
-    from litman_analysis.cli import main
+    from litman_core.cli import main
 
     monkeypatch.setattr("sys.argv", ["litman-analysis", command, "--help"])
     with pytest.raises(SystemExit) as exit_status:
@@ -210,30 +210,30 @@ def test_public_commands_are_available(monkeypatch, capsys, command: str) -> Non
 
 def test_public_modules_and_composition_roots_import() -> None:
     modules = (
-        "litman_analysis.cli",
-        "litman_analysis.infrastructure.runs",
-        "litman_analysis.infrastructure.documents.bundle",
-        "litman_analysis.infrastructure.llm.codex_cli",
-        "litman_analysis.domain.validation",
-        "litman_analysis.pipelines.registry",
-        "litman_analysis.pipelines.runner",
-        "litman_analysis.generation",
-        "litman_analysis.generation.opportunity_report",
-        "litman_analysis.pipelines",
+        "litman_core.cli",
+        "litman_core.infrastructure.runs",
+        "litman_core.infrastructure.documents.bundle",
+        "litman_core.infrastructure.llm.codex_cli",
+        "litman_core.domain.validation",
+        "litman_core.pipelines.registry",
+        "litman_core.pipelines.runner",
+        "litman_core.generation",
+        "litman_core.generation.opportunity_report",
+        "litman_core.pipelines",
     )
     assert all(importlib.import_module(name) for name in modules)
 
 
-def test_all_litman_analysis_modules_import() -> None:
-    import litman_analysis
+def test_all_litman_core_modules_import() -> None:
+    import litman_core
 
-    modules = [name for _, name, _ in pkgutil.walk_packages(litman_analysis.__path__, "litman_analysis.")]
+    modules = [name for _, name, _ in pkgutil.walk_packages(litman_core.__path__, "litman_core.")]
     assert all(importlib.import_module(name) for name in modules)
 
 
 def test_registries_declare_all_runtime_components() -> None:
-    from litman_analysis.generation import ARTIFACT_GENERATORS
-    from litman_analysis.pipelines.registry import PIPELINES
+    from litman_core.generation import ARTIFACT_GENERATORS
+    from litman_core.pipelines.registry import PIPELINES
 
     assert {PIPELINES.get(name).identifier for name in ("assessment", "detailed-analysis")} == {
         "assessment", "detailed-analysis",
@@ -245,7 +245,7 @@ def test_registries_declare_all_runtime_components() -> None:
 
 def test_detailed_analysis_has_no_dependency_on_assessment_implementation() -> None:
     source = (
-        Path(__file__).parents[1] / "src" / "litman_analysis" / "pipelines" / "detailed_analysis"
+        Path(__file__).parents[1] / "src" / "litman_core" / "pipelines" / "detailed_analysis"
     ).glob("*.py")
     for path in source:
         tree = ast.parse(path.read_text(encoding="utf-8"))
@@ -253,7 +253,7 @@ def test_detailed_analysis_has_no_dependency_on_assessment_implementation() -> N
             node.module or "" for node in ast.walk(tree)
             if isinstance(node, ast.ImportFrom)
         ]
-        assert not any(name.startswith("litman_analysis.pipelines.assessment") for name in imports), path
+        assert not any(name.startswith("litman_core.pipelines.assessment") for name in imports), path
 
 
 def test_failed_stage_persists_validation_diagnostics_before_raising(tmp_path: Path) -> None:

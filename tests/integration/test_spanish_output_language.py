@@ -7,10 +7,10 @@ from pathlib import Path
 from docx import Document
 from openpyxl import load_workbook
 
-from litman_analysis.application.ports.llm import LLMResult
-from litman_analysis.config import Settings
-from litman_analysis.pipelines.assessment.service import AssessmentPipeline
-from litman_analysis.pipelines.detailed_analysis.service import DetailedAnalysisPipeline
+from litman_core.application.ports.llm import LLMResult
+from litman_core.config import Settings
+from litman_core.pipelines.assessment.service import AssessmentPipeline
+from litman_core.pipelines.detailed_analysis.service import DetailedAnalysisPipeline
 
 from conftest import dossier
 

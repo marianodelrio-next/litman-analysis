@@ -6,8 +6,8 @@ from docx import Document
 from docx.shared import Cm
 
 from conftest import dossier
-from litman_analysis.generation.bid_preparation_guide import BidPreparationGuideGenerator
-from litman_analysis.generation.bid_preparation_guide.renderer import write_bid_preparation_guide
+from litman_core.generation.bid_preparation_guide import BidPreparationGuideGenerator
+from litman_core.generation.bid_preparation_guide.renderer import write_bid_preparation_guide
 
 
 def _text(path: Path) -> str:

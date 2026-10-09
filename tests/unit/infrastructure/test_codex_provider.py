@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from litman_analysis.application.ports.llm import output_paths_for_run
-from litman_analysis.infrastructure.llm.codex_cli import CodexProvider, CodexTimeoutError, CodexToolExecutionError
+from litman_core.application.ports.llm import output_paths_for_run
+from litman_core.infrastructure.llm.codex_cli import CodexProvider, CodexTimeoutError, CodexToolExecutionError
 
 
 FAKE_CODEX = r'''#!/usr/bin/env python3

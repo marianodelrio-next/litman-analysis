@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from litman_analysis.domain.validation.evidence import build_evidence_index
-from litman_analysis.domain.documents import Document, NormalizedDocument
+from litman_core.domain.validation.evidence import build_evidence_index
+from litman_core.domain.documents import Document, NormalizedDocument
 
 
 def test_evidence_is_verified_on_its_declared_page(tmp_path: Path) -> None:

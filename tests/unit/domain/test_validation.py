@@ -1,5 +1,5 @@
-from litman_analysis.domain.validation import validate_extraction
-from litman_analysis.domain.validation.semantic import detailed_analysis_economic_semantic_errors
+from litman_core.domain.validation import validate_extraction
+from litman_core.domain.validation.semantic import detailed_analysis_economic_semantic_errors
 
 
 def test_invalid_schema_is_reported() -> None:

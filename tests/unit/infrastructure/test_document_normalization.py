@@ -1,4 +1,4 @@
-from litman_analysis.infrastructure.documents.normalize import _clean_pdf_text
+from litman_core.infrastructure.documents.normalize import _clean_pdf_text
 
 
 def test_pdf_cleanup_only_repairs_unambiguous_encoding_and_line_hyphens():

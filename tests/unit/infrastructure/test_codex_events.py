@@ -1,4 +1,4 @@
-from litman_analysis.infrastructure.llm.codex_events import CodexEventSummary
+from litman_core.infrastructure.llm.codex_events import CodexEventSummary
 import pytest
 
 

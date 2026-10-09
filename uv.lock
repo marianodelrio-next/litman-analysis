@@ -472,7 +472,7 @@ wheels = [
 ]
 
 [[package]]
-name = "litman-analysis"
+name = "litman-core"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

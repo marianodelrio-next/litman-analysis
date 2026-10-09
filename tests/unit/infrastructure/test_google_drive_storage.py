@@ -5,9 +5,9 @@ import json
 from pathlib import Path
 import pytest
 
-from litman_analysis.domain.jobs import JobRequest, JobType, StorageKind
-from litman_analysis.infrastructure.storage.google_drive import GoogleDriveArtifactPublisher, GoogleDriveDocumentSource
-from litman_analysis.infrastructure.storage.common import detailed_analysis_delivery_catalog
+from litman_core.domain.jobs import JobRequest, JobType, StorageKind
+from litman_core.infrastructure.storage.google_drive import GoogleDriveArtifactPublisher, GoogleDriveDocumentSource
+from litman_core.infrastructure.storage.common import detailed_analysis_delivery_catalog
 
 class Request:
     def __init__(self, value): self.value = value

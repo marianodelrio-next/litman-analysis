@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from litman_analysis.infrastructure.documents.inventory import inventory
+from litman_core.infrastructure.documents.inventory import inventory
 
 
 def test_inventory_is_stable_and_ignores_case_metadata(tmp_path: Path) -> None:

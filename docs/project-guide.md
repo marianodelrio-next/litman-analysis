@@ -2,9 +2,9 @@
 
 ## Arquitectura de ejecución
 
-La interfaz pública (`litman-analysis run`, `assess` y `analyze`) se ejecuta en el host. `ContainerJobLauncher` valida el job, convierte únicamente las rutas locales a `/input` y `/output`, crea un contrato interno en un directorio privado y lanza una sola instancia del servicio `litman-analysis`.
+La interfaz pública (`litman-core run`, `assess` y `analyze`) se ejecuta en el host. `ContainerJobLauncher` valida el job, convierte únicamente las rutas locales a `/input` y `/output`, crea un contrato interno en un directorio privado y lanza una sola instancia del servicio Compose `litman-analysis`.
 
-Dentro del contenedor, `litman-analysis-worker run` carga el contrato y delega en el `JobRunner` canónico:
+Dentro del contenedor, `litman-core-worker run` carga el contrato y delega en el `JobRunner` canónico:
 
 ```text
 CLI host → un contenedor → origen → inventario/normalización → Codex
@@ -38,7 +38,7 @@ para la herramienta interna: el contenedor no root, sin capabilities, con raíz
 de solo lectura, mounts mínimos y `no-new-privileges` es la frontera de
 aislamiento. No montes información ajena al job.
 
-Usa `litman-analysis-worker preflight runtime` para validar UID/GID,
+Usa `litman-core-worker preflight runtime` para validar UID/GID,
 capabilities, `NoNewPrivs`, mounts y autenticación sin leer secretos. Usa
 `preflight container` para una comprobación integral con `fixture.md`; registra
 la conectividad observada, pero no exige que la red esté aislada.

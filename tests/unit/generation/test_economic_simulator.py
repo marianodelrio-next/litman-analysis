@@ -5,12 +5,12 @@ from pathlib import Path
 
 from openpyxl import load_workbook
 
-from litman_analysis.generation.service import generate_documents
-from litman_analysis.generation.economic_simulator.calculator import calculate_scenario
-from litman_analysis.generation.economic_simulator.generator import _pending, render_existing_economic_run
-from litman_analysis.generation.economic_simulator.planner import build_economic_plan, skeleton_economic_inputs
-from litman_analysis.generation.economic_simulator.renderer import render_economic_workbook
-from litman_analysis.resource_paths import RESOURCE_ROOT
+from litman_core.generation.service import generate_documents
+from litman_core.generation.economic_simulator.calculator import calculate_scenario
+from litman_core.generation.economic_simulator.generator import _pending, render_existing_economic_run
+from litman_core.generation.economic_simulator.planner import build_economic_plan, skeleton_economic_inputs
+from litman_core.generation.economic_simulator.renderer import render_economic_workbook
+from litman_core.resource_paths import RESOURCE_ROOT
 
 from conftest import dossier
 

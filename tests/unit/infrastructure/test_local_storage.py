@@ -7,11 +7,11 @@ from pathlib import Path
 import pytest
 from jsonschema import Draft202012Validator
 
-from litman_analysis.application.job_loader import load_job
-from litman_analysis.config import Settings
-from litman_analysis.domain.jobs import JobRequest, JobType, StorageKind
-from litman_analysis.infrastructure.storage.local import LocalArtifactPublisher, LocalDocumentSource
-from litman_analysis.resource_paths import resource_path
+from litman_core.application.job_loader import load_job
+from litman_core.config import Settings
+from litman_core.domain.jobs import JobRequest, JobType, StorageKind
+from litman_core.infrastructure.storage.local import LocalArtifactPublisher, LocalDocumentSource
+from litman_core.resource_paths import resource_path
 
 ROOT = Path(__file__).parents[3]
 

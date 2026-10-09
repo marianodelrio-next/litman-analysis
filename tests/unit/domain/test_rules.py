@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from litman_analysis.pipelines.assessment.rules import evaluate_rules, load_rules
-from litman_analysis.resource_paths import resource_path
+from litman_core.pipelines.assessment.rules import evaluate_rules, load_rules
+from litman_core.resource_paths import resource_path
 
 
 RULES = load_rules(resource_path("pipelines", "assessment", "v1", "rules.yaml"))

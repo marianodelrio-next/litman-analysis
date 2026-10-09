@@ -4,8 +4,8 @@ import shutil
 from pathlib import Path
 import pytest
 from pypdf import PdfReader
-from litman_analysis.generation.opportunity_report import generate_opportunity_report
-from litman_analysis.generation.opportunity_report import build_report_model, render_html
+from litman_core.generation.opportunity_report import generate_opportunity_report
+from litman_core.generation.opportunity_report import build_report_model, render_html
 
 def _template(): return {"id":"executive-v1", "version":"1.2.0", "document":{"max_pages":2}, "limits":{"sources":8}}
 def _result(): return {"extraction":{"ficha":{"objeto_contrato":"Servicio", "presupuesto":{"base_sin_iva":10,"moneda":"EUR"}, "fecha_limite_presentacion":None, "equipo":{"perfiles":["consultor"]}, "stack_tecnologico":{"tecnologias":["CTIS"]}, "certificaciones_exigidas":[{"nombre":"ISO 9001"}], "solvencia_tecnica":"experiencia", "solvencia_economica":"volumen", "lotes":{"existen":None}}, "clasificacion":{}, "calidad_informacion":{"estado":"parcial"}, "control_documental":{"documentos":[]}}, "decision":{"accion":"continuar", "evaluaciones":[]}, "validation":{"valid":True}}

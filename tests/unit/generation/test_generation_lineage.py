@@ -1,8 +1,8 @@
 import json
 from pathlib import Path
 
-from litman_analysis.generation.service import generate_documents
-from litman_analysis.infrastructure.runs import dossier_lineage
+from litman_core.generation.service import generate_documents
+from litman_core.infrastructure.runs import dossier_lineage
 
 from conftest import dossier
 

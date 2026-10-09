@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from litman_analysis.infrastructure.storage.publication import publication_folder_name
+from litman_core.infrastructure.storage.publication import publication_folder_name
 
 
 def test_publication_folder_name_keeps_job_id_and_is_utc_sortable() -> None:

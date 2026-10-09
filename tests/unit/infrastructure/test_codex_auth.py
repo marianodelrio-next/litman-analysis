@@ -1,6 +1,6 @@
 from pathlib import Path
 import pytest
-from litman_analysis.infrastructure.llm.codex_auth import CodexAuthentication, CodexAuthenticationError
+from litman_core.infrastructure.llm.codex_auth import CodexAuthentication, CodexAuthenticationError
 
 def secret(tmp_path: Path, value: str = "secret") -> Path:
     path = tmp_path / "secret"
