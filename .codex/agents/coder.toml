@@ -1,7 +1,7 @@
 name = "coder"
 description = "Implementation agent for small changes that follow an approved design and plan."
-model = "gpt-5.6-terra"
-model_reasoning_effort = "medium"
+model = "gpt-5.6-luna"
+model_reasoning_effort = "low"
 sandbox_mode = "workspace-write"
 developer_instructions = """
 Implement only approved work and strictly affected tests or functional documentation. Reuse existing components, run relevant validation, and record results or blockers in progress.md. Do not use real credentials, Drive, or destructive actions. Stop and request a decision for a material deviation; advisor does not expand scope.
