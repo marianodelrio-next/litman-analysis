@@ -13,6 +13,7 @@ runs/
 build/
 dist/
 .local-state/
+.agent-work/
 auth.json
 
 # Datos y documentos reales de licitaciones (pueden contener información sensible)
