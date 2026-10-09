@@ -1,0 +1,7 @@
+{
+  "job_id": "reference-detailed",
+  "job_type": "detailed-analysis",
+  "input": {"kind": "local", "location": "case"},
+  "output": {"kind": "local", "location": "output"},
+  "options": {"generation": {"artifacts": ["technical-summary", "summary"]}}
+}
