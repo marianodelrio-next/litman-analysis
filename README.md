@@ -42,6 +42,13 @@ Cada ejecución publica en una carpeta nueva bajo el destino, denominada `<job_i
 
 Un análisis detallado completo publica cuatro entregables: `resumen_tecnico.docx` para la revisión técnica del expediente, `guia_preparacion_oferta.docx` para coordinar la preparación de la oferta, `propuesta_tecnica_base.docx` y `simulador_economico.xlsx`. La generación completa usa los artefactos `technical-summary`, `summary`, `technical-document` y `economic-simulator`, en ese orden.
 
+Todos los análisis y entregables se redactan en español, incluso si el pliego
+está en otro idioma. Se conservan literalmente las citas de evidencia,
+identificadores y nombres de documentos o archivos, referencias estables y de
+página, nombres propios y las fórmulas literales designadas por el schema. La
+opción de propuesta técnica `output_language` solo admite `auto` o `es`; el
+valor heredado `en` falla de forma explícita.
+
 El contenedor monta el job en `/job` (solo lectura), la entrada en `/input` (solo lectura), la salida en `/output`, los runs en `/data/runs`, las credenciales en `/run/secrets` (solo lectura) y el estado Codex persistente en `/var/lib/litman-analysis/codex`. Codex comparte el contenedor y puede ver el mount de secretos; ningún prompt le solicita leerlo. El workspace efímero vive en `/tmp/litman-analysis` y se elimina siempre. Los runs y diagnósticos se conservan aunque falle el análisis.
 
 Las citas se verifican primero literalmente y, para PDFs, con una segunda comparación que ignora únicamente espacios de maquetación. Las evidencias no verificables quedan señaladas como advertencias en el informe; los errores estructurales, referencias a documentos inexistentes y errores semánticos siguen impidiendo la publicación.

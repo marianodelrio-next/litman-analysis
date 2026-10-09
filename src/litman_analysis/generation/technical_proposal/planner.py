@@ -13,12 +13,12 @@ DEFAULT_SECTION_TITLES = (
     "Equipo requerido",
 )
 
-SUPPORTED_LANGUAGES = ("es", "en")
+SUPPORTED_LANGUAGES = ("es",)
 
 
 def build_document_plan(dossier: dict, template_id: str = "next-standard-v1") -> dict:
     memory = dossier.get("memoria_tecnica") or {}
-    language = normalize_output_language(memory.get("idioma"))
+    language = "es"
     specified = sorted(memory.get("secciones") or [], key=lambda item: item.get("orden", 0))
     structure_source = "tender" if specified else "detailed-analysis-suggestion"
     if specified:
@@ -56,60 +56,52 @@ def build_document_plan(dossier: dict, template_id: str = "next-standard-v1") ->
 
 
 def normalize_output_language(value: str | None) -> str:
-    """Convierte el idioma libre del pliego en una variante renderizable.
-
-    Cuando el expediente permite varios idiomas, español es el desempate
-    acordado. Por ahora la interfaz visual solo dispone de español e inglés.
-    """
-    if not value:
-        return "es"
-    normalized = unicodedata.normalize("NFKD", str(value)).encode("ascii", "ignore").decode().lower()
-    spanish = any(term in normalized for term in ("espanol", "castellano", "spanish"))
-    english = any(term in normalized for term in ("ingles", "english"))
-    if spanish:
-        return "es"
-    if english:
-        return "en"
-    if normalized.strip() in SUPPORTED_LANGUAGES:
-        return normalized.strip()
+    """La salida del producto es siempre española; el idioma fuente es descriptivo."""
     return "es"
 
 
 def _specified_section(item: dict, dossier: dict, index: int, language: str) -> dict:
-    criteria = _matching_criteria(item["titulo"], dossier)
+    source_title = item["titulo"]
+    title = _presentation_title(source_title, index)
+    translated = title == source_title
+    criteria = _matching_criteria(source_title, dossier)
     score_info = _resolve_score(item.get("puntuacion"), criteria, dossier)
     score = score_info["score"]
     page_limit = item.get("limite_paginas")
     return {
-        "id": f"section-{index:03d}-{_slug(item['titulo'])}",
+        "id": f"section-{index:03d}-{_slug(source_title)}",
         "order": index,
-        "title": item["titulo"],
-        "purpose": item.get("descripcion") or _contextual_purpose(item["titulo"], dossier, language),
+        "title": title,
+        "source_title": source_title,
+        "purpose": item.get("descripcion") if translated and item.get("descripcion") else _contextual_purpose(title, dossier, language),
         "required": item.get("obligatoria") is not False,
         "score": score,
         **score_info,
-        "display_title": display_title(item["titulo"], score, language),
+        "display_title": display_title(title, score, language),
         "page_limit": page_limit,
         "target_words": _target_words(score, page_limit),
-        "requirements": item.get("requisitos_relacionados") or _matching_requirements(item["titulo"], dossier),
+        "requirements": item.get("requisitos_relacionados") or _matching_requirements(source_title, dossier),
         "criteria": criteria,
         "evidence_fields": _section_evidence_fields(item, dossier),
         "subsections": _subsections(item, dossier, index, language),
-        "guidance": _guidance(item["titulo"], item.get("descripcion"), dossier, score, page_limit,
-                              item.get("requisitos_relacionados") or _matching_requirements(item["titulo"], dossier), criteria,
+        "guidance": _guidance(title, item.get("descripcion") if translated else None, dossier, score, page_limit,
+                              item.get("requisitos_relacionados") or _matching_requirements(source_title, dossier), criteria,
                               _section_evidence_fields(item, dossier), item.get("evidencias", []), language),
         "generation_status": "ready",
     }
 
 
 def _fallback_section(title: str, dossier: dict, index: int, language: str) -> dict:
-    criteria = _matching_criteria(title, dossier)
+    source_title = title
+    title = _presentation_title(source_title, index)
+    criteria = _matching_criteria(source_title, dossier)
     score_info = _resolve_score(None, criteria, dossier)
     score = score_info["score"]
     return {
-        "id": f"section-{index:03d}-{_slug(title)}",
+        "id": f"section-{index:03d}-{_slug(source_title)}",
         "order": index,
         "title": title,
+        "source_title": source_title,
         "purpose": "Estructura propuesta al no haberse localizado un índice obligatorio en el expediente.",
         "required": True,
         "score": score,
@@ -117,7 +109,7 @@ def _fallback_section(title: str, dossier: dict, index: int, language: str) -> d
         "display_title": display_title(title, score, language),
         "page_limit": None,
         "target_words": 500,
-        "requirements": _matching_requirements(title, dossier),
+        "requirements": _matching_requirements(source_title, dossier),
         "criteria": criteria,
         "evidence_fields": _matching_evidence_fields(title, dossier),
         "subsections": _proposed_subsections(title, dossier, index, language),
@@ -160,8 +152,8 @@ def _subsections(item: dict, dossier: dict, index: int, language: str) -> list[d
     explicit = item.get("subapartados") or []
     if explicit:
         return [{"id": f"section-{index:03d}-{_slug(item['titulo'])}-sub-{position:02d}-{_slug(x['titulo'])}",
-                 "title": x["titulo"], "level": x.get("nivel", 2), "source": "tender",
-                 "purpose": x.get("descripcion") or _contextual_purpose(x["titulo"], dossier, language),
+                 "title": _presentation_title(x["titulo"], position), "source_title": x["titulo"], "level": x.get("nivel", 2), "source": "tender",
+                 "purpose": x.get("descripcion") if _presentation_title(x["titulo"], position) == x["titulo"] and x.get("descripcion") else _contextual_purpose(_presentation_title(x["titulo"], position), dossier, language),
                  "requirements": x.get("requisitos_relacionados") or [], "criteria": [],
                  "evidence_fields": [e.get("campo") for e in x.get("evidencias", []) if e.get("campo")]}
                 for position, x in enumerate(explicit, 1)]
@@ -171,12 +163,12 @@ def _subsections(item: dict, dossier: dict, index: int, language: str) -> list[d
 def _proposed_subsections(title: str, dossier: dict, index: int, language: str) -> list[dict]:
     lowered = title.casefold()
     catalog = {
-        "method": (["Methodological principles", "Activity organisation", "Validation and quality control", "Monitoring and continuous improvement"] if language == "en" else ["Principios metodológicos", "Organización de las actividades", "Validación y control de calidad", "Seguimiento y mejora continua"]),
-        "plan": (["Overall plan", "Phases and activities", "Milestones and deliverables", "Monitoring and control", "Risks and dependencies"] if language == "en" else ["Enfoque general del plan", "Fases y actividades", "Hitos y entregables", "Seguimiento y control", "Riesgos y dependencias"]),
-        "team": (["Team organisation", "Profiles and responsibilities", "Coordination model", "Availability and continuity to be confirmed"] if language == "en" else ["Organización del equipo", "Perfiles y responsabilidades", "Modelo de coordinación", "Disponibilidad y continuidad pendiente de confirmar"]),
-        "solution": (["Functional architecture", "Components and integrations", "Data, security and governance", "Deployment and operations", "Pending technical decisions"] if language == "en" else ["Arquitectura funcional", "Componentes e integraciones", "Datos, seguridad y gobierno", "Despliegue y operación", "Decisiones técnicas pendientes"]),
-        "scope": (["Context and current situation", "Processes and users in scope", "Functional needs", "Use cases and expected outcomes", "Scope constraints"] if language == "en" else ["Contexto y situación de partida", "Procesos y usuarios incluidos", "Necesidades funcionales", "Casos de uso y resultados esperados", "Condicionantes del alcance"]),
-        "other": (["Purpose and scope", "Content and supporting evidence"] if language == "en" else ["Objetivo y alcance del apartado", "Contenido y evidencias a aportar"]),
+        "method": ["Principios metodológicos", "Organización de las actividades", "Validación y control de calidad", "Seguimiento y mejora continua"],
+        "plan": ["Enfoque general del plan", "Fases y actividades", "Hitos y entregables", "Seguimiento y control", "Riesgos y dependencias"],
+        "team": ["Organización del equipo", "Perfiles y responsabilidades", "Modelo de coordinación", "Disponibilidad y continuidad pendiente de confirmar"],
+        "solution": ["Arquitectura funcional", "Componentes e integraciones", "Datos, seguridad y gobierno", "Despliegue y operación", "Decisiones técnicas pendientes"],
+        "scope": ["Contexto y situación de partida", "Procesos y usuarios incluidos", "Necesidades funcionales", "Casos de uso y resultados esperados", "Condicionantes del alcance"],
+        "other": ["Objetivo y alcance del apartado", "Contenido y evidencias a aportar"],
     }
     if any(term in lowered for term in ("metodolog", "metodología", "methodolog")):
         candidates = catalog["method"]
@@ -197,11 +189,29 @@ def _proposed_subsections(title: str, dossier: dict, index: int, language: str) 
             for position, name in enumerate(candidates, 1)]
 
 
+def _presentation_title(value: str, position: int) -> str:
+    """Produce rótulos de presentación españoles sin alterar el hecho fuente."""
+    normalized = _slug(value)
+    catalog = {
+        "methodology": "Metodología",
+        "technical-approach": "Enfoque técnico",
+        "work-plan": "Plan de trabajo",
+        "team": "Equipo",
+        "project-team": "Equipo del proyecto",
+        "scope": "Alcance",
+        "deliverables": "Entregables",
+        "methodological-principles": "Principios metodológicos",
+        "activity-organisation": "Organización de las actividades",
+        "validation-and-quality-control": "Validación y control de calidad",
+    }
+    # El dossier ya cruza la frontera de traducción. Solo se conservan alias
+    # ingleses explícitos de planes históricos; el idioma declarado del pliego
+    # nunca decide si un campo semántico válido se altera.
+    return catalog.get(normalized, value)
+
+
 def _contextual_purpose(title: str, dossier: dict, language: str = "es") -> str:
     context = dossier.get("contexto")
-    if language == "en":
-        base = f"Explain verifiably how this section addresses ‘{title}’ within the tender scope."
-        return base + (" Relate it to the needs and constraints in the tender without turning company assumptions into commitments." if context else " Distinguish tender facts from decisions to be supplied by the company.")
     base = f"Explicar de forma verificable cómo este apartado responde a «{title}» dentro del alcance licitado."
     if context:
         return base + " Relaciónelo con las necesidades y condicionantes descritos en el expediente, sin convertir hipótesis empresariales en compromisos."
@@ -215,13 +225,13 @@ def _guidance(title, description, dossier, score, page_limit, requirements, crit
     lowered = title.casefold()
     available = _relevant_information(lowered, dossier)
     questions = _guidance_questions(lowered, language)
-    suffix = (" Separate tender facts from company decisions that still require confirmation." if language == "en" else " Debe separar los hechos acreditados del expediente de las decisiones de la empresa pendientes de confirmar.")
-    intent = (f"Editorial guidance: make {title.casefold()} easy to assess through a verifiable response; this adds no tender obligations." if language == "en" else f"Orientación editorial: facilite la evaluación de {title.casefold()} mediante una respuesta verificable; no añade obligaciones distintas de las extraídas del pliego.")
+    suffix = " Debe separar los hechos acreditados del expediente de las decisiones de la empresa pendientes de confirmar."
+    intent = f"Orientación editorial: facilite la evaluación de {title.casefold()} mediante una respuesta verificable; no añade obligaciones distintas de las extraídas del pliego."
     return {"purpose": (description or _contextual_purpose(title, dossier, language)) + suffix,
             "evaluation_intent": intent,
             "questions_to_answer": questions,
             "mandatory_content": requirements, "criteria": criteria, "available_information": available,
-            "company_inputs_required": (["Confirm decisions, resources and commitments not stated in the tender."] if language == "en" else ["Validar decisiones, recursos y compromisos que no consten en el expediente."]),
+            "company_inputs_required": ["Validar decisiones, recursos y compromisos que no consten en el expediente."],
             "evidence_summary": _evidence_summary(dossier, evidence_fields, direct_evidence), "avoid": avoid, "target_pages": page_limit,
             "target_words": _target_words(score, page_limit), "score": score, "score_confirmed": score is not None}
 
@@ -250,12 +260,6 @@ def _relevant_information(title: str, dossier: dict) -> list[str]:
 
 
 def _guidance_questions(title: str, language: str) -> list[str]:
-    if language == "en":
-        if "method" in title: return ["How will activities be organised?", "Which validation mechanisms will be used?", "How will quality, risks and changes be controlled?"]
-        if any(x in title for x in ("plan", "phase", "deliverable", "milestone")): return ["What are the phases, dependencies and milestones?", "Which deliverables are produced in each phase?", "How will progress be monitored?"]
-        if any(x in title for x in ("team", "profile")): return ["Which profiles does the tender require?", "What responsibilities will each profile have?", "What availability must the company confirm?"]
-        if any(x in title for x in ("scope", "functional", "understanding", "design")): return ["Which processes, users and systems are in scope?", "What is out of scope?", "Which constraints affect the solution?"]
-        return [f"What must be demonstrated in {title}?", "Which tender evidence supports the response?", "Which decision must the company provide?"]
     if any(x in title for x in ("metodolog",)):
         return ["¿Cómo se organizarán las actividades?", "¿Qué mecanismos de validación se utilizarán?", "¿Cómo se controlarán calidad, riesgos y cambios?"]
     if any(x in title for x in ("plan", "fase", "entregable", "hito")):
@@ -330,7 +334,7 @@ def display_title(title: str, score: float | int | None, language: str = "es") -
         return title
     numeric = float(score)
     rendered = str(int(numeric)) if numeric.is_integer() else str(numeric).replace(".", ",")
-    unit = ("point" if numeric == 1 else "points") if language == "en" else ("punto" if numeric == 1 else "puntos")
+    unit = "punto" if numeric == 1 else "puntos"
     return f"{title} ({rendered} {unit})"
 
 

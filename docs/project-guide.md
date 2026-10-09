@@ -51,6 +51,13 @@ Cada publicación local o Drive crea una carpeta única bajo `output.location`, 
 
 El catálogo cerrado de `detailed-analysis` contiene `resumen_tecnico.docx` (contexto completo para técnico, arquitecto o revisor), `guia_preparacion_oferta.docx` (guía operativa para bid manager o redactor), `propuesta_tecnica_base.docx` y `simulador_economico.xlsx`. Los dos primeros se generan de forma determinista desde `dossier.json`; `summary` conserva su ID histórico, aunque ahora identifica la guía de preparación.
 
+La salida del análisis y de todos los entregables es siempre española. Las
+citas de evidencia, identificadores, nombres de archivo, referencias estables o
+de página, nombres propios y fórmulas literales designadas por el schema se
+mantienen textualmente como material fuente. En la propuesta técnica,
+`output_language` solo acepta `auto` o `es`; el valor heredado `en` se rechaza
+para impedir una salida parcial en inglés.
+
 La verificación de evidencias conserva documento y página estrictos. Tolera solamente espacios artificiales introducidos por el layout PDF y registra `verification_method` (`exact` o `layout_whitespace`). Una cita no comprobable produce un informe parcial con advertencias; los fallos estructurales o semánticos continúan siendo bloqueantes.
 
 Consulta el README para autenticación y comandos. Las salidas quedan en el destino indicado y los runs/diagnósticos bajo `runs/`. Antes de cerrar cambios ejecuta pytest, `docker compose config --quiet` y `docker compose build`. Las llamadas reales a Drive requieren autorización explícita; los tests usan fakes.

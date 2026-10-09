@@ -4,8 +4,11 @@ from xml.etree import ElementTree
 from pathlib import Path
 
 from docx import Document
+from openpyxl import load_workbook
+from jsonschema import Draft202012Validator
 from litman_analysis.generation import ARTIFACT_GENERATORS, resolve_artifact_generators
 from litman_analysis.generation.service import generate_documents
+from litman_analysis.resource_paths import RESOURCE_ROOT
 
 from conftest import dossier
 
@@ -112,6 +115,32 @@ def test_multiple_artifacts_are_consolidated_with_versions(tmp_path: Path) -> No
     assert {item["id"] for item in manifest["artifacts"]} == {"technical-summary", "summary", "economic-simulator"}
     assert all(item["generator_version"] for item in manifest["artifacts"])
     assert manifest["artifacts"][2]["metadata"]["template_version"] == "1.1.0"
+
+
+def test_english_source_contract_fixture_generates_four_spanish_artifacts(tmp_path: Path) -> None:
+    contract = json.loads((Path(__file__).parents[2] / "fixtures/spanish-output-language/english-source-contract.json").read_text())
+    value = dossier()
+    value["memoria_tecnica"]["idioma"] = contract["source_language"]
+    value["contexto"] = contract["semantic_context"]
+    value["memoria_tecnica"]["secciones"][0]["titulo"] = contract["semantic_section"]
+    value["memoria_tecnica"]["secciones"][0]["subapartados"] = [{"titulo": "Enfoque técnico", "descripcion": "Descripción semántica en español", "nivel": 2, "requisitos_relacionados": [], "evidencias": []}]
+    value["evidencias"] = [{"campo": "metodologia", "documento_id": "ENG-1", "pagina": 3, "texto_citado": contract["source_quote"]}]
+    value["simulador_economico"]["formula_precio"]["expresion_literal"] = contract["price_formula"]
+    value["simulador_economico"]["baja_anormal"]["formula_literal"] = contract["abnormal_formula"]
+    assert not list(Draft202012Validator(json.loads((RESOURCE_ROOT / "schemas/detailed-analysis.schema.json").read_text())).iter_errors(value))
+    dossier_path = tmp_path / "dossier.json"
+    dossier_path.write_text(json.dumps(value, ensure_ascii=False), encoding="utf-8")
+    manifest = generate_documents(dossier_path, output_dir=tmp_path / "run", provider=None)
+    assert {item["id"] for item in manifest["artifacts"]} == {"technical-summary", "summary", "technical-document", "economic-simulator"}
+    docx_text = "\n".join("\n".join(p.text for p in Document(path).paragraphs) for path in manifest["documents"] if path.endswith(".docx"))
+    assert contract["semantic_context"] in docx_text
+    assert "Propuesta técnica" in docx_text
+    workbook = load_workbook(next(Path(path) for path in manifest["documents"] if path.endswith(".xlsx")), data_only=False)
+    workbook_text = "\n".join(str(cell.value) for sheet in workbook.worksheets for row in sheet.iter_rows() for cell in row if cell.value is not None)
+    assert contract["source_quote"] in docx_text
+    assert contract["price_formula"] in workbook_text
+    economic_plan = json.loads((tmp_path / "run/input/economic_plan.json").read_text(encoding="utf-8"))
+    assert economic_plan["abnormally_low"]["formula_literal"] == contract["abnormal_formula"]
 
 
 def test_selective_summary_generation_declares_existing_output_documents(tmp_path: Path) -> None:

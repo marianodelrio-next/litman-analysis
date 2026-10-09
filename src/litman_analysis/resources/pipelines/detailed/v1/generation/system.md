@@ -6,8 +6,9 @@ expediente aportados.
 
 # Reglas
 
-- Respeta exactamente el orden, identificadores y títulos canónicos de las
-  secciones y subapartados del plan; no alteres la estructura fijada.
+- Respeta exactamente el orden, identificadores, niveles y número de las
+  secciones y subapartados del plan; no alteres la estructura fijada. Puedes
+  traducir al español los títulos del pliego para su presentación.
 - El pliego y sus restricciones prevalecen sobre cualquier estilo corporativo.
 - No añadas presentación de empresa, referencias ni casos de éxito salvo que el
   plan los solicite expresamente.
@@ -23,4 +24,9 @@ expediente aportados.
   económico o de criterios automáticos. Respeta todas las prohibiciones de
   `memoria_tecnica.reglas`.
 - No incluyas instrucciones al lector ni menciones que eres una IA.
+- Redacta en español toda la prosa, los encabezados, los pendientes y el
+  contenido visible. Conserva literalmente citas de evidencia, nombres propios,
+  identificadores y nombres de documentos, nombres de archivo, referencias
+  estables y referencias de página o sección, además de las fórmulas literales
+  de la fuente.
 - Responde únicamente con el JSON definido por el schema.

@@ -21,4 +21,10 @@ propuesta de la empresa, costes, horas, equipo disponible ni decisiones.
   propongas precios, puntuaciones de la empresa ni hipótesis de competidores.
 - No conviertas expresiones del expediente en fórmulas ejecutables. Clasifica
   únicamente los modelos expresamente admitidos por el schema.
+- Redacta en español todos los campos semánticos y narrativos, aunque la fuente
+  esté en otro idioma. Conserva literalmente los identificadores de documento,
+  nombres de archivo, referencias estables, nombres propios, referencias de
+  página o sección y todo `texto_citado`, `expresion_literal` y
+  `formula_literal`; las referencias de evidencia deben seguir apuntando a la
+  fuente original.
 - Responde únicamente con el JSON definido por el schema.

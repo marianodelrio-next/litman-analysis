@@ -10,7 +10,7 @@ from jsonschema import Draft202012Validator
 from litman_analysis.application.ports.llm import output_paths_for_run
 
 from .content import build_generation_prompt, fallback_content, skeleton_content
-from .planner import build_document_plan, normalize_output_language
+from .planner import build_document_plan
 from .renderer import render_technical_document
 from litman_analysis.generation.models import ArtifactContext
 from litman_analysis.resource_paths import resource_path
@@ -18,14 +18,14 @@ from litman_analysis.resource_paths import resource_path
 
 class TechnicalDocumentGenerator:
     id = "technical-document"
-    version = "technical-document-generator-v3"
+    version = "technical-document-generator-v4"
 
     def generate(self, context: ArtifactContext) -> dict:
+        if context.output_language not in ("auto", "es"):
+            raise ValueError("La propuesta técnica solo admite salida en español; use 'auto' o 'es'.")
         template_path, manifest = _template(context.template_id)
         shutil.copy2(template_path.parent / "template.yaml", context.run_dir / "input" / "template.yaml")
         plan = build_document_plan(context.dossier, context.template_id)
-        if context.output_language != "auto":
-            plan.update(language=normalize_output_language(context.output_language), source_language=context.output_language)
         _write_json(context.run_dir / "input" / "document_plan.json", plan)
         content, generation = _generate_content(context, plan)
         _write_json(context.run_dir / "output" / "content.json", content)
@@ -41,7 +41,8 @@ class TechnicalDocumentGenerator:
         if bool(options.get("refresh_skeleton", False)) and plan.get("version") != "document-plan-v2":
             plan = build_document_plan(dossier, plan.get("template_id", "next-standard-v1"))
             _write_json(run_dir / "input" / "document_plan.json", plan)
-        plan["language"] = normalize_output_language(plan.get("language"))
+        if plan.get("language") != "es":
+            raise ValueError("No se puede rerenderizar un plan histórico que no sea de salida en español.")
         content_path = run_dir / "output" / "content.json"
         refresh = bool(options.get("refresh_skeleton", False))
         content = skeleton_content(dossier, plan) if refresh else json.loads(content_path.read_text(encoding="utf-8"))
@@ -108,14 +109,15 @@ def _generate_content(context, plan):
 def _validate_content(content, plan):
     schema = json.loads(resource_path("schemas", "technical-content.schema.json").read_text(encoding="utf-8"))
     errors = [{"path": ".".join(map(str, e.path)), "message": e.message} for e in Draft202012Validator(schema).iter_errors(content)]
-    if [(x.get("id"), x.get("title")) for x in content.get("sections", [])] != [(x["id"], x["title"]) for x in plan["sections"]]: errors.append({"path": "sections", "message": "Las secciones no respetan el plan y su orden"})
+    if [x.get("id") for x in content.get("sections", [])] != [x["id"] for x in plan["sections"]]: errors.append({"path": "sections", "message": "Las secciones no respetan el plan y su orden"})
     for key, label in (("document_title", "El título no respeta el plan del documento"), ("language", "El idioma no respeta el plan del documento")):
         if content.get(key) != plan.get(key): errors.append({"path": key, "message": label})
     planned = {x["id"]: x for x in plan["sections"]}
     for section in content.get("sections", []):
         expected = planned.get(section.get("id"), {})
         actual_subsections = [(b.get("id"), b.get("text"), b.get("level")) for b in section.get("blocks", []) if b.get("type") == "subheading"]
-        planned_subsections = [(b.get("id"), b.get("title"), b.get("level", 2)) for b in expected.get("subsections", [])]
+        planned_subsections = [(b.get("id"), b.get("level", 2)) for b in expected.get("subsections", [])]
+        actual_subsections = [(block_id, level) for block_id, _text, level in actual_subsections]
         if actual_subsections != planned_subsections:
             errors.append({"path": f"sections.{section.get('id')}.blocks", "message": "Los subapartados no respetan el plan y su orden"})
         for key, label in (("requirements_covered", "Declara requisitos no asignados al apartado"), ("evidence_fields", "Declara evidencias no trazables al plan")):

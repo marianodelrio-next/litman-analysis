@@ -39,6 +39,20 @@ def test_quote_not_found_is_not_verified(tmp_path: Path) -> None:
     assert index["evidences"][0]["verification"] == "quote_not_found"
 
 
+def test_english_source_quote_is_verified_but_spanish_translation_is_not(tmp_path: Path) -> None:
+    markdown = tmp_path / "document.md"
+    markdown.write_text("<!-- pagina: 1 -->\nThe methodology must be described.", encoding="utf-8")
+    document = Document("doc_1", tmp_path / "source.pdf", "source.pdf", "source.pdf", ".pdf", "application/pdf", 1, "x", "ppt", "licitacion", "ready")
+    normalized = NormalizedDocument("doc_1", str(markdown), "ready", "pdf_text_by_page", 1, 80, [])
+    data = {"evidencias": [
+        {"campo": "original", "documento_id": "doc_1", "pagina": 1, "texto_citado": "The methodology must be described."},
+        {"campo": "translation", "documento_id": "doc_1", "pagina": 1, "texto_citado": "La metodología debe describirse."},
+    ]}
+    entries = {entry["field"]: entry for entry in build_evidence_index(data, [document], [normalized])["evidences"]}
+    assert entries["original"]["verification"] == "verified"
+    assert entries["translation"]["verification"] == "quote_not_found"
+
+
 def test_pdf_layout_spaces_are_tolerated_but_paraphrases_are_not(tmp_path: Path) -> None:
     markdown = tmp_path / "document.md"
     markdown.write_text(

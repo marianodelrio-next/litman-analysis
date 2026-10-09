@@ -3,13 +3,17 @@ import zipfile
 from xml.etree import ElementTree
 from pathlib import Path
 
+import pytest
+
 from docx import Document
 from jsonschema import Draft202012Validator
 
 from litman_analysis.generation.technical_proposal.content import fallback_content, skeleton_content
 from litman_analysis.generation.technical_proposal.planner import build_document_plan, normalize_output_language
 from litman_analysis.generation.technical_proposal.renderer import render_technical_document
+from litman_analysis.generation.technical_proposal.generator import _validate_content
 from litman_analysis.generation.service import generate_documents, render_existing_run
+from litman_analysis.cli import main
 from litman_analysis.resource_paths import RESOURCE_ROOT
 
 from conftest import dossier
@@ -61,9 +65,9 @@ def test_generic_criterion_destination_does_not_contaminate_other_sections() -> 
     assert plan["sections"][0]["criteria"] == ["Metodología"]
 
 
-def test_language_normalization_prefers_spanish_for_multilingual_option() -> None:
+def test_language_normalization_is_always_spanish() -> None:
     assert normalize_output_language("Catalán o español") == "es"
-    assert normalize_output_language("English") == "en"
+    assert normalize_output_language("English") == "es"
     assert normalize_output_language(None) == "es"
 
 
@@ -109,10 +113,13 @@ def test_english_plan_localizes_generated_structure_and_nested_evidence() -> Non
     }])
     plan = build_document_plan(value)
     planned = plan["sections"][0]
-    assert planned["display_title"] == "Methodology (20 points)"
-    assert planned["subsections"][0]["title"] == "Methodological principles"
+    assert plan["language"] == "es"
+    assert plan["source_language"] == "en"
+    assert planned["display_title"] == "Metodología (20 puntos)"
+    assert planned["subsections"][0]["title"] == "Principios metodológicos"
     assert planned["guidance"]["evidence_summary"][0]["document_id"] == "PPT"
-    assert "Explain verifiably" in planned["guidance"]["purpose"]
+    assert planned["guidance"]["evidence_summary"][0]["quoted_text"] == "The methodology must be described."
+    assert "Explicar de forma verificable" in planned["guidance"]["purpose"]
 
 
 def test_filename_does_not_repeat_compound_reference(tmp_path: Path) -> None:
@@ -186,7 +193,7 @@ def test_render_uses_clean_template_and_keeps_dynamic_section(tmp_path: Path) ->
     assert blue_runs
 
 
-def test_render_localizes_template_interface_in_english(tmp_path: Path) -> None:
+def test_render_keeps_spanish_interface_for_historical_english_plan(tmp_path: Path) -> None:
     plan = build_document_plan(dossier())
     plan["language"] = "en"
     content = fallback_content(dossier(), plan)
@@ -196,9 +203,91 @@ def test_render_localizes_template_interface_in_english(tmp_path: Path) -> None:
         content, plan, output,
     )
     text = "\n".join(item.text for item in Document(output).paragraphs)
-    assert "Technical proposal" in text
-    assert "Contents" in text
-    assert "Propuesta técnica" not in text
+    assert "Propuesta técnica" in text
+    assert "Índice" in text
+    assert "Technical proposal" not in text
+
+
+def test_technical_document_rejects_legacy_english_output_option(tmp_path: Path) -> None:
+    dossier_path = tmp_path / "dossier.json"
+    dossier_path.write_text(json.dumps(dossier()), encoding="utf-8")
+    with pytest.raises(ValueError, match="solo admite salida en español"):
+        generate_documents(dossier_path, output_dir=tmp_path / "run", artifacts=["technical-document"],
+                           provider=None, output_language="en")
+
+
+def test_generated_spanish_headings_keep_section_and_subsection_ids(tmp_path: Path) -> None:
+    value = dossier()
+    value["memoria_tecnica"]["secciones"][0]["titulo"] = "Methodology"
+    plan = build_document_plan(value)
+    content = fallback_content(value, plan)
+    content["sections"][0]["title"] = "Metodología"
+    subheading = next(block for block in content["sections"][0]["blocks"] if block["type"] == "subheading")
+    subheading["text"] = "Principios metodológicos"
+    assert _validate_content(content, plan)["valid"]
+    output = tmp_path / "proposal.docx"
+    render_technical_document(RESOURCES / "templates" / "technical-proposal" / "next-standard-v1" / "template.docx", content, plan, output)
+    text = "\n".join(item.text for item in Document(output).paragraphs)
+    assert "1. Metodología" in text
+
+
+def test_standard_generation_hides_english_tender_structure_from_proposal(tmp_path: Path) -> None:
+    value = dossier()
+    value["memoria_tecnica"]["idioma"] = "en"
+    value["memoria_tecnica"]["secciones"] = [{
+        "orden": 1, "titulo": "Methodology", "descripcion": "Describe the delivery approach.",
+        "obligatoria": True, "puntuacion": 20, "limite_paginas": 2,
+        "requisitos_relacionados": [], "evidencias": [],
+        "subapartados": [{"titulo": "Technical approach", "descripcion": "Explain the approach.", "nivel": 2,
+                            "requisitos_relacionados": [], "evidencias": []}],
+    }]
+    dossier_path = tmp_path / "dossier.json"
+    dossier_path.write_text(json.dumps(value), encoding="utf-8")
+    manifest = generate_documents(dossier_path, output_dir=tmp_path / "run", artifacts=["technical-document"], provider=None)
+    plan = json.loads((tmp_path / "run/input/document_plan.json").read_text(encoding="utf-8"))
+    text = "\n".join(paragraph.text for paragraph in Document(manifest["documents"][0]).paragraphs)
+    assert plan["sections"][0]["source_title"] == "Methodology"
+    assert plan["sections"][0]["title"] == "Metodología"
+    assert plan["sections"][0]["subsections"][0]["source_title"] == "Technical approach"
+    assert "Methodology" not in text
+    assert "Technical approach" not in text
+    assert "Describe the delivery approach." not in text
+    assert "Explain the approach." not in text
+    assert "Metodología" in text
+    assert "Enfoque técnico" in text
+
+
+def test_spanish_titles_and_descriptions_are_preserved_without_heuristics() -> None:
+    value = dossier()
+    section = value["memoria_tecnica"]["secciones"][0]
+    section.update(titulo="Plan de implantación", descripcion="Descripción española exacta")
+    section["subapartados"] = [{"titulo": "Preparación", "descripcion": "Detalle español exacto", "nivel": 2,
+                                 "requisitos_relacionados": [], "evidencias": []}]
+    plan = build_document_plan(value)
+    assert plan["sections"][0]["title"] == "Plan de implantación"
+    assert plan["sections"][0]["purpose"] == "Descripción española exacta"
+    assert plan["sections"][0]["guidance"]["purpose"].startswith("Descripción española exacta")
+    assert plan["sections"][0]["subsections"][0]["title"] == "Preparación"
+    assert plan["sections"][0]["subsections"][0]["purpose"] == "Detalle español exacto"
+
+
+def test_declared_english_tender_preserves_unknown_translated_spanish_titles() -> None:
+    value = dossier()
+    value["memoria_tecnica"]["idioma"] = "en"
+    value["memoria_tecnica"]["secciones"] = [
+        {"orden": 1, "titulo": "Estrategia de implantación", "descripcion": "Descripción española exacta", "obligatoria": True,
+         "puntuacion": None, "limite_paginas": None, "requisitos_relacionados": [], "evidencias": [], "subapartados": []},
+        {"orden": 2, "titulo": "Modelo operativo", "descripcion": "Otra descripción española", "obligatoria": True,
+         "puntuacion": None, "limite_paginas": None, "requisitos_relacionados": [], "evidencias": [], "subapartados": []},
+    ]
+    plan = build_document_plan(value)
+    assert [section["title"] for section in plan["sections"]] == ["Estrategia de implantación", "Modelo operativo"]
+    assert plan["sections"][0]["purpose"] == "Descripción española exacta"
+
+
+def test_cli_rejects_legacy_english_output_option() -> None:
+    with pytest.raises(SystemExit, match="2"):
+        main(["analyze", "case", "--output-language", "en"])
 
 
 def test_clean_template_contains_no_historical_body() -> None:

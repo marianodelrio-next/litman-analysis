@@ -33,6 +33,26 @@ class FakeProvider:
         )
 
 
+def test_versioned_prompts_require_spanish_semantics_and_verbatim_sources() -> None:
+    assessment = (RESOURCE_ROOT / "pipelines/assessment/v1/system.md").read_text(encoding="utf-8")
+    detailed = (RESOURCE_ROOT / "pipelines/detailed/v1/system.md").read_text(encoding="utf-8")
+    generation_system = (RESOURCE_ROOT / "pipelines/detailed/v1/generation/system.md").read_text(encoding="utf-8")
+    generation_task = (RESOURCE_ROOT / "pipelines/detailed/v1/generation/generation.md").read_text(encoding="utf-8")
+    assert "campos semánticos y narrativos, aunque la fuente" in assessment
+    assert "texto_citado" in assessment
+    for literal in ("texto_citado", "expresion_literal", "formula_literal"):
+        assert literal in detailed
+    assert "identificadores, niveles y número" in generation_system
+    assert "títulos del pliego para su presentación" in generation_system
+    for literal in ("nombres propios", "nombres de documentos", "nombres de archivo",
+                    "referencias\n  estables", "página o sección", "fórmulas literales"):
+        assert literal in generation_system
+    assert "mismo id y\nnivel" in generation_task
+    assert (RESOURCE_ROOT / "pipelines/assessment/v1/VERSION").read_text().strip() == "assessment-prompt-v2"
+    assert (RESOURCE_ROOT / "pipelines/detailed/v1/VERSION").read_text().strip() == "detailed-analysis-prompt-v3"
+    assert (RESOURCE_ROOT / "pipelines/detailed/v1/generation/VERSION").read_text().strip() == "detailed-generation-prompt-v4"
+
+
 def test_stage_can_prepare_versioned_resources_and_persists_common_files(tmp_path: Path) -> None:
     project = tmp_path / "project"
     resources = project / "resources"

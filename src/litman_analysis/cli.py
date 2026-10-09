@@ -31,7 +31,7 @@ def main(argv: list[str] | None = None) -> None:
         command.add_argument("--job-id")
         if name == "analyze":
             command.add_argument("--content-profile", choices=("skeleton-v1", "draft-v1"), default="skeleton-v1")
-            command.add_argument("--output-language", choices=("auto", "es", "en"), default="auto")
+            command.add_argument("--output-language", choices=("auto", "es"), default="auto")
     args = parser.parse_args(argv)
     try:
         if args.command == "run":

@@ -1,0 +1,8 @@
+{
+  "source_quote": "The methodology must be described.",
+  "price_formula": "Score = lowest bid / evaluated bid * 10",
+  "abnormal_formula": "R=(85%+C×5%)×average bid",
+  "source_language": "en",
+  "semantic_context": "La entidad necesita una metodología verificable.",
+  "semantic_section": "Metodología"
+}
