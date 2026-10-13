@@ -4,51 +4,48 @@ import os
 import shutil
 import uuid
 from pathlib import Path
-from typing import Callable
 
-from litman_core.domain.jobs import JobRequest, MaterializedCase, PublishedArtifact
-from .common import publication_catalog
-from .publication import publication_folder_name
+from litman_core.domain.jobs import PublishedArtifact
+from .common import CatalogArtifact, sha256
 
 
 class LocalDocumentSource:
-    def materialize(self, job: JobRequest, workspace: Path) -> MaterializedCase:
+    def materialize(self, job, workspace: Path):
+        from litman_core.domain.jobs import MaterializedCase
         source = Path(job.input_location).expanduser().resolve()
-        if not source.is_dir():
-            raise ValueError(f"No existe el directorio de entrada: {source}")
-        target = workspace / "case"
-        shutil.copytree(source, target)
+        if not source.is_dir(): raise ValueError(f"No existe el directorio de entrada: {source}")
+        target = workspace / "case"; shutil.copytree(source, target)
         return MaterializedCase(job.job_id, target)
 
 
 class LocalArtifactPublisher:
-    def __init__(self, temporary_suffix: Callable[[], str] | None = None,
-                 publication_name_factory: Callable[[str], str] = publication_folder_name) -> None:
-        self._temporary_suffix = temporary_suffix or (lambda: uuid.uuid4().hex)
-        self._publication_name_factory = publication_name_factory
-
-    def publish(self, job: JobRequest, run_dir: Path) -> tuple[PublishedArtifact, ...]:
-        root = Path(job.output_location).expanduser().resolve()
-        publication_id = self._publication_name_factory(job.job_id)
-        target = root / publication_id
-        catalog = publication_catalog(run_dir, str(job.job_type))
-        if target.exists():
-            raise FileExistsError(f"La carpeta de publicación ya existe: {target}")
-        root.mkdir(parents=True, exist_ok=True)
-        temporary = root / f".{publication_id}.tmp-{self._temporary_suffix()}"
-        try:
-            temporary.mkdir()
-            artifacts = []
-            for item in catalog:
-                destination = temporary / item.name
-                destination.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(item.source, destination)
-                artifacts.append((item.name, item.checksum, (target / item.name).as_uri()))
-            if target.exists():
+    """Reduce the already allocated canonical run only after all remote work."""
+    def publish(self, run_dir: Path, inventory: tuple[CatalogArtifact, ...], *, include_run_files: bool) -> tuple[PublishedArtifact, ...]:
+        if not include_run_files:
+            temporary = run_dir.with_name(f".{run_dir.name}.catalog-{uuid.uuid4().hex}")
+            backup = run_dir.with_name(f".{run_dir.name}.complete-{uuid.uuid4().hex}")
+            try:
+                temporary.mkdir()
+                for item in inventory:
+                    destination = temporary / item.relative_path
+                    destination.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(item.source, destination)
+                    if sha256(destination) != item.checksum: raise RuntimeError("El hash del catálogo local no coincide")
+                os.rename(run_dir, backup)
+                try:
+                    os.rename(temporary, run_dir)
+                except Exception:
+                    os.rename(backup, run_dir)
+                    raise
+                try:
+                    shutil.rmtree(backup)
+                except Exception:
+                    # A successful rename is not enough: retain the complete
+                    # diagnostic run if removing its backup cannot be proven.
+                    os.rename(run_dir, temporary)
+                    os.rename(backup, run_dir)
+                    raise
+            except Exception:
                 shutil.rmtree(temporary, ignore_errors=True)
-                raise FileExistsError(f"La carpeta de publicación ya existe: {target}")
-            os.rename(temporary, target)
-            return tuple(PublishedArtifact(name, uri, checksum) for name, checksum, uri in artifacts)
-        except Exception:
-            shutil.rmtree(temporary, ignore_errors=True)
-            raise
+                raise
+        return tuple(PublishedArtifact(item.relative_path, (run_dir / item.relative_path).as_uri(), item.checksum) for item in inventory)

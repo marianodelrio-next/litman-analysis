@@ -7,11 +7,10 @@ from pathlib import Path
 from typing import Any
 
 DEFAULT_GENERATION: dict[str, Any] = {
-    "artifacts": ["technical-summary", "bid-preparation-guide", "technical-document", "economic-simulator"],
     "technical_document": {"template_id": "next-standard-v1", "content_profile": "skeleton-v1", "output_language": "auto"},
     "economic_simulator": {"template_id": "standard-v1"},
 }
-_KEYS = {"artifacts", "technical_document", "economic_simulator"}
+_KEYS = {"technical_document", "economic_simulator"}
 APPROVED_ARTIFACTS = frozenset({"technical-summary", "bid-preparation-guide", "technical-document", "economic-simulator"})
 _TECHNICAL_KEYS = {"template_id", "content_profile", "output_language", "include_internal_pending", "include_editorial_guidance"}
 
@@ -49,12 +48,6 @@ def _validate(data: dict[str, Any]) -> dict[str, Any]:
     unknown = set(data) - _KEYS
     if unknown:
         raise ValueError(f"Claves de generación desconocidas: {', '.join(sorted(unknown))}")
-    if "artifacts" in data and (not isinstance(data["artifacts"], list) or not all(isinstance(x, str) for x in data["artifacts"])):
-        raise ValueError("generation.artifacts debe ser una lista de textos")
-    if "artifacts" in data:
-        unknown_artifacts = set(data["artifacts"]) - APPROVED_ARTIFACTS
-        if unknown_artifacts:
-            raise ValueError(f"Artefactos de generación desconocidos: {', '.join(sorted(unknown_artifacts))}")
     for name, allowed in (("technical_document", _TECHNICAL_KEYS), ("economic_simulator", {"template_id"})):
         value = data.get(name)
         if value is not None:

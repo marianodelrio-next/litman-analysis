@@ -17,4 +17,4 @@ del consumo de una wheel instalada (`deployment/local-install/`). Docker es la
 frontera de aislamiento y construye la wheel en una etapa intermedia para
 instalarla en la imagen final; no usa `src/` como runtime.
 
-`litman-core` es la única CLI pública. Los comandos `run`, `assess`, `analyze` y `check` ejecutan el comportamiento documentado en el proceso actual; no existe una interfaz worker en el paquete.
+`litman-core` es la única CLI pública. El comando `run` carga el contrato único `config.toml` en el proceso actual; no existe una interfaz worker en el paquete.

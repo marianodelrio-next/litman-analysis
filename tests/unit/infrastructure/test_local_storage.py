@@ -1,88 +1,54 @@
-from __future__ import annotations
-
-import hashlib
-import json
 from pathlib import Path
 
-import pytest
-from jsonschema import Draft202012Validator
-
-from litman_core.application.job_loader import load_job
-from litman_core.config import Settings
-from litman_core.domain.jobs import JobRequest, JobType, StorageKind
+from litman_core.domain.jobs import JobType
+from litman_core.infrastructure.storage.common import publication_inventory
 from litman_core.infrastructure.storage.local import LocalArtifactPublisher, LocalDocumentSource
-from litman_core.resource_paths import resource_path
 
-ROOT = Path(__file__).parents[3]
 
-def local_job(input_dir: Path, output_dir: Path) -> JobRequest:
-    return JobRequest(
-        job_id="job-1", job_type=JobType.ASSESSMENT,
-        input_kind=StorageKind.LOCAL, output_kind=StorageKind.LOCAL,
-        input_location=str(input_dir), output_location=str(output_dir),
-    )
 def test_local_source_materializes_an_isolated_copy(tmp_path: Path) -> None:
-    source = tmp_path / "source"
-    source.mkdir()
-    (source / "PCAP.txt").write_text("original", encoding="utf-8")
-    materialized = LocalDocumentSource().materialize(
-        local_job(source, tmp_path / "published"), tmp_path / "workspace")
-    (materialized.directory / "PCAP.txt").write_text("changed", encoding="utf-8")
-    assert (source / "PCAP.txt").read_text(encoding="utf-8") == "original"
+    source = tmp_path / "source"; source.mkdir(); (source / "PCAP.txt").write_text("original")
+    job = type("Job", (), {"input_location": str(source), "job_id": "job"})()
+    materialized = LocalDocumentSource().materialize(job, tmp_path / "workspace")
+    (materialized.directory / "PCAP.txt").write_text("changed")
+    assert (source / "PCAP.txt").read_text() == "original"
 
 
-def test_local_publisher_publishes_only_public_assessment_artifacts(tmp_path: Path) -> None:
-    source = tmp_path / "source"
-    source.mkdir()
-    output = tmp_path / "published"
-    run = tmp_path / "run"
-    (run / "output").mkdir(parents=True)
-    payload = b"pdf"
-    (run / "output" / "ficha_oportunidad.pdf").write_bytes(payload)
-    (run / "lineage.json").write_text("{}")
-    published = LocalArtifactPublisher(publication_name_factory=lambda _: "job-1-20261008T153045.123456Z").publish(local_job(source, output), run)
-    assert (output / "job-1-20261008T153045.123456Z" / "ficha_oportunidad.pdf").read_bytes() == payload
-    assert not (output / "job-1-20261008T153045.123456Z" / "lineage.json").exists()
-    item = next(value for value in published if value.name == "ficha_oportunidad.pdf")
-    assert item.checksum == hashlib.sha256(payload).hexdigest()
+def test_local_catalog_promotion_replaces_complete_run_only_after_copy(tmp_path: Path) -> None:
+    run = tmp_path / "job-20261008T153045.123456Z"; output = run / "output"; output.mkdir(parents=True)
+    (output / "ficha_oportunidad.pdf").write_bytes(b"pdf"); (run / "lineage.json").write_text("{}")
+    inventory = publication_inventory(run, JobType.ASSESSMENT, False)
+    artifacts = LocalArtifactPublisher().publish(run, inventory, include_run_files=False)
+    assert [item.name for item in artifacts] == ["ficha_oportunidad.pdf"]
+    assert (run / "ficha_oportunidad.pdf").read_bytes() == b"pdf"
+    assert not (run / "lineage.json").exists()
 
 
-def test_local_publication_creates_a_new_folder_for_each_execution(tmp_path: Path) -> None:
-    source, output, run = tmp_path / "source", tmp_path / "published", tmp_path / "run"
-    source.mkdir()
-    run.mkdir()
-    (run / "output").mkdir()
-    (run / "output" / "ficha_oportunidad.pdf").write_bytes(b"pdf")
-    job = local_job(source, output)
-    names = iter(("job-1-20261008T153045.123456Z", "job-1-20261008T153046.123456Z"))
-    publisher = LocalArtifactPublisher(publication_name_factory=lambda _: next(names))
-    publisher.publish(job, run)
-    publisher.publish(job, run)
-    folders = sorted(path.name for path in output.iterdir())
-    assert folders == list(names := ["job-1-20261008T153045.123456Z", "job-1-20261008T153046.123456Z"])
-    assert all((output / folder / "ficha_oportunidad.pdf").is_file() for folder in folders)
+def test_full_run_inventory_preserves_relative_tree(tmp_path: Path) -> None:
+    run = tmp_path / "run"; (run / "output").mkdir(parents=True); (run / "logs").mkdir()
+    (run / "output/ficha_oportunidad.pdf").write_bytes(b"pdf"); (run / "logs/run.log").write_text("log")
+    inventory = publication_inventory(run, JobType.ASSESSMENT, True)
+    artifacts = LocalArtifactPublisher().publish(run, inventory, include_run_files=True)
+    assert {item.name for item in artifacts} == {"output/ficha_oportunidad.pdf", "logs/run.log"}
 
 
+def test_catalog_cleanup_failure_restores_complete_run(tmp_path: Path, monkeypatch) -> None:
+    run = tmp_path / "run"; output = run / "output"; output.mkdir(parents=True)
+    (output / "ficha_oportunidad.pdf").write_bytes(b"pdf"); (run / "lineage.json").write_text("{}")
+    inventory = publication_inventory(run, JobType.ASSESSMENT, False)
+    import litman_core.infrastructure.storage.local as local
+    real_rmtree = local.shutil.rmtree
+    def fail_backup(path, *args, **kwargs):
+        if ".complete-" in str(path): raise OSError("cleanup failed")
+        return real_rmtree(path, *args, **kwargs)
+    monkeypatch.setattr(local.shutil, "rmtree", fail_backup)
+    import pytest
+    with pytest.raises(OSError): LocalArtifactPublisher().publish(run, inventory, include_run_files=False)
+    assert (run / "lineage.json").is_file()
 
-def test_settings_can_separate_runtime_data_from_project(tmp_path: Path) -> None:
-    settings = Settings(project_root=ROOT, runs_root=tmp_path / "runs",
-                        workspace_root=tmp_path / "workspace")
-    assert settings.runs_dir == tmp_path / "runs"
-    assert settings.workspace_dir == tmp_path / "workspace"
 
-def test_local_detailed_publication_is_flat_and_excludes_internal_files(tmp_path: Path) -> None:
-    source, output, run = tmp_path / "source", tmp_path / "published", tmp_path / "run"
-    source.mkdir(); (run / "output").mkdir(parents=True)
-    for name, data in (("resumen_tecnico.docx", b"technical"), ("guia_preparacion_oferta.docx", b"guide"),
-                       ("propuesta_tecnica_base.docx", b"proposal"), ("simulador_economico.xlsx", b"xlsx")):
-        (run / "output" / name).write_bytes(data)
-    (run / "output" / "generation_manifest.json").write_text(json.dumps({"artifacts":[
-        {"id":"technical-summary","documents":["resumen_tecnico.docx"]},
-        {"id":"bid-preparation-guide","documents":["guia_preparacion_oferta.docx"]},
-        {"id":"technical-document","documents":["propuesta_tecnica_base.docx"]}]}))
-    (run / "output" / "result.json").write_text("{}"); (run / "lineage.json").write_text("{}")
-    job = JobRequest("job-1", JobType.DETAILED_ANALYSIS, StorageKind.LOCAL, StorageKind.LOCAL, str(source), str(output))
-    publication_id = "job-1-20261008T153045.123456Z"
-    published = LocalArtifactPublisher(publication_name_factory=lambda _: publication_id).publish(job, run)
-    assert {item.name for item in published} == {"resumen_tecnico.docx", "guia_preparacion_oferta.docx", "propuesta_tecnica_base.docx", "simulador_economico.xlsx"}
-    assert not list((output / publication_id).glob("*.json"))
+def test_detailed_catalog_requires_manifest_declared_technical_document(tmp_path: Path) -> None:
+    run = tmp_path / "run"; (run / "output").mkdir(parents=True)
+    from litman_core.infrastructure.storage.common import detailed_analysis_delivery_catalog
+    import pytest
+    with pytest.raises(ValueError, match="generation_manifest.json es obligatorio"):
+        detailed_analysis_delivery_catalog(run)

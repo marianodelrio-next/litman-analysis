@@ -1,5 +1,9 @@
 .venv/
 .env
+deployment/.env
+deployment/input/
+deployment/runs/
+deployment/local-secrets/
 local-data/
 local-secrets/
 credentials*.json

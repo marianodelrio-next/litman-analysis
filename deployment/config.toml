@@ -1,0 +1,25 @@
+[job]
+id = "licitacion-ayuntamiento-2026"
+type = "detailed-analysis"
+
+[input]
+kind = "local"
+location = "./input"
+
+[output]
+directory = "./runs"
+# google_drive_folder_id = "DESTINATION_FOLDER_ID"
+
+[codex]
+model = "gpt-5.5"
+
+[publication]
+include_run_files = false
+
+[analysis.detailed.generation.technical_document]
+template_id = "next-standard-v1"
+content_profile = "skeleton-v1"
+output_language = "auto"
+
+[analysis.detailed.generation.economic_simulator]
+template_id = "standard-v1"

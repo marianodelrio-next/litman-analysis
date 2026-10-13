@@ -40,10 +40,10 @@ class AssessmentPreparation:
 
 def prepare_assessment(case_dir: Path, settings: Settings | None = None,
                      bundle: DocumentBundle | None = None,
-                     run_case_id: str | None = None) -> AssessmentPreparation:
+                     run_case_id: str | None = None, run_dir: Path | None = None) -> AssessmentPreparation:
     settings = settings or Settings()
     return AssessmentPreparation(prepare_stage(definition(), case_dir, settings, bundle=bundle,
-                                          context={"settings": settings}, run_case_id=run_case_id))
+                                          context={"settings": settings}, run_case_id=run_case_id, run_dir=run_dir))
 
 
 def run_assessment(prepared: AssessmentPreparation, provider: LLMProvider) -> dict:

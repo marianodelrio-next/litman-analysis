@@ -118,10 +118,10 @@ def test_pipeline_definitions_keep_their_domain_hooks_and_facades() -> None:
     assert "evidence-index.json" in assessment.output_files
     assert "dossier.json" in detailed.output_files
     assert list(inspect.signature(prepare_assessment).parameters) == [
-        "case_dir", "settings", "bundle", "run_case_id",
+        "case_dir", "settings", "bundle", "run_case_id", "run_dir",
     ]
     assert list(inspect.signature(prepare_detailed_analysis).parameters) == [
-        "case_dir", "settings", "bundle", "assessment_result", "run_case_id",
+        "case_dir", "settings", "bundle", "assessment_result", "run_case_id", "run_dir",
     ]
     assert list(inspect.signature(run_assessment).parameters) == ["prepared", "provider"]
     assert list(inspect.signature(run_detailed_analysis).parameters) == ["prepared", "provider"]
@@ -197,15 +197,14 @@ def test_prepare_assessment_persists_version_bundle(tmp_path: Path) -> None:
     assert len(bundle["sha256"]["schema"]) == 64
 
 
-@pytest.mark.parametrize("command", ["assess", "analyze"])
-def test_public_commands_are_available(monkeypatch, capsys, command: str) -> None:
+@pytest.mark.parametrize("command", ["assess", "analyze", "check"])
+def test_removed_public_commands_are_rejected(monkeypatch, command: str) -> None:
     from litman_core.cli import main
 
     monkeypatch.setattr("sys.argv", ["litman-core", command, "--help"])
     with pytest.raises(SystemExit) as exit_status:
         main()
-    assert exit_status.value.code == 0
-    assert command in capsys.readouterr().out
+    assert exit_status.value.code == 2
 
 
 def test_public_modules_and_composition_roots_import() -> None:

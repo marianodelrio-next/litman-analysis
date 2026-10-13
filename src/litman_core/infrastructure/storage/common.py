@@ -13,8 +13,12 @@ _SHA256 = re.compile(r"^(?:sha256:)?[0-9a-fA-F]{64}$")
 @dataclass(frozen=True)
 class CatalogArtifact:
     source: Path
-    name: str
+    relative_path: str
     checksum: str
+
+    @property
+    def name(self) -> str:
+        return self.relative_path
 
 
 def sha256(path: Path) -> str:
@@ -68,34 +72,32 @@ def detailed_analysis_delivery_catalog(run_dir: Path) -> tuple[CatalogArtifact, 
     artifacts: list[CatalogArtifact] = []
     names = list(_DETAILED_ANALYSIS_DELIVERABLES)
     manifest_path = output / "generation_manifest.json"
-    if manifest_path.is_file():
-        try:
-            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError) as exc:
-            raise ValueError("generation_manifest.json no es legible o contiene JSON inválido") from exc
-        if not isinstance(manifest, dict) or not isinstance(manifest.get("artifacts"), list):
-            raise ValueError("generation_manifest.json no contiene una lista de artefactos válida")
-        if not all(isinstance(item, dict) for item in manifest["artifacts"]):
-            raise ValueError("generation_manifest.json contiene artefactos inválidos")
-        summaries = {item.get("id"): item for item in manifest["artifacts"] if item.get("id") in {"technical-summary", "bid-preparation-guide"}}
-        if set(summaries) != {"technical-summary", "bid-preparation-guide"}:
-            raise ValueError("generation_manifest.json debe declarar los dos resúmenes requeridos")
-        expected_summaries = {"technical-summary": "resumen_tecnico.docx", "bid-preparation-guide": "guia_preparacion_oferta.docx"}
-        for artifact_id, expected_name in expected_summaries.items():
-            documents = summaries[artifact_id].get("documents")
-            declared_summary = [Path(path).name for path in documents] if isinstance(documents, list) else []
-            if declared_summary != [expected_name]:
-                raise ValueError(f"generation_manifest.json debe declarar {expected_name} para {artifact_id}")
-        technical = [item for item in manifest["artifacts"] if item.get("id") == "technical-document"]
-        if len(technical) != 1 or not isinstance(technical[0].get("documents"), list):
-            raise ValueError("generation_manifest.json debe declarar exactamente un artefacto technical-document")
-        declared = [Path(path).name for path in technical[0]["documents"] if str(path).lower().endswith(".docx")]
-        if len(declared) != 1 or declared[0] in _DETAILED_ANALYSIS_DELIVERABLES:
-            raise ValueError("generation_manifest.json debe declarar exactamente un DOCX técnico")
-        names.extend(declared)
-    if not any(name.lower().endswith(".docx") and name not in _DETAILED_ANALYSIS_DELIVERABLES for name in names):
-        # Compatibilidad con runs previos; no reconstruye un nombre nuevo.
-        names.append("propuesta_tecnica_base.docx")
+    if not manifest_path.is_file():
+        raise ValueError("generation_manifest.json es obligatorio para detailed-analysis")
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError("generation_manifest.json no es legible o contiene JSON inválido") from exc
+    if not isinstance(manifest, dict) or not isinstance(manifest.get("artifacts"), list):
+        raise ValueError("generation_manifest.json no contiene una lista de artefactos válida")
+    if not all(isinstance(item, dict) for item in manifest["artifacts"]):
+        raise ValueError("generation_manifest.json contiene artefactos inválidos")
+    summaries = {item.get("id"): item for item in manifest["artifacts"] if item.get("id") in {"technical-summary", "bid-preparation-guide"}}
+    if set(summaries) != {"technical-summary", "bid-preparation-guide"}:
+        raise ValueError("generation_manifest.json debe declarar los dos resúmenes requeridos")
+    expected_summaries = {"technical-summary": "resumen_tecnico.docx", "bid-preparation-guide": "guia_preparacion_oferta.docx"}
+    for artifact_id, expected_name in expected_summaries.items():
+        documents = summaries[artifact_id].get("documents")
+        declared_summary = [Path(path).name for path in documents] if isinstance(documents, list) else []
+        if declared_summary != [expected_name]:
+            raise ValueError(f"generation_manifest.json debe declarar {expected_name} para {artifact_id}")
+    technical = [item for item in manifest["artifacts"] if item.get("id") == "technical-document"]
+    if len(technical) != 1 or not isinstance(technical[0].get("documents"), list):
+        raise ValueError("generation_manifest.json debe declarar exactamente un artefacto technical-document")
+    declared = [Path(path).name for path in technical[0]["documents"] if str(path).lower().endswith(".docx")]
+    if len(declared) != 1 or declared[0] in _DETAILED_ANALYSIS_DELIVERABLES:
+        raise ValueError("generation_manifest.json debe declarar exactamente un DOCX técnico")
+    names.extend(declared)
     names.append("simulador_economico.xlsx")
     for name in dict.fromkeys(names):
         path = output / name
@@ -108,12 +110,32 @@ def detailed_analysis_delivery_catalog(run_dir: Path) -> tuple[CatalogArtifact, 
 def catalog_digest(catalog: Iterable[CatalogArtifact]) -> str:
     """Stable digest of the public contract, independent of filesystem order."""
     digest = hashlib.sha256()
-    for item in sorted(catalog, key=lambda artifact: artifact.name):
-        digest.update(item.name.encode("utf-8"))
+    for item in sorted(catalog, key=lambda artifact: artifact.relative_path):
+        digest.update(item.relative_path.encode("utf-8"))
         digest.update(b"\0")
         digest.update(item.checksum.encode("ascii"))
         digest.update(b"\n")
     return digest.hexdigest()
+
+
+def publication_inventory(run_dir: Path, job_type: str, include_run_files: bool) -> tuple[CatalogArtifact, ...]:
+    """Freeze the canonical local files used by every publisher."""
+    if not include_run_files:
+        return publication_catalog(run_dir, job_type)
+    root = run_dir.resolve()
+    items: list[CatalogArtifact] = []
+    for path in sorted(root.rglob("*"), key=lambda item: item.as_posix()):
+        if path.is_symlink():
+            raise ValueError(f"El inventario no admite enlaces simbólicos: {path}")
+        if not path.is_file():
+            continue
+        relative = path.relative_to(root).as_posix()
+        if not relative or relative.startswith("/") or ".." in Path(relative).parts:
+            raise ValueError(f"Ruta de inventario inválida: {relative}")
+        items.append(CatalogArtifact(path, relative, sha256(path)))
+    if not items:
+        raise ValueError("El run no contiene archivos publicables")
+    return tuple(items)
 
 
 def manifest(job_id: str, publication_id: str, job_type: str, artifacts: Iterable[tuple[str, str, str]]) -> dict:

@@ -6,7 +6,7 @@ Use this map to locate likely ownership, then verify the current code before edi
 | --- | --- | --- |
 | Package and configuration | `src/litman_core/config.py`, `src/litman_core/resource_paths.py`, `src/litman_core/runtime.py` | Package settings, resource resolution, runtime directories. |
 | Host entry points | `src/litman_core/cli.py`, `src/litman_core/execution/job_runner.py` | Public commands and direct job orchestration. |
-| Job contract | `src/litman_core/application/job_loader.py`, `src/litman_core/domain/jobs.py`, `src/litman_core/resources/schemas/job.schema.json` | Job loading, validation, and job types. |
+| Job contract | `src/litman_core/application/job_loader.py`, `src/litman_core/domain/jobs.py` | Typed `config.toml` loading, validation, and job types. |
 | Document input | `src/litman_core/infrastructure/documents/`, `src/litman_core/infrastructure/storage/local.py`, `src/litman_core/infrastructure/storage/google_drive.py` | Inventory, normalization, local sources, and Drive materialization. |
 | Drive integration | `src/litman_core/infrastructure/storage/google_drive.py`, `src/litman_core/infrastructure/storage/publication.py` | Google API setup, Drive reads, staged publication, publication naming. |
 | Product Codex CLI | `src/litman_core/infrastructure/llm/codex_cli.py`, `src/litman_core/infrastructure/llm/codex_auth.py`, `src/litman_core/infrastructure/llm/codex_events.py` | Authentication, `codex exec`, event capture, and LLM failures. |

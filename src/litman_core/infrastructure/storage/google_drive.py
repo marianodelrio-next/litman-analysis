@@ -172,73 +172,71 @@ class GoogleDriveArtifactPublisher:
             body["appProperties"] = app_properties
         return self.service.files().create(body=body, fields="id", **_DRIVE_OPTIONS).execute()["id"]
 
+    def publish_inventory(self, job: JobRequest, publication_id: str, catalog: tuple, *, run_dir: Path) -> tuple[PublishedArtifact, ...]:
+        """Replicate the frozen local inventory, preserving its hierarchy."""
+        self._validate_inventory(catalog, run_dir)
+        temporary = self._create_folder(f".{publication_id}.tmp-{self._temporary_suffix()}", job.google_drive_folder_id,
+            self._folder_properties(job, publication_id, catalog))
+        folders: dict[str, str] = {"": temporary}
+        try:
+            published: list[PublishedArtifact] = []
+            for item in catalog:
+                relative = Path(item.relative_path)
+                if relative.is_absolute() or ".." in relative.parts or not relative.parts:
+                    raise ValueError("Ruta de publicación Drive inválida")
+                parent = ""
+                for part in relative.parts[:-1]:
+                    next_parent = f"{parent}/{part}" if parent else part
+                    if next_parent not in folders:
+                        folders[next_parent] = self._create_folder(part, folders[parent])
+                    parent = next_parent
+                result = self.service.files().create(body={"name": relative.name, "parents": [folders[parent]], "appProperties": {"sha256": item.checksum}}, media_body=self.uploader(item.source), fields="id,webViewLink", **_DRIVE_OPTIONS).execute()
+                if not result.get("id"): raise RuntimeError("La subida a Drive no devolvió un ID")
+                published.append(PublishedArtifact(item.relative_path, result.get("webViewLink") or f"drive://{result['id']}", item.checksum))
+            self.service.files().update(fileId=temporary, body={"name": publication_id}, fields="id", **_DRIVE_OPTIONS).execute()
+            return tuple(published)
+        except Exception:
+            try: self._delete_temporary(temporary)
+            except Exception: _LOGGER.warning("No se pudo limpiar la carpeta Drive temporal %s", temporary)
+            raise
+
+    @staticmethod
+    def _validate_inventory(catalog: tuple, run_dir: Path) -> None:
+        root = run_dir.resolve()
+        if run_dir.is_symlink() or not root.is_dir():
+            raise ValueError("El directorio de run para Drive no es seguro")
+        seen: set[str] = set()
+        directories: dict[str, set[str]] = {}
+        for item in catalog:
+            relative = Path(item.relative_path)
+            if relative.is_absolute() or not relative.parts or any(part in {"", ".", ".."} for part in relative.parts):
+                raise ValueError("Ruta de publicación Drive inválida")
+            normalized = "/".join(relative.parts)
+            if normalized in seen: raise ValueError("El inventario Drive contiene rutas duplicadas")
+            seen.add(normalized)
+            source = item.source
+            try: source_parts = source.relative_to(root).parts
+            except ValueError as exc: raise ValueError("El inventario Drive contiene un archivo fuera del run") from exc
+            current = root
+            for part in source_parts:
+                current = current / part
+                if current.is_symlink(): raise ValueError("El inventario Drive contiene enlaces simbólicos")
+            if not source.is_file(): raise ValueError("El inventario Drive contiene un archivo no regular")
+            parent = ""
+            for part in relative.parts:
+                safe = safe_filename(part)
+                siblings = directories.setdefault(parent, set())
+                if safe in siblings and part not in siblings:
+                    raise ValueError("Nombres de Drive colisionan tras sanearse")
+                siblings.add(part)
+                parent = f"{parent}/{part}" if parent else part
+
     @staticmethod
     def _folder_properties(job: JobRequest, publication_id: str, catalog: tuple) -> dict[str, str]:
         return {"job_id": job.job_id, "job_type": str(job.job_type),
                 "publication_id": publication_id,
                 "publication_contract": _DELIVERY_CONTRACT_VERSION,
                 "catalog_sha256": catalog_digest(catalog)}
-
-    def publish(self, job: JobRequest, run_dir: Path) -> tuple[PublishedArtifact, ...]:
-        catalog = publication_catalog(run_dir, str(job.job_type))
-        if job.job_type is JobType.ASSESSMENT:
-            return self._publish_assessment(job, run_dir, catalog)
-        publication_id = self._publication_name_factory(job.job_id)
-        temporary_name = f".{publication_id}.tmp-{self._temporary_suffix()}"
-        temporary = self._create_folder(temporary_name, job.output_location, self._folder_properties(job, publication_id, catalog))
-        try:
-            published: list[tuple[str, str, str]] = []
-            for item in catalog:
-                result = self.service.files().create(body={"name": item.name, "parents": [temporary], "appProperties": {"sha256": item.checksum}}, media_body=self.uploader(item.source), fields="id,webViewLink", **_DRIVE_OPTIONS).execute()
-                if not result.get("id"):
-                    raise RuntimeError(f"La subida de {item.name} a Drive no devolvió un ID")
-                published.append((item.name, item.checksum, result.get("webViewLink") or f"drive://{result['id']}"))
-            if len(published) != len(catalog):
-                raise RuntimeError("Publicación Drive incompleta")
-            self.service.files().update(fileId=temporary, body={"name": publication_id}, fields="id", **_DRIVE_OPTIONS).execute()
-            return tuple(PublishedArtifact(name, uri, checksum) for name, checksum, uri in published)
-        except Exception:
-            try:
-                self._delete_temporary(temporary)
-            except Exception as cleanup_error:
-                _LOGGER.warning(
-                    "No se pudo limpiar la carpeta Drive temporal del job %s (temporary_id=%s): %s",
-                    job.job_id, temporary, type(cleanup_error).__name__,
-                )
-            raise
-
-    def _publish_assessment(self, job: JobRequest, run_dir: Path, catalog: tuple) -> tuple[PublishedArtifact, ...]:
-        """Publish one PDF inside an atomic job folder in the requested destination."""
-        pdf = catalog[0].source
-        checksum = catalog[0].checksum
-        publication_id = self._publication_name_factory(job.job_id)
-        temporary = self._create_folder(
-            f".{publication_id}.tmp-{self._temporary_suffix()}", job.output_location,
-            {"job_id": job.job_id, "publication_id": publication_id, "job_type": str(job.job_type),
-             "publication_contract": _ASSESSMENT_CONTRACT_VERSION, "pdf_sha256": checksum},
-        )
-        try:
-            result = self.service.files().create(
-                body={"name": "ficha_oportunidad.pdf", "parents": [temporary],
-                      "appProperties": {"sha256": checksum}},
-                media_body=self.uploader(pdf), fields="id,webViewLink", **_DRIVE_OPTIONS,
-            ).execute()
-            if not result.get("id"):
-                raise RuntimeError("La subida de ficha_oportunidad.pdf a Drive no devolvió un ID")
-            self.service.files().update(
-                fileId=temporary, body={"name": publication_id}, fields="id", **_DRIVE_OPTIONS
-            ).execute()
-            uri = result.get("webViewLink") or f"drive://{result['id']}"
-            return (PublishedArtifact("ficha_oportunidad.pdf", uri, checksum),)
-        except Exception:
-            try:
-                self._delete_temporary(temporary)
-            except Exception as cleanup_error:
-                _LOGGER.warning(
-                    "No se pudo limpiar la carpeta temporal de assessment %s (temporary_id=%s): %s",
-                    job.job_id, temporary, type(cleanup_error).__name__,
-                )
-            raise
 
     def _delete_temporary(self, temporary: str) -> None:
         self.service.files().delete(fileId=temporary, **_DRIVE_OPTIONS).execute()

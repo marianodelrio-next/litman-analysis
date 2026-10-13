@@ -4,7 +4,12 @@ Docker ejecuta la misma CLI instalada en la imagen. Desde la raíz:
 
 ```sh
 docker compose -f deployment/docker/compose.yaml build
-docker compose -f deployment/docker/compose.yaml run --rm litman-core assess /input --output /output
+docker compose -f deployment/docker/compose.yaml run --rm litman-core run
 ```
 
-Los mounts proporcionan `/input`, `/output`, `/data/runs` y `/job`; los jobs deben usar esas rutas internas. Las credenciales se proporcionan explícitamente mediante los mounts y variables de Compose.
+Compose carga `deployment/config.toml` como `/app/config.toml`, `deployment/input/`
+como `/app/input` y escribe en `deployment/runs/` (`/app/runs`). Por defecto,
+`local-secrets/` se resuelve relativo a `deployment/docker/`, por lo que apunta a
+`deployment/local-secrets/`; se puede reemplazar con `LITMAN_CORE_SECRETS_DIR`.
+El subdirectorio `local-secrets/codex` se monta separadamente para el estado
+ChatGPT. Ejecuta siempre `run`, sin job JSON/YAML ni argumentos de entrada/salida.

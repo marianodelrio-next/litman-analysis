@@ -10,20 +10,14 @@ services:
       HOME: /tmp/litman-core/home
       CODEX_HOME: /var/lib/litman-core/codex
       GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/google-service-account.json
-      LITMAN_CORE_RUNS_DIR: /data/runs
       LITMAN_CORE_WORKSPACE_DIR: /tmp/litman-core/workspaces
-      LITMAN_CORE_MAX_FILE_MB: ${LITMAN_CORE_MAX_FILE_MB:-25}
       LITMAN_CORE_CODEX_AUTH_MODE: ${LITMAN_CORE_CODEX_AUTH_MODE:-chatgpt}
-      LITMAN_CORE_CODEX_MODEL: ${LITMAN_CORE_CODEX_MODEL:-gpt-5.5}
-      LITMAN_CORE_CODEX_TIMEOUT_SECONDS: ${LITMAN_CORE_CODEX_TIMEOUT_SECONDS:-1800}
-      LITMAN_CORE_CODEX_PREFLIGHT: ${LITMAN_CORE_CODEX_PREFLIGHT:-true}
     volumes:
-      - ${LITMAN_CORE_JOB_DIR:-./.local-state/mounts/job}:/job:ro
-      - ${LITMAN_CORE_INPUT_DIR:-./local-data/input}:/input:ro
-      - ${LITMAN_CORE_OUTPUT_DIR:-./local-data/output}:/output
-      - ${LITMAN_CORE_RUNS_HOST_DIR:-./runs}:/data/runs
-      - ${LITMAN_CORE_SECRETS_DIR:-./local-secrets}:/run/secrets:ro
-      - ${LITMAN_CORE_CODEX_STATE_DIR:-./.local-state/codex}:/var/lib/litman-core/codex
+      - ../config.toml:/app/config.toml:ro
+      - ../input:/app/input:ro
+      - ../runs:/app/runs
+      - ${LITMAN_CORE_SECRETS_DIR:-../local-secrets}:/run/secrets:ro
+      - ${LITMAN_CORE_CODEX_STATE_DIR:-../local-secrets/codex}:/var/lib/litman-core/codex
     read_only: true
     tmpfs: [/tmp]
     cap_drop: [ALL]

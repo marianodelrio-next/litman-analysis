@@ -16,6 +16,6 @@ class AssessmentPipeline:
         self.provider = provider
 
     def execute(self, case_dir: Path, *, case_id: str | None = None,
-                bundle: DocumentBundle | None = None) -> tuple[Path, dict]:
-        prepared = prepare_assessment(case_dir, self.settings, bundle=bundle, run_case_id=case_id)
+                bundle: DocumentBundle | None = None, run_dir: Path | None = None) -> tuple[Path, dict]:
+        prepared = prepare_assessment(case_dir, self.settings, bundle=bundle, run_case_id=case_id, run_dir=run_dir)
         return prepared.run_dir, run_assessment(prepared, self.provider)

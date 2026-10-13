@@ -20,7 +20,7 @@ from .models import LoadedResources, PreparedStage, StageDefinition
 
 def prepare_stage(definition: StageDefinition, case_dir: Path, settings: Any, *,
                   bundle: DocumentBundle | None = None, context: dict[str, Any] | None = None,
-                  run_case_id: str | None = None) -> PreparedStage:
+                  run_case_id: str | None = None, run_dir: Path | None = None) -> PreparedStage:
     case_dir = case_dir.resolve()
     documents = bundle.documents if bundle else inventory(case_dir, settings.max_file_mb)
     print(f"[{definition.identifier} inventario] {len(documents)} documentos detectados", file=sys.stderr, flush=True)
@@ -32,7 +32,9 @@ def prepare_stage(definition: StageDefinition, case_dir: Path, settings: Any, *,
                              resource_paths.prompt_version_path or resource_paths.prompt_dir / "VERSION",
                              resource_paths.config_path, resource_paths.schema_path, resource_paths.rules_path,
                              resource_paths.version_bundle)
-    run_dir = new_run_dir(settings.runs_dir, case_dir, definition.identifier, case_name=run_case_id)
+    run_dir = run_dir or new_run_dir(settings.runs_dir, case_dir, definition.identifier, case_name=run_case_id)
+    for name in ("input", "output", "logs"):
+        (run_dir / name).mkdir(parents=True, exist_ok=True)
     normalized = bundle.normalized if bundle else normalize_documents(documents, run_dir / "input" / "documents")
     preparation = definition.prepare_prompt(loaded, documents, normalized, context or {})
     prepared = PreparedStage(case_dir, run_dir, documents, normalized, loaded, resource_paths.schema_path,

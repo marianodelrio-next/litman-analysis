@@ -15,13 +15,13 @@ class Settings:
     project_root: Path = PROJECT_ROOT
     resource_root: Path = RESOURCE_ROOT
     codex_binary: str = field(default_factory=lambda: os.getenv("LITMAN_CORE_CODEX_BINARY", "codex"))
-    codex_model: str | None = field(default_factory=lambda: os.getenv("LITMAN_CORE_CODEX_MODEL") or "gpt-5.5")
-    codex_timeout_seconds: int = field(default_factory=lambda: int(os.getenv("LITMAN_CORE_CODEX_TIMEOUT_SECONDS", "1800")))
-    max_file_mb: int = field(default_factory=lambda: int(os.getenv("LITMAN_CORE_MAX_FILE_MB", "25")))
-    codex_context_window_tokens: int = field(default_factory=lambda: int(os.getenv("LITMAN_CORE_CODEX_CONTEXT_WINDOW_TOKENS", "1050000")))
-    codex_context_reserve_tokens: int = field(default_factory=lambda: int(os.getenv("LITMAN_CORE_CODEX_CONTEXT_RESERVE_TOKENS", "50000")))
-    codex_preflight: bool = field(default_factory=lambda: _env_bool("LITMAN_CORE_CODEX_PREFLIGHT", True))
-    codex_preflight_timeout_seconds: int = field(default_factory=lambda: int(os.getenv("LITMAN_CORE_CODEX_PREFLIGHT_TIMEOUT_SECONDS", "120")))
+    codex_model: str | None = "gpt-5.5"
+    codex_timeout_seconds: int = 1800
+    max_file_mb: int = 25
+    codex_context_window_tokens: int = 1050000
+    codex_context_reserve_tokens: int = 50000
+    codex_preflight: bool = True
+    codex_preflight_timeout_seconds: int = 120
     runs_root: Path | None = field(default_factory=lambda: _env_path("LITMAN_CORE_RUNS_DIR"))
     workspace_root: Path = field(default_factory=lambda: _env_path("LITMAN_CORE_WORKSPACE_DIR") or Path("/tmp/litman-core"))
     home_dir: Path = field(default_factory=lambda: _env_path("HOME") or Path("/tmp/litman-core/home"))

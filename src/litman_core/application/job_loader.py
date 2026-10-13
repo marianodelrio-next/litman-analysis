@@ -1,49 +1,85 @@
+"""Typed loader for the single public config.toml contract."""
 from __future__ import annotations
 
-import json
 import re
+import tomllib
 from pathlib import Path
-
-from jsonschema import Draft202012Validator
-import yaml
+from typing import Any
 
 from litman_core.domain.jobs import JobRequest, JobType, StorageKind
-from litman_core.resource_paths import resource_path
+from litman_core.generation_config import merge_generation
 
-_JOB_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+_ROOT = {"job", "input", "output", "codex", "publication", "analysis"}
 
 
 def load_job(path: Path) -> JobRequest:
-    if path.suffix.lower() == ".json":
-        data = json.loads(path.read_text(encoding="utf-8"))
-    elif path.suffix.lower() in {".yaml", ".yml"}:
-        data = yaml.safe_load(path.read_text(encoding="utf-8"))
-    else:
-        raise ValueError("El job debe tener extensión .json, .yaml o .yml")
-    if not isinstance(data, dict):
-        raise ValueError("El job debe ser un objeto JSON o YAML")
-    schema_path = resource_path("schemas", "job.schema.json")
-    schema = json.loads(schema_path.read_text(encoding="utf-8"))
-    errors = sorted(Draft202012Validator(schema).iter_errors(data), key=lambda error: list(error.path))
-    if errors:
-        details = "; ".join(
-            f"{'.'.join(map(str, error.path)) or 'root'}: {error.message}" for error in errors)
-        raise ValueError(f"Contrato de job inválido: {details}")
-    missing = sorted({"job_id", "job_type", "input", "output"} - data.keys())
-    if missing:
-        raise ValueError(f"Faltan campos del job: {', '.join(missing)}")
-    job_id = data["job_id"]
-    if not isinstance(job_id, str) or not _JOB_ID.fullmatch(job_id):
-        raise ValueError("job_id contiene caracteres no permitidos")
-    input_data, output_data = data["input"], data["output"]
-    if not isinstance(input_data, dict) or not isinstance(output_data, dict):
-        raise ValueError("input y output deben ser objetos")
-    options = data.get("options", {})
-    if not isinstance(options, dict):
-        raise ValueError("options debe ser un objeto")
-    return JobRequest(
-        job_id=job_id, job_type=JobType(data["job_type"]),
-        input_kind=StorageKind(input_data["kind"]), output_kind=StorageKind(output_data["kind"]),
-        input_location=input_data["location"], output_location=output_data["location"],
-        options=options,
-    )
+    path = path.expanduser().resolve()
+    try:
+        data = tomllib.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        raise ValueError(f"No existe la configuración: {path}") from exc
+    except tomllib.TOMLDecodeError as exc:
+        raise ValueError(f"TOML inválido: {exc}") from exc
+    _keys(data, _ROOT, "root")
+    job, input_data, output = (_table(data, name) for name in ("job", "input", "output"))
+    _keys(job, {"id", "type"}, "job"); _keys(input_data, {"kind", "location"}, "input"); _keys(output, {"directory", "google_drive_folder_id"}, "output")
+    job_id = _text(job, "id", "job.id")
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}", job_id):
+        raise ValueError("job.id contiene caracteres no permitidos")
+    job_type = _enum(_text(job, "type", "job.type"), JobType, "job.type")
+    input_kind = _enum(_text(input_data, "kind", "input.kind"), StorageKind, "input.kind")
+    location = _text(input_data, "location", "input.location")
+    if input_kind is StorageKind.LOCAL:
+        location = str((path.parent / location).resolve()) if not Path(location).is_absolute() else str(Path(location).resolve())
+    directory = Path(_text(output, "directory", "output.directory"))
+    output_directory = (path.parent / directory).resolve() if not directory.is_absolute() else directory.resolve()
+    drive_id = output.get("google_drive_folder_id")
+    if drive_id is not None and (not isinstance(drive_id, str) or not drive_id):
+        raise ValueError("output.google_drive_folder_id debe ser texto no vacío")
+    codex = data.get("codex", {})
+    if not isinstance(codex, dict): raise ValueError("codex debe ser una tabla")
+    _keys(codex, {"model"}, "codex")
+    model = codex.get("model")
+    if model is not None and not isinstance(model, str): raise ValueError("codex.model debe ser texto")
+    publication = data.get("publication", {})
+    if not isinstance(publication, dict): raise ValueError("publication debe ser una tabla")
+    _keys(publication, {"include_run_files"}, "publication")
+    include = publication.get("include_run_files", False)
+    if type(include) is not bool: raise ValueError("publication.include_run_files debe ser booleano")
+    generation = _generation(data, job_type)
+    return JobRequest(job_id, job_type, input_kind, location, output_directory, drive_id, include, model, {"generation": generation} if generation else {})
+
+
+def _generation(data: dict[str, Any], job_type: JobType) -> dict[str, Any] | None:
+    analysis = data.get("analysis", {})
+    if not isinstance(analysis, dict): raise ValueError("analysis debe ser una tabla")
+    _keys(analysis, {"detailed"}, "analysis")
+    detailed = analysis.get("detailed", {})
+    if not isinstance(detailed, dict): raise ValueError("analysis.detailed debe ser una tabla")
+    _keys(detailed, {"generation"}, "analysis.detailed")
+    generation = detailed.get("generation", {})
+    if not isinstance(generation, dict): raise ValueError("analysis.detailed.generation debe ser una tabla")
+    return merge_generation(generation) if job_type is JobType.DETAILED_ANALYSIS else None
+
+
+def _table(data: dict[str, Any], name: str) -> dict[str, Any]:
+    value = data.get(name)
+    if not isinstance(value, dict): raise ValueError(f"{name} debe ser una tabla")
+    return value
+
+
+def _keys(value: dict[str, Any], allowed: set[str], path: str) -> None:
+    for key in value:
+        if key not in allowed:
+            raise ValueError(f"Clave TOML desconocida: {key if path == 'root' else path + '.' + key}")
+
+
+def _text(data: dict[str, Any], key: str, path: str) -> str:
+    value = data.get(key)
+    if not isinstance(value, str) or not value: raise ValueError(f"{path} debe ser texto no vacío")
+    return value
+
+
+def _enum(value: str, enum: type, path: str):
+    try: return enum(value)
+    except ValueError as exc: raise ValueError(f"{path} tiene un valor no admitido") from exc

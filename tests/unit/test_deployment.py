@@ -11,8 +11,13 @@ def test_optional_docker_deployment_configuration_is_hardened():
     assert service["read_only"] is True
     assert service["cap_drop"] == ["ALL"]
     assert service["security_opt"] == ["no-new-privileges:true"]
-    assert ":/input:ro" in " ".join(service["volumes"])
-    assert ":/output" in " ".join(service["volumes"])
+    volumes = " ".join(service["volumes"])
+    assert ":/app/config.toml:ro" in volumes
+    assert ":/app/input:ro" in volumes
+    assert ":/app/runs" in volumes
+    assert ".local-state" not in volumes
+    assert "${LITMAN_CORE_SECRETS_DIR:-../local-secrets}:/run/secrets:ro" in volumes
+    assert "${LITMAN_CORE_CODEX_STATE_DIR:-../local-secrets/codex}:/var/lib/litman-core/codex" in volumes
 
 def test_docker_image_enters_through_public_cli():
     dockerfile = (ROOT / "deployment/docker/Dockerfile").read_text().lower()

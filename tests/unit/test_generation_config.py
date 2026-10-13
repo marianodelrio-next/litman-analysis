@@ -2,27 +2,22 @@ from pathlib import Path
 
 import pytest
 
-from litman_core.generation_config import load_generation_config, merge_generation
+from litman_core.application.job_loader import load_job
 
 
-def test_toml_and_job_precedence(tmp_path: Path):
+def _base(extra: str = "") -> str:
+    return "[job]\nid='job'\ntype='detailed-analysis'\n[input]\nkind='local'\nlocation='input'\n[output]\ndirectory='runs'\n" + extra
+
+
+def test_generation_preferences_are_loaded_from_unified_toml(tmp_path: Path):
     config = tmp_path / "config.toml"
-    config.write_text('[analysis.detailed.generation]\nartifacts=["technical-summary"]\n[analysis.detailed.generation.technical_document]\noutput_language="es"\n', encoding="utf-8")
-    result = merge_generation(load_generation_config(config), {"technical_document": {"output_language": "auto"}})
-    assert result["artifacts"] == ["technical-summary"]
-    assert result["technical_document"]["output_language"] == "auto"
+    config.write_text(_base("[analysis.detailed.generation.technical_document]\noutput_language='es'\n"), encoding="utf-8")
+    result = load_job(config).options["generation"]
+    assert result["technical_document"]["output_language"] == "es"
+    assert "artifacts" not in result
 
 
-@pytest.mark.parametrize("body", ["[analysis.detailed.generation]\nunknown=true\n", "[analysis.detailed.generation]\nartifacts=1\n"])
-def test_toml_rejects_unknown_keys_and_types(tmp_path: Path, body: str):
-    path = tmp_path / "bad.toml"
-    path.write_text(body, encoding="utf-8")
-    with pytest.raises(ValueError):
-        load_generation_config(path)
-
-
-def test_toml_rejects_unknown_root_tables(tmp_path: Path):
-    path = tmp_path / "bad-root.toml"
-    path.write_text("[project]\nname='bad'\n", encoding="utf-8")
-    with pytest.raises(ValueError):
-        load_generation_config(path)
+@pytest.mark.parametrize("body", ["[analysis.detailed.generation]\nunknown=true\n", "[analysis.detailed.generation.technical_document]\noutput_language=1\n"])
+def test_unified_toml_rejects_unknown_generation_keys_and_types(tmp_path: Path, body: str):
+    path = tmp_path / "bad.toml"; path.write_text(_base(body), encoding="utf-8")
+    with pytest.raises(ValueError): load_job(path)

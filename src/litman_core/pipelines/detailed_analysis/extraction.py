@@ -40,10 +40,10 @@ class DetailedAnalysisPreparation:
 def prepare_detailed_analysis(case_dir: Path, settings: Settings | None = None,
                      bundle: DocumentBundle | None = None,
                      assessment_result: dict | None = None,
-                     run_case_id: str | None = None) -> DetailedAnalysisPreparation:
+                     run_case_id: str | None = None, run_dir: Path | None = None) -> DetailedAnalysisPreparation:
     settings = settings or Settings()
     return DetailedAnalysisPreparation(prepare_stage(definition(), case_dir, settings, bundle=bundle,
-                                           context={"assessment_result": assessment_result}, run_case_id=run_case_id))
+                                           context={"assessment_result": assessment_result}, run_case_id=run_case_id, run_dir=run_dir))
 
 
 def run_detailed_analysis(prepared: DetailedAnalysisPreparation, provider: LLMProvider) -> dict:

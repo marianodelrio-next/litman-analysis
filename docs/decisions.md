@@ -17,6 +17,6 @@
 - Docker remains the external distribution and isolation boundary; domain and pipelines do not select or branch on runtime.
 - Local development and local wheel consumption are documented as separate
   flows (`deployment/local-dev/` and `deployment/local-install/`). The wheel
-  flow requires explicit persistent workspace and runs paths; `check` remains a
+  flow requires explicit persistent workspace and runs paths; la configuración
   diagnostic and does not create them. Docker continues to install a built
   wheel in its isolated runtime.

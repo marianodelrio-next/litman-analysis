@@ -5,9 +5,8 @@ autenticación explícita de Codex:
 
 ```sh
 uv sync
-uv run litman-core assess ./local-data/input --output ./local-data/output
-uv run litman-core analyze ./local-data/input --output ./local-data/output
-uv run litman-core run ./job.json
+cd deployment
+uv run litman-core run
 UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest -q
 ```
 

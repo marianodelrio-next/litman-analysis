@@ -33,6 +33,8 @@ def generate_documents(dossier_path: Path, output_dir: Path | None = None,
         template_id=template_id, economic_template_id=economic_template_id,
         include_internal_pending=include_internal_pending, output_language=output_language,
         content_profile=content_profile, provider=provider, include_editorial_guidance=include_editorial_guidance)
+    # This utility remains reusable for maintenance/rerendering. The public
+    # pipeline never supplies ``artifacts`` and therefore always generates all.
     results = [_generate(generator, context) for generator in resolve_artifact_generators(artifacts)]
     # El snapshot conserva exactamente la entrada utilizada para generar los entregables.
     output_lineage = dict(lineage)

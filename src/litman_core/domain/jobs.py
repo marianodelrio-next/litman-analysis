@@ -21,9 +21,11 @@ class JobRequest:
     job_id: str
     job_type: JobType
     input_kind: StorageKind
-    output_kind: StorageKind
     input_location: str
-    output_location: str
+    output_directory: Path
+    google_drive_folder_id: str | None = None
+    include_run_files: bool = False
+    codex_model: str | None = None
     options: dict[str, Any] = field(default_factory=dict)
 
 
@@ -46,6 +48,7 @@ class JobResult:
     job_id: str
     job_type: JobType
     status: str
-    run_dir: str
+    publication_id: str
+    local_path: str
     artifacts: tuple[PublishedArtifact, ...] = ()
     details: dict[str, Any] = field(default_factory=dict)
