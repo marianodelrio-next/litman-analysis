@@ -7,4 +7,4 @@ COPY pyproject.toml README.md ./
 COPY src ./src
 RUN pip install --no-cache-dir "." && useradd --uid 10001 --no-create-home litman && mkdir -p /tmp/litman-analysis/workspaces /var/lib/litman-analysis/codex /data/runs && chown -R litman:litman /var/lib/litman-analysis /data/runs && chmod -R a+rX /app /usr/local/lib/node_modules && chmod 1777 /tmp/litman-analysis /tmp/litman-analysis/workspaces
 USER litman
-ENTRYPOINT ["litman-core-worker"]
+ENTRYPOINT ["litman-core"]

@@ -7,12 +7,10 @@ actual, no una API futura.
 
 | Comando | Audiencia | Ciclo | Estado |
 |---|---|---|---|
-| `litman-core run JOB` | integración/operación | carga un job y delega al launcher; `--native` ejecuta Core directamente | canónico |
+| `litman-core run JOB` | integración/operación | carga un job y ejecuta `JobRunner` directamente | canónico |
 | `litman-core assess CASE` | usuario local | construye un job assessment y delega | canónico |
 | `litman-core analyze CASE` | usuario local | construye un job detailed-analysis y delega | canónico |
-| `litman-core-worker run JOB` | contenedor interno | carga el job y ejecuta `JobRunner` | canónico, interno |
-| `litman-core-worker preflight [runtime\|container]` | operación interna | comprueba aislamiento y Codex | canónico, interno |
-| `litman-analysis`, `litman-analysis-worker` | compatibilidad | aliases de los módulos de `litman_core` | temporal |
+| `litman-analysis` | compatibilidad | alias de la CLI de `litman_core` | temporal |
 
 Toda la implementación pertenece al paquete `litman_core`; no existe un paquete Python `litman_analysis` de compatibilidad.
 
@@ -20,7 +18,7 @@ Toda la implementación pertenece al paquete `litman_core`; no existe un paquete
 
 Un job contiene `job_id`, `job_type` (`assessment` o `detailed-analysis`),
 `input` y `output` (`local` o `google-drive`, cada uno con `location`) y
-opciones. El worker no acepta fases independientes. `JobRunner` materializa,
+opciones. `JobRunner` materializa,
 normaliza, analiza, valida y publica atómicamente.
 
 Un run tiene `input/`, `output/` y `logs/`. Ambos pipelines producen
@@ -30,8 +28,8 @@ contiene versión, origen, ruta y SHA-256 del dossier.
 
 ## Publicación
 
-La publicación local copia el catálogo completo de `output/**`, además del
-manifiesto con hashes. Drive conserva catálogos distintos: assessment publica
+Ambos destinos publican el mismo catálogo cerrado, sin diagnósticos, lineage ni
+manifiesto de publicación: assessment publica
 la ficha PDF; detailed-analysis publica los dos resúmenes, un DOCX técnico y
 el simulador económico según el manifiesto. Drive usa carpeta temporal y solo
 la renombra tras completar la subida.
@@ -45,10 +43,10 @@ incompleta impide presentar el run como éxito.
 Los pipelines declaran sus bundles versionados y sus hashes; los resultados
 de validación incluyen errores de schema, semántica y evidencias. Las
 referencias de documentos conservan identificador, nombre, MIME, páginas o
-texto citado cuando están disponibles. El preflight exige usuario no root,
-capacidades restringidas, `NoNewPrivs`, directorios esperados y autenticación
-de Codex configurada. Drive requiere credenciales explícitas; esta línea base
-no usa red, credenciales ni servicios externos en tests.
+texto citado cuando están disponibles. Drive requiere credenciales explícitas;
+esta línea base no usa red, credenciales ni servicios externos en tests. Las
+comprobaciones de usuario, capabilities, mounts y `no-new-privileges` son
+preflight opcional de `deployment/docker`, no parte del contrato de Core.
 
 ## Transición
 

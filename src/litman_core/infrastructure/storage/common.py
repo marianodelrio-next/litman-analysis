@@ -38,18 +38,21 @@ def safe_filename(value: str) -> str:
     return name
 
 
-def publication_catalog(run_dir: Path) -> tuple[CatalogArtifact, ...]:
-    """Only permanent public artifacts; never input, logs, secrets or temporaries."""
-    files: list[CatalogArtifact] = []
+def publication_catalog(run_dir: Path, job_type: str) -> tuple[CatalogArtifact, ...]:
+    """Return the closed public delivery contract for a job type."""
     output = run_dir / "output"
-    if output.is_dir():
-        for path in sorted(output.rglob("*")):
-            if path.is_file():
-                files.append(CatalogArtifact(path, path.relative_to(run_dir).as_posix(), sha256(path)))
-    lineage = run_dir / "lineage.json"
-    if lineage.is_file():
-        files.append(CatalogArtifact(lineage, "lineage.json", sha256(lineage)))
-    return tuple(files)
+    if job_type == "assessment":
+        names = ("ficha_oportunidad.pdf",)
+    elif job_type == "detailed-analysis":
+        return detailed_analysis_delivery_catalog(run_dir)
+    else:
+        raise ValueError(f"Tipo de job no publicable: {job_type}")
+    artifacts = tuple(CatalogArtifact(output / name, name, sha256(output / name))
+                      for name in names if (output / name).is_file())
+    if len(artifacts) != len(names):
+        missing = next(name for name in names if not (output / name).is_file())
+        raise ValueError(f"No existe el artefacto de entrega requerido: {output / missing}")
+    return artifacts
 
 
 _DETAILED_ANALYSIS_DELIVERABLES = ("resumen_tecnico.docx", "guia_preparacion_oferta.docx")

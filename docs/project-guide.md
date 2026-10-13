@@ -2,9 +2,9 @@
 
 ## Arquitectura de ejecución
 
-La interfaz pública (`litman-core run`, `assess` y `analyze`) se ejecuta en el host. `ContainerJobLauncher` valida el job, convierte únicamente las rutas locales a `/input` y `/output`, crea un contrato interno en un directorio privado y lanza una sola instancia del servicio Compose `litman-analysis`.
+La interfaz pública (`litman-core run`, `assess` y `analyze`) ejecuta directamente `JobRunner`. Docker es opcional y se invoca desde `deployment/docker/compose.yaml`; los jobs del contenedor usan sus rutas internas sin traducción host→contenedor.
 
-Dentro del contenedor, `litman-core-worker run` carga el contrato y delega en el `JobRunner` canónico:
+Dentro del contenedor, el entrypoint `litman-core` ejecuta el `JobRunner` canónico:
 
 ```text
 CLI host → un contenedor → origen → inventario/normalización → Codex
@@ -38,10 +38,9 @@ para la herramienta interna: el contenedor no root, sin capabilities, con raíz
 de solo lectura, mounts mínimos y `no-new-privileges` es la frontera de
 aislamiento. No montes información ajena al job.
 
-Usa `litman-core-worker preflight runtime` para validar UID/GID,
-capabilities, `NoNewPrivs`, mounts y autenticación sin leer secretos. Usa
-`preflight container` para una comprobación integral con `fixture.md`; registra
-la conectividad observada, pero no exige que la red esté aislada.
+La configuración Docker conserva usuario no root, filesystem de solo lectura,
+capabilities eliminadas y `no-new-privileges`; las credenciales se proporcionan
+explícitamente sin leer secretos durante las comprobaciones.
 
 ## Extensión y operación
 
@@ -60,4 +59,4 @@ para impedir una salida parcial en inglés.
 
 La verificación de evidencias conserva documento y página estrictos. Tolera solamente espacios artificiales introducidos por el layout PDF y registra `verification_method` (`exact` o `layout_whitespace`). Una cita no comprobable produce un informe parcial con advertencias; los fallos estructurales o semánticos continúan siendo bloqueantes.
 
-Consulta el README para autenticación y comandos. Las salidas quedan en el destino indicado y los runs/diagnósticos bajo `runs/`. Antes de cerrar cambios ejecuta pytest, `docker compose config --quiet` y `docker compose build`. Las llamadas reales a Drive requieren autorización explícita; los tests usan fakes.
+Consulta el README para autenticación y comandos. Las salidas quedan en el destino indicado y los runs/diagnósticos bajo `runs/`. Antes de cerrar cambios ejecuta pytest, `docker compose -f deployment/docker/compose.yaml config --quiet` y `docker compose -f deployment/docker/compose.yaml build`. Las llamadas reales a Drive requieren autorización explícita; los tests usan fakes.

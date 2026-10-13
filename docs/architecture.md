@@ -10,6 +10,6 @@ Versioned prompts, rules, schemas, and templates are under `resources/`. The pro
 
 `litman_core` es el namespace público de la aplicación: su `JobRunner` carga y ejecuta un `JobRequest` y contiene el flujo común de materialización, pipelines, validación, generación y publicación. Core no importa ni invoca Docker y no distingue entre runtimes `native` y `docker` en el dominio o los pipelines.
 
-Docker pertenece a la capa de distribución y aislamiento. `ContainerJobLauncher` vive en `litman_core.execution` como adaptador del host, mientras `litman_core.worker` es el entrypoint dentro del contenedor. Ambos invocan el mismo `litman_core.JobRunner`; el worker puede añadir el preflight propio del contenedor, pero no duplica el motor.
+Docker pertenece únicamente a `deployment/docker/` como distribución opcional. La CLI local invoca directamente `JobRunner`; la imagen instala y ejecuta esa misma CLI.
 
-`litman-core` es la CLI canónica. Los comandos instalados `litman-analysis` y `litman-analysis-worker` son aliases temporales que apuntan directamente a módulos de `litman_core`; no corresponden a un segundo paquete. La CLI host conserva Docker como comportamiento predeterminado para compatibilidad. `--native` llama directamente a Core y no introduce una rama de runtime en los contratos de aplicación.
+`litman-core` es la CLI canónica y mantiene el alias `litman-analysis`. Los comandos `run`, `assess` y `analyze` ejecutan el runner en el proceso actual; no existe `--native` ni una interfaz worker en el paquete.

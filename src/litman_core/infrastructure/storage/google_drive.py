@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from litman_core.domain.jobs import JobRequest, JobType, MaterializedCase, PublishedArtifact
-from .common import catalog_digest, detailed_analysis_delivery_catalog, safe_filename, sha256
+from .common import catalog_digest, publication_catalog, safe_filename, sha256
 from .publication import publication_folder_name
 
 _DRIVE_OPTIONS = {"supportsAllDrives": True}
@@ -180,9 +180,9 @@ class GoogleDriveArtifactPublisher:
                 "catalog_sha256": catalog_digest(catalog)}
 
     def publish(self, job: JobRequest, run_dir: Path) -> tuple[PublishedArtifact, ...]:
+        catalog = publication_catalog(run_dir, str(job.job_type))
         if job.job_type is JobType.ASSESSMENT:
-            return self._publish_assessment(job, run_dir)
-        catalog = detailed_analysis_delivery_catalog(run_dir)
+            return self._publish_assessment(job, run_dir, catalog)
         publication_id = self._publication_name_factory(job.job_id)
         temporary_name = f".{publication_id}.tmp-{self._temporary_suffix()}"
         temporary = self._create_folder(temporary_name, job.output_location, self._folder_properties(job, publication_id, catalog))
@@ -207,12 +207,10 @@ class GoogleDriveArtifactPublisher:
                 )
             raise
 
-    def _publish_assessment(self, job: JobRequest, run_dir: Path) -> tuple[PublishedArtifact, ...]:
+    def _publish_assessment(self, job: JobRequest, run_dir: Path, catalog: tuple) -> tuple[PublishedArtifact, ...]:
         """Publish one PDF inside an atomic job folder in the requested destination."""
-        pdf = run_dir / "output" / "ficha_oportunidad.pdf"
-        if not pdf.is_file():
-            raise ValueError(f"No existe el PDF de assessment requerido: {pdf}")
-        checksum = sha256(pdf)
+        pdf = catalog[0].source
+        checksum = catalog[0].checksum
         publication_id = self._publication_name_factory(job.job_id)
         temporary = self._create_folder(
             f".{publication_id}.tmp-{self._temporary_suffix()}", job.output_location,

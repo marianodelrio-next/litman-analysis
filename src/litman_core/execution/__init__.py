@@ -1,5 +1,4 @@
-"""Container launcher and canonical internal execution use case."""
-from .container_launcher import ContainerJobLauncher, ContainerLaunchResult
+"""Canonical execution use case."""
 from .job_runner import JobRunner, JobRunnerResult
 
-__all__ = ("ContainerJobLauncher", "ContainerLaunchResult", "JobRunner", "JobRunnerResult")
+__all__ = ("JobRunner", "JobRunnerResult")

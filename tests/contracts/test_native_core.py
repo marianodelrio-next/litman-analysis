@@ -33,13 +33,13 @@ def test_core_runner_does_not_depend_on_container_launcher() -> None:
     assert "docker" not in source.lower()
 
 
-def test_worker_and_native_cli_use_the_same_core_runner() -> None:
+def test_cli_uses_the_same_core_runner() -> None:
     import litman_core.cli as cli
-    import litman_core.worker as worker
     from litman_core import JobRunner
 
     assert cli.JobRunner is JobRunner
-    assert worker.JobRunner is JobRunner
+    assert not (Path(__file__).resolve().parents[2] / "src/litman_core/worker.py").exists()
+    assert not (Path(__file__).resolve().parents[2] / "src/litman_core/execution/container_launcher.py").exists()
 
 
 def test_all_product_python_imports_use_core_namespace() -> None:

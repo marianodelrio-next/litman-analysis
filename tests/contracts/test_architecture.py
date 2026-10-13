@@ -16,7 +16,7 @@ from litman_core.resource_paths import resource_path
 ROOT = Path(__file__).parents[2]
 
 def test_job_example_matches_public_schema_and_loader() -> None:
-    example = ROOT / "examples/jobs/assessment.local.json"
+    example = ROOT / "tests/fixtures/reference-jobs/assessment.json"
     raw = json.loads(example.read_text(encoding="utf-8"))
     schema = json.loads(resource_path("schemas", "job.schema.json").read_text(encoding="utf-8"))
     assert list(Draft202012Validator(schema).iter_errors(raw)) == []

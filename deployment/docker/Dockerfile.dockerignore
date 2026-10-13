@@ -1,0 +1,7 @@
+.git
+.venv
+.env
+runs
+local-data
+local-secrets
+.agent-work

@@ -8,6 +8,7 @@ import pytest
 from litman_core.domain.jobs import JobRequest, JobType, StorageKind
 from litman_core.infrastructure.storage.google_drive import GoogleDriveArtifactPublisher, GoogleDriveDocumentSource
 from litman_core.infrastructure.storage.common import detailed_analysis_delivery_catalog
+from litman_core.infrastructure.storage.local import LocalArtifactPublisher
 
 class Request:
     def __init__(self, value): self.value = value
@@ -169,6 +170,15 @@ def test_detailed_analysis_publishes_expected_flat_catalog(tmp_path):
     assert all(not item["name"].endswith(".json") for item in uploads)
     assert all(item.name in DELIVERABLES and item.checksum == hashlib.sha256(item.name.encode()).hexdigest() for item in result)
 
+def test_local_and_fake_drive_detailed_catalogs_match(tmp_path):
+    run = delivery_run(tmp_path)
+    local_job = JobRequest("job", JobType.DETAILED_ANALYSIS, StorageKind.LOCAL, StorageKind.LOCAL, str(tmp_path), str(tmp_path / "local"))
+    local = LocalArtifactPublisher(publication_name_factory=lambda _: "job-local").publish(local_job, run)
+    files = DeliveryFiles()
+    drive = GoogleDriveArtifactPublisher(DeliveryService(files), uploader=lambda path: str(path), publication_name_factory=lambda _: "job-drive").publish(job(StorageKind.GOOGLE_DRIVE, JobType.DETAILED_ANALYSIS), run)
+    assert {(item.name, item.checksum) for item in local} == {(item.name, item.checksum) for item in drive}
+    assert not {item["name"] for item in files.items.values() if item["name"].endswith(".json")}
+
 def test_detailed_analysis_requires_all_documents_before_temporary_folder(tmp_path):
     files=DeliveryFiles(); run=delivery_run(tmp_path); (run/"output"/DELIVERABLES[0]).unlink()
     with pytest.raises(ValueError, match="artefacto de entrega requerido"):
@@ -218,7 +228,17 @@ def test_assessment_creates_unique_folder_containing_only_pdf(tmp_path):
         job(StorageKind.GOOGLE_DRIVE), assessment_run(tmp_path)
     )
     assert [item.name for item in result] == ["ficha_oportunidad.pdf"]
-    final = [item for item in files.items.values() if item["name"] == "job-20261008T153045.123456Z"]
+
+def test_local_and_fake_drive_assessment_catalogs_match(tmp_path):
+    run = assessment_run(tmp_path, b"same-pdf")
+    local_root = tmp_path / "local"
+    local_job = JobRequest("job", JobType.ASSESSMENT, StorageKind.LOCAL, StorageKind.LOCAL, str(tmp_path), str(local_root))
+    local = LocalArtifactPublisher(publication_name_factory=lambda _: "job-local").publish(local_job, run)
+    files = DeliveryFiles()
+    drive = GoogleDriveArtifactPublisher(DeliveryService(files), temporary_suffix=lambda: "fixed", uploader=lambda path: str(path), publication_name_factory=lambda _: "job-drive").publish(job(StorageKind.GOOGLE_DRIVE), run)
+    assert {(item.name, item.checksum) for item in local} == {(item.name, item.checksum) for item in drive}
+    assert {item["name"] for item in files.items.values() if item["mimeType"] != "application/vnd.google-apps.folder"} == {"ficha_oportunidad.pdf"}
+    final = [item for item in files.items.values() if item["name"] == "job-drive"]
     assert len(final) == 1
     children = [item for item in files.items.values() if final[0]["id"] in item["parents"]]
     assert [item["name"] for item in children] == ["ficha_oportunidad.pdf"]
@@ -240,5 +260,5 @@ def test_assessment_creates_a_new_folder_despite_an_existing_job_folder(tmp_path
 def test_assessment_requires_pdf_before_drive_publication(tmp_path):
     run = tmp_path / "run"
     (run / "output").mkdir(parents=True)
-    with pytest.raises(ValueError, match="No existe el PDF"):
+    with pytest.raises(ValueError, match="artefacto de entrega requerido"):
         GoogleDriveArtifactPublisher(Service()).publish(job(StorageKind.GOOGLE_DRIVE), run)

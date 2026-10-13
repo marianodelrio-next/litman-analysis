@@ -11,7 +11,7 @@
 
 ## Application namespace and Docker boundary
 
-- `litman_core` is the only Python application package and owns CLI, worker, orchestration, domain, pipelines, infrastructure, generation, configuration, and packaged resources.
+- `litman_core` is the only Python application package and owns CLI, orchestration, domain, pipelines, infrastructure, generation, configuration, and packaged resources.
 - The former `litman_analysis` Python package is removed rather than retained as a compatibility implementation.
-- `litman-core` and `litman-core-worker` are canonical entry points. Historical command names may remain only as aliases targeting `litman_core` modules.
+- `litman-core` is the canonical entry point; `litman-analysis` remains a compatibility alias. Docker invokes the same CLI and does not add a package worker entry point.
 - Docker remains the external distribution and isolation boundary; domain and pipelines do not select or branch on runtime.

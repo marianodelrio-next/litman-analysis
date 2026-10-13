@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Callable
 
 from litman_core.domain.jobs import JobRequest, MaterializedCase, PublishedArtifact
-from .common import manifest, publication_catalog, write_manifest
+from .common import publication_catalog
 from .publication import publication_folder_name
 
 
@@ -31,7 +31,7 @@ class LocalArtifactPublisher:
         root = Path(job.output_location).expanduser().resolve()
         publication_id = self._publication_name_factory(job.job_id)
         target = root / publication_id
-        catalog = publication_catalog(run_dir)
+        catalog = publication_catalog(run_dir, str(job.job_type))
         if target.exists():
             raise FileExistsError(f"La carpeta de publicación ya existe: {target}")
         root.mkdir(parents=True, exist_ok=True)
@@ -44,7 +44,6 @@ class LocalArtifactPublisher:
                 destination.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(item.source, destination)
                 artifacts.append((item.name, item.checksum, (target / item.name).as_uri()))
-            write_manifest(temporary / "publication-manifest.json", manifest(job.job_id, publication_id, job.job_type, artifacts))
             if target.exists():
                 shutil.rmtree(temporary, ignore_errors=True)
                 raise FileExistsError(f"La carpeta de publicación ya existe: {target}")

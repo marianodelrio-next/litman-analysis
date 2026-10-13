@@ -20,9 +20,7 @@ dependencies = [
 
 [project.scripts]
 litman-core = "litman_core.cli:main"
-litman-core-worker = "litman_core.worker:main"
 litman-analysis = "litman_core.cli:main"
-litman-analysis-worker = "litman_core.worker:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

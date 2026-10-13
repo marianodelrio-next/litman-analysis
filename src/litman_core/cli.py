@@ -3,13 +3,11 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import subprocess
 import sys
 from pathlib import Path
 
 from litman_core.application.job_loader import load_job
 from litman_core.domain.jobs import JobRequest, JobType, StorageKind
-from litman_core.execution import ContainerJobLauncher
 from litman_core import JobRunner
 
 
@@ -25,13 +23,11 @@ def main(argv: list[str] | None = None) -> None:
     commands = parser.add_subparsers(dest="command", required=True)
     run = commands.add_parser("run", help="Ejecuta un job JSON o YAML")
     run.add_argument("job", type=Path)
-    run.add_argument("--native", action="store_true", help="Ejecuta JobRunner en el proceso actual")
     for name in ("assess", "analyze"):
         command = commands.add_parser(name, help="Wrapper compatible")
         command.add_argument("case_dir", type=Path)
         command.add_argument("--output", type=Path, default=Path("local-data/output"))
         command.add_argument("--job-id")
-        command.add_argument("--native", action="store_true", help="Ejecuta JobRunner en el proceso actual")
         if name == "analyze":
             command.add_argument("--content-profile", choices=("skeleton-v1", "draft-v1"), default="skeleton-v1")
             command.add_argument("--output-language", choices=("auto", "es"), default="auto")
@@ -46,22 +42,12 @@ def main(argv: list[str] | None = None) -> None:
                 "output_language": args.output_language,
             }}} if kind is JobType.DETAILED_ANALYSIS else {})
             job = _local_job(kind, args.case_dir, args.output, args.job_id, options)
-        if args.native:
-            result = JobRunner().run(job)
-            payload = {
-                "job_id": result.job_id,
-                "status": result.status,
-                "run_dir": str(result.run_dir),
-                "diagnostics_dir": str(result.diagnostics_dir),
-                "artifacts": [item.uri for item in result.artifacts],
-            }
-        else:
-            result = ContainerJobLauncher().run(job)
-            payload = result.payload
+        result = JobRunner().run(job)
+        payload = {"job_id": result.job_id, "status": result.status,
+                   "run_dir": str(result.run_dir), "diagnostics_dir": str(result.diagnostics_dir),
+                   "artifacts": [{"name": item.name, "uri": item.uri, "checksum": item.checksum}
+                                  for item in result.artifacts]}
         print(json.dumps(payload, ensure_ascii=False, indent=2))
-    except subprocess.CalledProcessError as exc:
-        print(json.dumps({"status": "failed", "error": str(exc)}, ensure_ascii=False), file=sys.stderr)
-        raise SystemExit(exc.returncode) from exc
     except Exception as exc:
         print(json.dumps({"status": "failed", "error": str(exc)}, ensure_ascii=False), file=sys.stderr)
         raise SystemExit(1) from exc

@@ -31,17 +31,19 @@ def test_local_source_materializes_an_isolated_copy(tmp_path: Path) -> None:
     assert (source / "PCAP.txt").read_text(encoding="utf-8") == "original"
 
 
-def test_local_publisher_copies_run_and_reports_checksums(tmp_path: Path) -> None:
+def test_local_publisher_publishes_only_public_assessment_artifacts(tmp_path: Path) -> None:
     source = tmp_path / "source"
     source.mkdir()
     output = tmp_path / "published"
     run = tmp_path / "run"
     (run / "output").mkdir(parents=True)
-    payload = b'{"valid": true}'
-    (run / "output" / "result.json").write_bytes(payload)
+    payload = b"pdf"
+    (run / "output" / "ficha_oportunidad.pdf").write_bytes(payload)
+    (run / "lineage.json").write_text("{}")
     published = LocalArtifactPublisher(publication_name_factory=lambda _: "job-1-20261008T153045.123456Z").publish(local_job(source, output), run)
-    assert (output / "job-1-20261008T153045.123456Z" / "output" / "result.json").read_bytes() == payload
-    item = next(value for value in published if value.name == "output/result.json")
+    assert (output / "job-1-20261008T153045.123456Z" / "ficha_oportunidad.pdf").read_bytes() == payload
+    assert not (output / "job-1-20261008T153045.123456Z" / "lineage.json").exists()
+    item = next(value for value in published if value.name == "ficha_oportunidad.pdf")
     assert item.checksum == hashlib.sha256(payload).hexdigest()
 
 
@@ -49,14 +51,16 @@ def test_local_publication_creates_a_new_folder_for_each_execution(tmp_path: Pat
     source, output, run = tmp_path / "source", tmp_path / "published", tmp_path / "run"
     source.mkdir()
     run.mkdir()
+    (run / "output").mkdir()
+    (run / "output" / "ficha_oportunidad.pdf").write_bytes(b"pdf")
     job = local_job(source, output)
     names = iter(("job-1-20261008T153045.123456Z", "job-1-20261008T153046.123456Z"))
     publisher = LocalArtifactPublisher(publication_name_factory=lambda _: next(names))
     publisher.publish(job, run)
     publisher.publish(job, run)
     folders = sorted(path.name for path in output.iterdir())
-    assert folders == ["job-1-20261008T153045.123456Z", "job-1-20261008T153046.123456Z"]
-    assert all(json.loads((output / folder / "publication-manifest.json").read_text())["job_id"] == "job-1" for folder in folders)
+    assert folders == list(names := ["job-1-20261008T153045.123456Z", "job-1-20261008T153046.123456Z"])
+    assert all((output / folder / "ficha_oportunidad.pdf").is_file() for folder in folders)
 
 
 
@@ -65,3 +69,20 @@ def test_settings_can_separate_runtime_data_from_project(tmp_path: Path) -> None
                         workspace_root=tmp_path / "workspace")
     assert settings.runs_dir == tmp_path / "runs"
     assert settings.workspace_dir == tmp_path / "workspace"
+
+def test_local_detailed_publication_is_flat_and_excludes_internal_files(tmp_path: Path) -> None:
+    source, output, run = tmp_path / "source", tmp_path / "published", tmp_path / "run"
+    source.mkdir(); (run / "output").mkdir(parents=True)
+    for name, data in (("resumen_tecnico.docx", b"technical"), ("guia_preparacion_oferta.docx", b"guide"),
+                       ("propuesta_tecnica_base.docx", b"proposal"), ("simulador_economico.xlsx", b"xlsx")):
+        (run / "output" / name).write_bytes(data)
+    (run / "output" / "generation_manifest.json").write_text(json.dumps({"artifacts":[
+        {"id":"technical-summary","documents":["resumen_tecnico.docx"]},
+        {"id":"summary","documents":["guia_preparacion_oferta.docx"]},
+        {"id":"technical-document","documents":["propuesta_tecnica_base.docx"]}]}))
+    (run / "output" / "result.json").write_text("{}"); (run / "lineage.json").write_text("{}")
+    job = JobRequest("job-1", JobType.DETAILED_ANALYSIS, StorageKind.LOCAL, StorageKind.LOCAL, str(source), str(output))
+    publication_id = "job-1-20261008T153045.123456Z"
+    published = LocalArtifactPublisher(publication_name_factory=lambda _: publication_id).publish(job, run)
+    assert {item.name for item in published} == {"resumen_tecnico.docx", "guia_preparacion_oferta.docx", "propuesta_tecnica_base.docx", "simulador_economico.xlsx"}
+    assert not list((output / publication_id).glob("*.json"))
