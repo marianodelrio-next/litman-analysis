@@ -1,10 +1,10 @@
 # Essential Architecture
 
-LitMan Core is a Python 3.11 application implemented exclusively under `src/litman_core`; the former `litman_analysis` Python package no longer exists. The host CLI validates a job and starts one container. Inside it, `JobRunner` materializes local or Google Drive files, builds a `DocumentBundle`, normalizes documents, and runs either `assessment` or `detailed-analysis`.
+LitMan Core is a Python 3.11 application implemented exclusively under `src/litman_core`; the former `litman_analysis` Python package no longer exists. The CLI validates a job and invokes `JobRunner` in the current Python process. `JobRunner` materializes local or Google Drive files, builds a `DocumentBundle`, normalizes documents, and runs either `assessment` or `detailed-analysis`.
 
 Pipelines use `infrastructure/llm/CodexProvider` for structured analysis. Schema, semantic, and evidence validation complete before publishing. `generation/` creates deliverables from the dossier and versioned resources; `infrastructure/storage/` publishes locally or to Drive.
 
-Versioned prompts, rules, schemas, and templates are under `resources/`. The product runs its own Codex CLI in the container; `.codex/` and `.agents/` are development-only configuration and are not part of that runtime.
+Versioned prompts, rules, schemas, and templates are under `resources/`. The product invokes an explicitly configured Codex CLI in its execution environment, local or containerized; `.codex/` and `.agents/` are development-only configuration and are not part of the product runtime.
 
 ## Core y Docker
 
