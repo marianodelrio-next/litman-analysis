@@ -19,3 +19,10 @@ def test_docker_image_enters_through_public_cli():
     assert 'entrypoint ["litman-core"]' in dockerfile
     assert "chromium" in dockerfile and "ripgrep" in dockerfile
     assert "bubblewrap" not in dockerfile and "bwrap" not in dockerfile
+
+def test_docker_runtime_installs_builder_wheel_without_sources():
+    dockerfile = (ROOT / "deployment/docker/Dockerfile").read_text().lower()
+    runtime = dockerfile.split("from python:3.11-slim-bookworm", 2)[-1]
+    assert "copy --from=builder /dist/litman_core-*.whl /tmp/" in dockerfile
+    assert "pip install --no-cache-dir /tmp/litman_core-*.whl" in dockerfile
+    assert "copy src" not in runtime

@@ -15,3 +15,8 @@
 - The former alternate Python package is removed rather than retained as a compatibility implementation.
 - `litman-core` is the only public entry point. Docker invokes the same CLI and does not add a package worker entry point.
 - Docker remains the external distribution and isolation boundary; domain and pipelines do not select or branch on runtime.
+- Local development and local wheel consumption are documented as separate
+  flows (`deployment/local-dev/` and `deployment/local-install/`). The wheel
+  flow requires explicit persistent workspace and runs paths; `check` remains a
+  diagnostic and does not create them. Docker continues to install a built
+  wheel in its isolated runtime.

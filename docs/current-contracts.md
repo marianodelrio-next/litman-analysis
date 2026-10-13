@@ -46,9 +46,3 @@ texto citado cuando están disponibles. Drive requiere credenciales explícitas;
 esta línea base no usa red, credenciales ni servicios externos en tests. Las
 comprobaciones de usuario, capabilities, mounts y `no-new-privileges` son
 preflight opcional de `deployment/docker`, no parte del contrato de Core.
-
-## Transición
-
-Los nombres de comando históricos se conservan temporalmente como aliases de
-los mismos entry points de Core. Su retirada futura no afecta al namespace
-Python ni implica mantener una segunda implementación.

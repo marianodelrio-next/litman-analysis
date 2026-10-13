@@ -12,4 +12,9 @@ Versioned prompts, rules, schemas, and templates are under `resources/`. The pro
 
 Docker pertenece únicamente a `deployment/docker/` como distribución opcional. La CLI local invoca directamente `JobRunner`; la imagen instala y ejecuta esa misma CLI.
 
+El repositorio distingue el desarrollo desde checkout (`deployment/local-dev/`)
+del consumo de una wheel instalada (`deployment/local-install/`). Docker es la
+frontera de aislamiento y construye la wheel en una etapa intermedia para
+instalarla en la imagen final; no usa `src/` como runtime.
+
 `litman-core` es la única CLI pública. Los comandos `run`, `assess`, `analyze` y `check` ejecutan el comportamiento documentado en el proceso actual; no existe una interfaz worker en el paquete.
