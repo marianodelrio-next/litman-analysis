@@ -1,6 +1,6 @@
 # Essential Architecture
 
-LitMan Core is a Python 3.11 application implemented exclusively under `src/litman_core`; the former `litman_analysis` Python package no longer exists. The CLI validates a job and invokes `JobRunner` in the current Python process. `JobRunner` materializes local or Google Drive files, builds a `DocumentBundle`, normalizes documents, and runs either `assessment` or `detailed-analysis`.
+LitMan Core is a Python 3.11 application implemented exclusively under `src/litman_core`; no alternate Python package is shipped. The CLI validates a job and invokes `JobRunner` in the current Python process. `JobRunner` materializes local or Google Drive files, builds a `DocumentBundle`, normalizes documents, and runs either `assessment` or `detailed-analysis`.
 
 Pipelines use `infrastructure/llm/CodexProvider` for structured analysis. Schema, semantic, and evidence validation complete before publishing. `generation/` creates deliverables from the dossier and versioned resources; `infrastructure/storage/` publishes locally or to Drive.
 
@@ -12,4 +12,4 @@ Versioned prompts, rules, schemas, and templates are under `resources/`. The pro
 
 Docker pertenece únicamente a `deployment/docker/` como distribución opcional. La CLI local invoca directamente `JobRunner`; la imagen instala y ejecuta esa misma CLI.
 
-`litman-core` es la CLI canónica y mantiene el alias `litman-analysis`. Los comandos `run`, `assess` y `analyze` ejecutan el runner en el proceso actual; no existe `--native` ni una interfaz worker en el paquete.
+`litman-core` es la única CLI pública. Los comandos `run`, `assess`, `analyze` y `check` ejecutan el comportamiento documentado en el proceso actual; no existe una interfaz worker en el paquete.

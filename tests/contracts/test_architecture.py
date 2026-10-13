@@ -40,8 +40,8 @@ def test_summary_artifacts_remain_independent_components() -> None:
     from litman_core.generation.technical_summary import TechnicalSummaryGenerator
 
     root = Path(__file__).resolve().parents[2] / "src" / "litman_core" / "generation"
-    assert not (root / "summary").exists()
+    assert not (root / "bid-preparation-guide").exists()
     assert isinstance(ARTIFACT_GENERATORS["technical-summary"], TechnicalSummaryGenerator)
-    assert isinstance(ARTIFACT_GENERATORS["summary"], BidPreparationGuideGenerator)
-    assert ARTIFACT_GENERATORS["technical-summary"].id != ARTIFACT_GENERATORS["summary"].id
-    assert ARTIFACT_GENERATORS["technical-summary"].filename != ARTIFACT_GENERATORS["summary"].filename
+    assert isinstance(ARTIFACT_GENERATORS["bid-preparation-guide"], BidPreparationGuideGenerator)
+    assert ARTIFACT_GENERATORS["technical-summary"].id != ARTIFACT_GENERATORS["bid-preparation-guide"].id
+    assert ARTIFACT_GENERATORS["technical-summary"].filename != ARTIFACT_GENERATORS["bid-preparation-guide"].filename

@@ -18,7 +18,7 @@ def chatgpt_home(tmp_path: Path) -> Path:
 
 def test_chatgpt_uses_private_persistent_state(tmp_path):
     auth = CodexAuthentication.from_environment(
-        {"LITMAN_ANALYSIS_CODEX_AUTH_MODE": "chatgpt"},
+        {"LITMAN_CORE_CODEX_AUTH_MODE": "chatgpt"},
         codex_home=chatgpt_home(tmp_path),
     )
     assert auth.mode == "chatgpt"
@@ -43,23 +43,23 @@ def test_chatgpt_rejects_unsafe_auth_permissions(tmp_path):
 
 def test_api_key_only(tmp_path):
     auth = CodexAuthentication.from_environment({
-        "LITMAN_ANALYSIS_CODEX_AUTH_MODE": "api-key",
-        "LITMAN_ANALYSIS_CODEX_API_KEY_FILE": str(secret(tmp_path)),
+        "LITMAN_CORE_CODEX_AUTH_MODE": "api-key",
+        "LITMAN_CORE_CODEX_API_KEY_FILE": str(secret(tmp_path)),
     })
     assert auth.environment() == {"CODEX_API_KEY": "secret"}
     assert auth.cli_login_method == "api"
 
 def test_unsupported_mode_fails():
     with pytest.raises(CodexAuthenticationError):
-        CodexAuthentication.from_environment({"LITMAN_ANALYSIS_CODEX_AUTH_MODE": "other"})
+        CodexAuthentication.from_environment({"LITMAN_CORE_CODEX_AUTH_MODE": "other"})
 
 def test_api_key_requires_existing_file():
     with pytest.raises(CodexAuthenticationError):
-        CodexAuthentication.from_environment({"LITMAN_ANALYSIS_CODEX_AUTH_MODE": "api-key"})
+        CodexAuthentication.from_environment({"LITMAN_CORE_CODEX_AUTH_MODE": "api-key"})
 
 def test_mixed_supported_modes_fail(tmp_path):
     with pytest.raises(CodexAuthenticationError, match="mezcla"):
         CodexAuthentication.from_environment({
-            "LITMAN_ANALYSIS_CODEX_AUTH_MODE": "chatgpt",
-            "LITMAN_ANALYSIS_CODEX_API_KEY_FILE": str(secret(tmp_path)),
+            "LITMAN_CORE_CODEX_AUTH_MODE": "chatgpt",
+            "LITMAN_CORE_CODEX_API_KEY_FILE": str(secret(tmp_path)),
         }, codex_home=chatgpt_home(tmp_path / "state"))

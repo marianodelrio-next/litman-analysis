@@ -17,14 +17,14 @@ class CodexAuthentication:
     @classmethod
     def from_environment(cls, environ: dict[str, str] | None = None, *, codex_home: Path | None = None) -> "CodexAuthentication":
         env = os.environ if environ is None else environ
-        mode = env.get("LITMAN_ANALYSIS_CODEX_AUTH_MODE", "chatgpt")
+        mode = env.get("LITMAN_CORE_CODEX_AUTH_MODE", "chatgpt")
         if mode not in {"chatgpt", "api-key"}:
-            raise CodexAuthenticationError("LITMAN_ANALYSIS_CODEX_AUTH_MODE debe ser chatgpt o api-key")
-        api_key_file = _path(env, "LITMAN_ANALYSIS_CODEX_API_KEY_FILE")
+            raise CodexAuthenticationError("LITMAN_CORE_CODEX_AUTH_MODE debe ser chatgpt o api-key")
+        api_key_file = _path(env, "LITMAN_CORE_CODEX_API_KEY_FILE")
         if mode == "api-key":
             if api_key_file is None:
-                raise CodexAuthenticationError("LITMAN_ANALYSIS_CODEX_API_KEY_FILE es obligatorio para api-key")
-            _validate_file(api_key_file, "LITMAN_ANALYSIS_CODEX_API_KEY_FILE")
+                raise CodexAuthenticationError("LITMAN_CORE_CODEX_API_KEY_FILE es obligatorio para api-key")
+            _validate_file(api_key_file, "LITMAN_CORE_CODEX_API_KEY_FILE")
             return cls(mode=mode, api_key_file=api_key_file)
         if api_key_file is not None:
             raise CodexAuthenticationError("la configuración de autenticación mezcla modos")
@@ -38,7 +38,7 @@ class CodexAuthentication:
 
     def environment(self) -> dict[str, str]:
         if self.mode == "api-key":
-            return {"CODEX_API_KEY": _read_secret(self.api_key_file, "LITMAN_ANALYSIS_CODEX_API_KEY_FILE")}
+            return {"CODEX_API_KEY": _read_secret(self.api_key_file, "LITMAN_CORE_CODEX_API_KEY_FILE")}
         return {}
 
 def _validate_chatgpt_state(codex_home: Path) -> None:

@@ -35,8 +35,8 @@ def test_bid_guide_rerenders_snapshot_with_its_stable_contract(tmp_path: Path) -
     data = dossier(); (run / "input" / "dossier.json").write_text(json.dumps(data), encoding="utf-8")
     result = BidPreparationGuideGenerator().rerender(run)
     assert Path(result["documents"][0]).name == "guia_preparacion_oferta.docx"
-    assert result["id"] == "summary"
-    assert result["generator_version"] == "summary-generator-v3"
+    assert result["id"] == "bid-preparation-guide"
+    assert result["generator_version"] == "bid-preparation-guide-generator-v3"
     assert result["pending"] == data["pendientes"] and result["metadata"]["format"] == "docx"
 
 

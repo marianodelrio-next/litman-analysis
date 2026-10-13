@@ -201,7 +201,7 @@ def test_prepare_assessment_persists_version_bundle(tmp_path: Path) -> None:
 def test_public_commands_are_available(monkeypatch, capsys, command: str) -> None:
     from litman_core.cli import main
 
-    monkeypatch.setattr("sys.argv", ["litman-analysis", command, "--help"])
+    monkeypatch.setattr("sys.argv", ["litman-core", command, "--help"])
     with pytest.raises(SystemExit) as exit_status:
         main()
     assert exit_status.value.code == 0
@@ -239,7 +239,7 @@ def test_registries_declare_all_runtime_components() -> None:
         "assessment", "detailed-analysis",
     }
     assert set(ARTIFACT_GENERATORS) == {
-        "technical-summary", "summary", "technical-document", "economic-simulator",
+        "technical-summary", "bid-preparation-guide", "technical-document", "economic-simulator",
     }
 
 

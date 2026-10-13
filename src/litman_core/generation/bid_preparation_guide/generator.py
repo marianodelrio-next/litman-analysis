@@ -8,9 +8,9 @@ from .renderer import write_bid_preparation_guide
 
 
 class BidPreparationGuideGenerator:
-    """Operational bid-preparation guide; ``summary`` remains its stable ID."""
-    id = "summary"
-    version = "summary-generator-v3"
+    """Operational bid-preparation guide."""
+    id = "bid-preparation-guide"
+    version = "bid-preparation-guide-generator-v3"
     filename = "guia_preparacion_oferta.docx"
 
     def generate(self, context: ArtifactContext) -> dict:

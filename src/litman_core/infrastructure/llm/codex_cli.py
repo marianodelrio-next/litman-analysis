@@ -63,7 +63,7 @@ class CodexProvider:
         if executable is None:
             raise RuntimeError(
                 f"No se encuentra Codex CLI ({self.binary!r}). "
-                "Instálalo o configura LITMAN_ANALYSIS_CODEX_BINARY."
+                "Instálalo o configura LITMAN_CORE_CODEX_BINARY."
             )
 
         _prepare_output_paths(output_paths)
@@ -332,7 +332,7 @@ def _child_environment(authentication: CodexAuthentication, *, home: Path | None
     """A narrowly scoped environment, inherited by any agent tools as well."""
     allowed = {"PATH", "LANG", "LC_ALL", "LC_CTYPE", "SSL_CERT_FILE", "SSL_CERT_DIR", "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "http_proxy", "https_proxy", "no_proxy"}
     env = {name: value for name, value in os.environ.items() if name in allowed}
-    env["HOME"] = str(home or os.environ.get("HOME", "/tmp/litman-analysis/home"))
+    env["HOME"] = str(home or os.environ.get("HOME", "/tmp/litman-core/home"))
     env["CODEX_HOME"] = str(codex_home or os.environ.get("CODEX_HOME", str(Path.home() / ".codex")))
     env.update(authentication.environment())
     return env

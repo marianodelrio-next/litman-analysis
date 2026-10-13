@@ -5,7 +5,7 @@ ROOT = Path(__file__).parents[2]
 
 def test_optional_docker_deployment_configuration_is_hardened():
     compose = yaml.safe_load((ROOT / "deployment/docker/compose.yaml").read_text())
-    service = compose["services"]["litman-analysis"]
+    service = compose["services"]["litman-core"]
     assert service["build"]["context"] == "../.."
     assert service["build"]["dockerfile"] == "deployment/docker/Dockerfile"
     assert service["read_only"] is True

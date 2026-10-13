@@ -85,11 +85,11 @@ def test_generation_service_writes_traceable_artifacts(tmp_path: Path) -> None:
     ): 
         assert (run_dir / relative).exists()
 def test_artifact_registry_resolves_stable_generators() -> None:
-    generators = resolve_artifact_generators(["technical-summary", "summary", "technical-document", "economic-simulator"])
-    assert [generator.id for generator in generators] == ["technical-summary", "summary", "technical-document", "economic-simulator"]
+    generators = resolve_artifact_generators(["technical-summary", "bid-preparation-guide", "technical-document", "economic-simulator"])
+    assert [generator.id for generator in generators] == ["technical-summary", "bid-preparation-guide", "technical-document", "economic-simulator"]
     assert all(generator.version for generator in generators)
-    assert set(ARTIFACT_GENERATORS) == {"technical-summary", "summary", "technical-document", "economic-simulator"}
-    assert [generator.id for generator in resolve_artifact_generators(None)] == ["technical-summary", "summary", "technical-document", "economic-simulator"]
+    assert set(ARTIFACT_GENERATORS) == {"technical-summary", "bid-preparation-guide", "technical-document", "economic-simulator"}
+    assert [generator.id for generator in resolve_artifact_generators(None)] == ["technical-summary", "bid-preparation-guide", "technical-document", "economic-simulator"]
 
 
 def test_unknown_artifact_is_rejected_before_generation(tmp_path: Path) -> None:
@@ -110,9 +110,9 @@ def test_multiple_artifacts_are_consolidated_with_versions(tmp_path: Path) -> No
     dossier_path.parent.mkdir(parents=True)
     dossier_path.write_text(json.dumps(dossier()), encoding="utf-8")
     manifest = generate_documents(dossier_path, output_dir=tmp_path / "run",
-                                  artifacts=["technical-summary", "summary", "economic-simulator"])
+                                  artifacts=["technical-summary", "bid-preparation-guide", "economic-simulator"])
     assert len(manifest["documents"]) == 3
-    assert {item["id"] for item in manifest["artifacts"]} == {"technical-summary", "summary", "economic-simulator"}
+    assert {item["id"] for item in manifest["artifacts"]} == {"technical-summary", "bid-preparation-guide", "economic-simulator"}
     assert all(item["generator_version"] for item in manifest["artifacts"])
     assert manifest["artifacts"][2]["metadata"]["template_version"] == "1.1.0"
 
@@ -131,7 +131,7 @@ def test_english_source_contract_fixture_generates_four_spanish_artifacts(tmp_pa
     dossier_path = tmp_path / "dossier.json"
     dossier_path.write_text(json.dumps(value, ensure_ascii=False), encoding="utf-8")
     manifest = generate_documents(dossier_path, output_dir=tmp_path / "run", provider=None)
-    assert {item["id"] for item in manifest["artifacts"]} == {"technical-summary", "summary", "technical-document", "economic-simulator"}
+    assert {item["id"] for item in manifest["artifacts"]} == {"technical-summary", "bid-preparation-guide", "technical-document", "economic-simulator"}
     docx_text = "\n".join("\n".join(p.text for p in Document(path).paragraphs) for path in manifest["documents"] if path.endswith(".docx"))
     assert contract["semantic_context"] in docx_text
     assert "Propuesta técnica" in docx_text
@@ -146,8 +146,8 @@ def test_english_source_contract_fixture_generates_four_spanish_artifacts(tmp_pa
 def test_selective_summary_generation_declares_existing_output_documents(tmp_path: Path) -> None:
     dossier_path = tmp_path / "dossier.json"
     dossier_path.write_text(json.dumps(dossier()), encoding="utf-8")
-    manifest = generate_documents(dossier_path, output_dir=tmp_path / "run", artifacts=["technical-summary", "summary"])
-    assert [item["id"] for item in manifest["artifacts"]] == ["technical-summary", "summary"]
+    manifest = generate_documents(dossier_path, output_dir=tmp_path / "run", artifacts=["technical-summary", "bid-preparation-guide"])
+    assert [item["id"] for item in manifest["artifacts"]] == ["technical-summary", "bid-preparation-guide"]
     assert {Path(path).name for path in manifest["documents"]} == {"resumen_tecnico.docx", "guia_preparacion_oferta.docx"}
     assert all(Path(path).is_file() for path in manifest["documents"])
 
@@ -158,18 +158,18 @@ def test_artifact_failure_identifies_generator(tmp_path: Path, monkeypatch) -> N
     dossier_path.write_text(json.dumps(dossier()), encoding="utf-8")
 
     class BrokenSummary:
-        id = "summary"
+        id = "bid-preparation-guide"
         version = "test-v1"
         def generate(self, context):
             raise RuntimeError("fallo controlado")
         def rerender(self, run_dir, **options):
             raise RuntimeError("fallo controlado")
 
-    monkeypatch.setitem(ARTIFACT_GENERATORS, "summary", BrokenSummary())
+    monkeypatch.setitem(ARTIFACT_GENERATORS, "bid-preparation-guide", BrokenSummary())
     try:
-        generate_documents(dossier_path, output_dir=tmp_path / "run", artifacts=["summary"])
+        generate_documents(dossier_path, output_dir=tmp_path / "run", artifacts=["bid-preparation-guide"])
     except ValueError as error:
-        assert "summary" in str(error)
+        assert "bid-preparation-guide" in str(error)
         assert "fallo controlado" in str(error)
     else:
         raise AssertionError("Debe identificar el generador que falló")

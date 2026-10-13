@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "litman-analysis-job-v1",
+  "$id": "litman-core-job-v1",
   "type": "object",
   "additionalProperties": false,
   "required": ["job_id", "job_type", "input", "output"],

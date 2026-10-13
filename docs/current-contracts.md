@@ -10,9 +10,8 @@ actual, no una API futura.
 | `litman-core run JOB` | integración/operación | carga un job y ejecuta `JobRunner` directamente | canónico |
 | `litman-core assess CASE` | usuario local | construye un job assessment y delega | canónico |
 | `litman-core analyze CASE` | usuario local | construye un job detailed-analysis y delega | canónico |
-| `litman-analysis` | compatibilidad | alias de la CLI de `litman_core` | temporal |
 
-Toda la implementación pertenece al paquete `litman_core`; no existe un paquete Python `litman_analysis` de compatibilidad.
+Toda la implementación pertenece al paquete `litman_core`; no existe un paquete Python alternativo de compatibilidad.
 
 ## Job y run
 

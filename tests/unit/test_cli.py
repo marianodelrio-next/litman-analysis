@@ -33,6 +33,26 @@ def test_cli_run_uses_loaded_job(tmp_path, monkeypatch, capsys):
     cli.main(["run", str(job)])
     assert seen[0].job_id == "run-id" and json.loads(capsys.readouterr().out)["status"] == "succeeded"
 
+
+def test_cli_run_and_analyze_apply_explicit_config(tmp_path, monkeypatch, capsys):
+    config = tmp_path / "config.toml"
+    config.write_text('[analysis.detailed.generation]\nartifacts=["technical-summary"]\n', encoding="utf-8")
+    case = tmp_path / "case"
+    case.mkdir()
+    job = tmp_path / "job.json"
+    job.write_text(json.dumps({"job_id":"run-id","job_type":"detailed-analysis","input":{"kind":"local","location":str(case)},"output":{"kind":"local","location":str(tmp_path/"out")}}))
+    seen = []
+    class Runner:
+        def run(self, request):
+            seen.append(request)
+            return SimpleNamespace(job_id=request.job_id, status="succeeded", run_dir=Path("/run"), diagnostics_dir=Path("/run"), artifacts=())
+    monkeypatch.setattr(cli, "JobRunner", Runner)
+    cli.main(["run", str(job), "--config", str(config)])
+    cli.main(["analyze", str(case), "--config", str(config)])
+    capsys.readouterr()
+    assert seen[0].options["generation"]["artifacts"] == ["technical-summary"]
+    assert seen[1].options["generation"]["artifacts"] == ["technical-summary"]
+
 def test_cli_rejects_native_and_emits_json_failure(tmp_path, monkeypatch, capsys):
     with pytest.raises(SystemExit) as error:
         cli.main(["assess", str(tmp_path), "--native"])

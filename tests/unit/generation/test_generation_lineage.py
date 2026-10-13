@@ -18,7 +18,7 @@ def test_generation_uses_explicit_dossier_lineage_and_propagates_it(tmp_path: Pa
         origin="explicit")), encoding="utf-8")
 
     run_dir = tmp_path / "generated"
-    manifest = generate_documents(dossier_path, output_dir=run_dir, artifacts=["summary"])
+    manifest = generate_documents(dossier_path, output_dir=run_dir, artifacts=["bid-preparation-guide"])
 
     assert manifest["lineage"]["dossier"]["stage"] == "detailed-analysis"
     assert manifest["lineage"]["dossier"]["run"]["path"] == str(source_run)
@@ -32,7 +32,7 @@ def test_generation_accepts_external_dossier(tmp_path: Path) -> None:
     dossier_path.parent.mkdir()
     dossier_path.write_text(json.dumps(dossier()), encoding="utf-8")
 
-    manifest = generate_documents(dossier_path, output_dir=tmp_path / "generated", artifacts=["summary"])
+    manifest = generate_documents(dossier_path, output_dir=tmp_path / "generated", artifacts=["bid-preparation-guide"])
 
     assert manifest["lineage"]["dossier"]["stage"] == "external"
     assert manifest["lineage"]["dossier"]["origin"] == "external"
@@ -51,7 +51,7 @@ def test_generation_rejects_incorrect_declared_dossier_hash(tmp_path: Path) -> N
     (source_run / "lineage.json").write_text(json.dumps(lineage), encoding="utf-8")
 
     try:
-        generate_documents(dossier_path, output_dir=tmp_path / "generated", artifacts=["summary"])
+        generate_documents(dossier_path, output_dir=tmp_path / "generated", artifacts=["bid-preparation-guide"])
     except ValueError as error:
         assert "SHA-256" in str(error)
     else:
@@ -66,6 +66,6 @@ def test_generation_ignores_lineage_from_unrelated_ancestor(tmp_path: Path) -> N
         "file": str(tmp_path / "other.json"), "sha256": "0" * 64,
     }}), encoding="utf-8")
 
-    manifest = generate_documents(dossier_path, output_dir=tmp_path / "generated", artifacts=["summary"])
+    manifest = generate_documents(dossier_path, output_dir=tmp_path / "generated", artifacts=["bid-preparation-guide"])
 
     assert manifest["lineage"]["dossier"]["origin"] == "external"

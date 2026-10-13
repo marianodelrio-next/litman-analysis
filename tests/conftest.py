@@ -32,5 +32,5 @@ def dossier(**overrides) -> dict:
 def codex_test_auth(tmp_path_factory, monkeypatch):
     secret = tmp_path_factory.mktemp("codex-auth") / "codex-key"
     secret.write_text("test-only-secret\n", encoding="utf-8")
-    monkeypatch.setenv("LITMAN_ANALYSIS_CODEX_AUTH_MODE", "api-key")
-    monkeypatch.setenv("LITMAN_ANALYSIS_CODEX_API_KEY_FILE", str(secret))
+    monkeypatch.setenv("LITMAN_CORE_CODEX_AUTH_MODE", "api-key")
+    monkeypatch.setenv("LITMAN_CORE_CODEX_API_KEY_FILE", str(secret))

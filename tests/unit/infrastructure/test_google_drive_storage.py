@@ -144,7 +144,7 @@ class FailingRequest:
 def delivery_run(tmp_path):
     run=tmp_path/"run"; output=run/"output"; output.mkdir(parents=True)
     for name in DELIVERABLES: (output/name).write_bytes(name.encode())
-    (output/"generation_manifest.json").write_text(json.dumps({"artifacts":[{"id":"technical-summary","documents":[str(output/"resumen_tecnico.docx")]},{"id":"summary","documents":[str(output/"guia_preparacion_oferta.docx")]},{"id":"technical-document","documents":[str(output/"propuesta_tecnica_base.docx")]}]}))
+    (output/"generation_manifest.json").write_text(json.dumps({"artifacts":[{"id":"technical-summary","documents":[str(output/"resumen_tecnico.docx")]},{"id":"bid-preparation-guide","documents":[str(output/"guia_preparacion_oferta.docx")]},{"id":"technical-document","documents":[str(output/"propuesta_tecnica_base.docx")]}]}))
     (run/"lineage.json").write_text("{}")
     (run/"logs").mkdir(); (run/"logs/x.log").write_text("x")
     return run

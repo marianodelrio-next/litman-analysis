@@ -3,5 +3,5 @@
   "job_type": "detailed-analysis",
   "input": {"kind": "local", "location": "case"},
   "output": {"kind": "local", "location": "output"},
-  "options": {"generation": {"artifacts": ["technical-summary", "summary"]}}
+  "options": {"generation": {"artifacts": ["technical-summary", "bid-preparation-guide"]}}
 }

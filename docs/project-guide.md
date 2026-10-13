@@ -23,7 +23,7 @@ El runner no conoce Docker. Selecciona `LocalDocumentSource` o `GoogleDriveDocum
 ## Persistencia y seguridad
 
 - `/job` y `/input` son mounts de solo lectura.
-- `/output`, `/data/runs` y `/var/lib/litman-analysis/codex` son persistentes y escribibles.
+- `/output`, `/data/runs` y `/var/lib/litman-core/codex` son persistentes y escribibles.
 - `/run/secrets` es de solo lectura; contiene opcionalmente Google y la API key.
 - La raíz es de solo lectura y `/tmp` es `tmpfs`.
 - El workspace privado se elimina en `finally`; el run y sus diagnósticos no.
@@ -48,7 +48,7 @@ Los recursos versionados están en `resources/`; para añadir un origen o public
 
 Cada publicación local o Drive crea una carpeta única bajo `output.location`, con el formato `<job_id>-<timestamp UTC>`. Esto conserva cada relanzamiento del mismo job. Local usa un directorio temporal y promoción atómica. En Drive, `assessment` publica únicamente `ficha_oportunidad.pdf`, sin crear una carpeta `output` ni un manifiesto remoto; `detailed-analysis` conserva la carpeta temporal y promociona su catálogo completo. `storageQuotaExceeded` se traduce a una recomendación explícita de Shared Drive.
 
-El catálogo cerrado de `detailed-analysis` contiene `resumen_tecnico.docx` (contexto completo para técnico, arquitecto o revisor), `guia_preparacion_oferta.docx` (guía operativa para bid manager o redactor), `propuesta_tecnica_base.docx` y `simulador_economico.xlsx`. Los dos primeros se generan de forma determinista desde `dossier.json`; `summary` conserva su ID histórico, aunque ahora identifica la guía de preparación.
+El catálogo cerrado de `detailed-analysis` contiene `resumen_tecnico.docx` (contexto completo para técnico, arquitecto o revisor), `guia_preparacion_oferta.docx` (guía operativa para bid manager o redactor), `propuesta_tecnica_base.docx` y `simulador_economico.xlsx`. Los dos primeros se generan de forma determinista desde `dossier.json`; el ID canónico de la guía es `bid-preparation-guide`.
 
 La salida del análisis y de todos los entregables es siempre española. Las
 citas de evidencia, identificadores, nombres de archivo, referencias estables o

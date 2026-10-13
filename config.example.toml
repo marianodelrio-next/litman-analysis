@@ -1,0 +1,10 @@
+[analysis.detailed.generation]
+artifacts = ["technical-summary", "bid-preparation-guide", "technical-document", "economic-simulator"]
+
+[analysis.detailed.generation.technical_document]
+template_id = "next-standard-v1"
+content_profile = "skeleton-v1"
+output_language = "auto"
+
+[analysis.detailed.generation.economic_simulator]
+template_id = "standard-v1"

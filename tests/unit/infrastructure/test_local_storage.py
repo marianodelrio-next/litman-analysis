@@ -78,7 +78,7 @@ def test_local_detailed_publication_is_flat_and_excludes_internal_files(tmp_path
         (run / "output" / name).write_bytes(data)
     (run / "output" / "generation_manifest.json").write_text(json.dumps({"artifacts":[
         {"id":"technical-summary","documents":["resumen_tecnico.docx"]},
-        {"id":"summary","documents":["guia_preparacion_oferta.docx"]},
+        {"id":"bid-preparation-guide","documents":["guia_preparacion_oferta.docx"]},
         {"id":"technical-document","documents":["propuesta_tecnica_base.docx"]}]}))
     (run / "output" / "result.json").write_text("{}"); (run / "lineage.json").write_text("{}")
     job = JobRequest("job-1", JobType.DETAILED_ANALYSIS, StorageKind.LOCAL, StorageKind.LOCAL, str(source), str(output))

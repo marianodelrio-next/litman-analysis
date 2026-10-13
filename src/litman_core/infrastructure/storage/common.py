@@ -77,10 +77,10 @@ def detailed_analysis_delivery_catalog(run_dir: Path) -> tuple[CatalogArtifact, 
             raise ValueError("generation_manifest.json no contiene una lista de artefactos válida")
         if not all(isinstance(item, dict) for item in manifest["artifacts"]):
             raise ValueError("generation_manifest.json contiene artefactos inválidos")
-        summaries = {item.get("id"): item for item in manifest["artifacts"] if item.get("id") in {"technical-summary", "summary"}}
-        if set(summaries) != {"technical-summary", "summary"}:
+        summaries = {item.get("id"): item for item in manifest["artifacts"] if item.get("id") in {"technical-summary", "bid-preparation-guide"}}
+        if set(summaries) != {"technical-summary", "bid-preparation-guide"}:
             raise ValueError("generation_manifest.json debe declarar los dos resúmenes requeridos")
-        expected_summaries = {"technical-summary": "resumen_tecnico.docx", "summary": "guia_preparacion_oferta.docx"}
+        expected_summaries = {"technical-summary": "resumen_tecnico.docx", "bid-preparation-guide": "guia_preparacion_oferta.docx"}
         for artifact_id, expected_name in expected_summaries.items():
             documents = summaries[artifact_id].get("documents")
             declared_summary = [Path(path).name for path in documents] if isinstance(documents, list) else []

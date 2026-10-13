@@ -26,10 +26,10 @@ Desde la raíz del repositorio:
 ```bash
 docker compose -f deployment/docker/compose.yaml config --quiet
 docker compose -f deployment/docker/compose.yaml build
-docker compose -f deployment/docker/compose.yaml run --rm litman-analysis assess /input --output /output
+docker compose -f deployment/docker/compose.yaml run --rm litman-core assess /input --output /output
 ```
 
-Compose monta el job en `/job`, la entrada en `/input`, la salida en `/output`, los runs en `/data/runs`, secretos en `/run/secrets` y el estado de Codex en `/var/lib/litman-analysis/codex`. Los jobs ejecutados en Docker deben usar esas rutas internas; no existe traducción automática host→contenedor. La imagen usa el entrypoint `litman-core`, usuario no root, filesystem de solo lectura, capabilities eliminadas y `no-new-privileges`.
+Compose monta el job en `/job`, la entrada en `/input`, la salida en `/output`, los runs en `/data/runs`, secretos en `/run/secrets` y el estado de Codex en `/var/lib/litman-core/codex`. Los jobs ejecutados en Docker deben usar esas rutas internas; no existe traducción automática host→contenedor. La imagen usa el entrypoint `litman-core`, usuario no root, filesystem de solo lectura, capabilities eliminadas y `no-new-privileges`.
 
 Las comprobaciones de seguridad o preflight pertenecen al despliegue Docker, no al contrato de `litman_core`. No se deben incluir credenciales en jobs, logs, prompts ni en el contexto de build.
 

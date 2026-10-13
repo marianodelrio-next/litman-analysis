@@ -1,0 +1,78 @@
+"""Carga explícita y fusión de preferencias funcionales de generación."""
+from __future__ import annotations
+
+import copy
+import tomllib
+from pathlib import Path
+from typing import Any
+
+DEFAULT_GENERATION: dict[str, Any] = {
+    "artifacts": ["technical-summary", "bid-preparation-guide", "technical-document", "economic-simulator"],
+    "technical_document": {"template_id": "next-standard-v1", "content_profile": "skeleton-v1", "output_language": "auto"},
+    "economic_simulator": {"template_id": "standard-v1"},
+}
+_KEYS = {"artifacts", "technical_document", "economic_simulator"}
+APPROVED_ARTIFACTS = frozenset({"technical-summary", "bid-preparation-guide", "technical-document", "economic-simulator"})
+_TECHNICAL_KEYS = {"template_id", "content_profile", "output_language", "include_internal_pending", "include_editorial_guidance"}
+
+
+def load_generation_config(path: Path) -> dict[str, Any]:
+    try:
+        data = tomllib.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        raise ValueError(f"No existe la configuración: {path}") from exc
+    except tomllib.TOMLDecodeError as exc:
+        raise ValueError(f"TOML inválido: {exc}") from exc
+    if set(data) != {"analysis"} or not isinstance(data.get("analysis"), dict):
+        raise ValueError("La raíz TOML solo puede contener la tabla analysis")
+    analysis = data["analysis"]
+    if set(analysis) != {"detailed"} or not isinstance(analysis.get("detailed"), dict):
+        raise ValueError("analysis solo puede contener la tabla detailed")
+    detailed = analysis["detailed"]
+    if set(detailed) != {"generation"} or not isinstance(detailed.get("generation"), dict):
+        raise ValueError("detailed solo puede contener la tabla generation")
+    section = detailed["generation"]
+    if not isinstance(section, dict):
+        raise ValueError("La configuración debe contener [analysis.detailed.generation]")
+    return _validate(section)
+
+
+def merge_generation(*layers: dict[str, Any] | None) -> dict[str, Any]:
+    result = copy.deepcopy(DEFAULT_GENERATION)
+    for layer in layers:
+        if layer:
+            result = _merge(result, _validate(layer))
+    return result
+
+
+def _validate(data: dict[str, Any]) -> dict[str, Any]:
+    unknown = set(data) - _KEYS
+    if unknown:
+        raise ValueError(f"Claves de generación desconocidas: {', '.join(sorted(unknown))}")
+    if "artifacts" in data and (not isinstance(data["artifacts"], list) or not all(isinstance(x, str) for x in data["artifacts"])):
+        raise ValueError("generation.artifacts debe ser una lista de textos")
+    if "artifacts" in data:
+        unknown_artifacts = set(data["artifacts"]) - APPROVED_ARTIFACTS
+        if unknown_artifacts:
+            raise ValueError(f"Artefactos de generación desconocidos: {', '.join(sorted(unknown_artifacts))}")
+    for name, allowed in (("technical_document", _TECHNICAL_KEYS), ("economic_simulator", {"template_id"})):
+        value = data.get(name)
+        if value is not None:
+            if not isinstance(value, dict) or set(value) - allowed:
+                raise ValueError(f"generation.{name} contiene claves o tipos inválidos")
+            for key, item in value.items():
+                if key.startswith("include_"):
+                    if not isinstance(item, bool):
+                        raise ValueError(f"generation.{name}.{key} debe ser booleano")
+                elif not isinstance(item, str):
+                    raise ValueError(f"generation.{name}.{key} debe ser texto")
+    return copy.deepcopy(data)
+
+
+def _merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
+    for key, value in override.items():
+        if isinstance(value, dict) and isinstance(base.get(key), dict):
+            base[key] = _merge(base[key], value)
+        else:
+            base[key] = copy.deepcopy(value)
+    return base

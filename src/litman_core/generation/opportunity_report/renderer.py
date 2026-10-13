@@ -30,7 +30,7 @@ def render_html(report: dict, template: dict) -> str:
     sources = "".join(source_card(item) for item in report["sources"])
     title = escape(report["header"]["title"] or "Oportunidad sin título")
     return f'''<!doctype html><html lang="es"><head><meta charset="utf-8"><title>{title}</title><style>{_css()}</style></head><body>
-<main><header><span>LITMAN ANALYSIS · FICHA DE OPORTUNIDAD</span><h1>{title}</h1><p>{escape(str(report["header"].get("organization") or "No consta"))} · {escape(str(report["header"].get("contract_id") or "Sin expediente"))}</p></header>
+<main><header><span>LITMAN CORE · FICHA DE OPORTUNIDAD</span><h1>{title}</h1><p>{escape(str(report["header"].get("organization") or "No consta"))} · {escape(str(report["header"].get("contract_id") or "Sin expediente"))}</p></header>
 <section class="facts">{facts}</section><section><h2>Qué se contrata</h2><p>{escape(report["summary"])}</p><p class="tags">{" ".join(f"<span>{escape(str(tag))}</span>" for tag in report["tags"])}</p></section>
 <section class="columns"><div><h2>Motivos para avanzar</h2><ul>{items(report["positive_reasons"], "positive")}</ul></div><div><h2>Alertas y causas</h2><ul>{items(report["alerts"], "alert")}</ul></div></section>
 <section><h2>Filtros comerciales</h2><p class="section-summary">{escape(rule_summary)}</p><table><thead><tr><th>Regla</th><th>Resultado</th><th>Por qué</th></tr></thead><tbody>{checks}</tbody></table></section>

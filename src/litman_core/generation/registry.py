@@ -6,7 +6,7 @@ from .technical_proposal.generator import TechnicalDocumentGenerator
 
 ARTIFACT_GENERATORS: dict[str, ArtifactGenerator] = {
     # Insertion order defines the deterministic default; explicit requests retain caller order.
-    "technical-summary": TechnicalSummaryGenerator(), "summary": BidPreparationGuideGenerator(), "technical-document": TechnicalDocumentGenerator(),
+    "technical-summary": TechnicalSummaryGenerator(), "bid-preparation-guide": BidPreparationGuideGenerator(), "technical-document": TechnicalDocumentGenerator(),
     "economic-simulator": EconomicSimulatorGenerator(),
 }
 
