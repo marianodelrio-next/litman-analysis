@@ -13,4 +13,29 @@ Run `UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest -q`; when relevant, also
 
 Start with `AGENTS.md`, then use the [codebase map](docs/codebase-map.md) to locate relevant code. Read [architecture](docs/architecture.md) and [decisions](docs/decisions.md) only when relevant; verify the actual code and expand exploration only as needed.
 
-Use `research-design` before implementation. `implement` requires a human-approved task `design.md`. Task memory lives in untracked `.agent-work/<task>/`; keep it concise.
+## Work modes
+
+Choose the mode from the user's explicit request.
+
+### Direct change (default)
+
+When the user asks to change, fix, add, remove, or update a scoped part of the
+repository, make the change directly. Do not create `.agent-work/`, `design.md`,
+`progress.md`, or `plan.md`, and do not invoke `research-design` or `implement`
+unless the user explicitly requests that workflow.
+
+Inspect the relevant code, make the smallest scoped change, update affected
+tests and documentation, and run validation proportionate to the change.
+
+### Research and design workflow (opt-in)
+
+Use `research-design` only when the user explicitly asks to investigate
+interactively, create a design/task, seek design approval, or use the
+multi-agent implementation workflow.
+
+Use `implement` only when the user explicitly requests it and an approved
+`design.md` exists. Its `planner` → `coder` → `reviewer` → `memory-manager`
+sequence applies only within that workflow.
+
+Task memory lives in untracked `.agent-work/<task>/`; create it only for this
+opt-in workflow and keep it concise.
