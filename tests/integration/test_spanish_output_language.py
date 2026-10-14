@@ -97,7 +97,7 @@ def test_english_source_runs_real_stages_with_spanish_scripted_outputs(tmp_path:
     assert all("campos semánticos y narrativos" in text or "contenido visible" in text for text in provider.instructions[:2])
     documents = result["generation"]["documents"]
     text = "\n".join("\n".join(p.text for p in Document(path).paragraphs) for path in documents if path.endswith(".docx"))
-    assert "Propuesta técnica" in text and detailed["contexto"] in text and QUOTE in text
+    assert "Propuesta técnica" in text and detailed["contexto"] in text and QUOTE not in text
     workbook = load_workbook(next(path for path in documents if path.endswith(".xlsx")), data_only=False)
     cells = "\n".join(str(cell.value) for sheet in workbook.worksheets for row in sheet.iter_rows() for cell in row if cell.value is not None)
     assert PRICE_FORMULA in cells

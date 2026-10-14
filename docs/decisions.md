@@ -32,3 +32,19 @@
   but must not invent content or add a separate cover/detail section.
 - The generator contract version is bumped when this structure changes; the
   rerender path continues to use only the persisted dossier snapshot.
+
+## Bid preparation guide artifact contract
+
+- `guia_preparacion_oferta.docx` remains a deterministic operational guide
+  generated from the persisted dossier, with the canonical ID
+  `bid-preparation-guide`.
+- Its compact body has five fixed numbered sections: context, documents to
+  submit, offer-preparation requirements, award criteria, and pending checks.
+  The guide keeps operational requirements, rules, consequences, criteria, and
+  pending actions, while omitting the technical-summary content and the
+  evidence appendix; traceability remains in the dossier and persisted
+  analysis results.
+- Missing format data is grouped into one `No consta` notice, and unknown
+  values use that same convention. The generator contract version is bumped
+  when this structure changes; rerender continues to use only the persisted
+  dossier snapshot.

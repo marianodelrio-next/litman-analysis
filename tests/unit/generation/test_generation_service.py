@@ -137,7 +137,7 @@ def test_english_source_contract_fixture_generates_four_spanish_artifacts(tmp_pa
     assert "Propuesta técnica" in docx_text
     workbook = load_workbook(next(Path(path) for path in manifest["documents"] if path.endswith(".xlsx")), data_only=False)
     workbook_text = "\n".join(str(cell.value) for sheet in workbook.worksheets for row in sheet.iter_rows() for cell in row if cell.value is not None)
-    assert contract["source_quote"] in docx_text
+    assert contract["source_quote"] not in docx_text
     assert contract["price_formula"] in workbook_text
     economic_plan = json.loads((tmp_path / "run/input/economic_plan.json").read_text(encoding="utf-8"))
     assert economic_plan["abnormally_low"]["formula_literal"] == contract["abnormal_formula"]
