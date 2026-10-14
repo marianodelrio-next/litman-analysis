@@ -22,9 +22,8 @@ Crea rutas persistentes fuera del entorno Python y expórtalas antes de usar la
 CLI. Prepara estas rutas antes de ejecutar:
 
 ```sh
-mkdir -p "$HOME/.local/share/litman-core/workspace" "$HOME/.local/share/litman-core/runs"
+mkdir -p "$HOME/.local/share/litman-core/workspace"
 export LITMAN_CORE_WORKSPACE_DIR="$HOME/.local/share/litman-core/workspace"
-export LITMAN_CORE_RUNS_DIR="$HOME/.local/share/litman-core/runs"
 .venv/bin/litman-core run --config /ruta/a/config.toml
 ```
 

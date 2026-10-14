@@ -21,7 +21,7 @@ def test_legacy_python_package_is_removed() -> None:
 def test_core_namespace_resolves_packaged_resources() -> None:
     from litman_core.resource_paths import resource_path
 
-    schema = resource_path("schemas", "job.schema.json")
+    schema = resource_path("schemas", "assessment.schema.json")
     assert schema == Path(schema)
     assert schema.is_file()
 

@@ -8,7 +8,6 @@ from typing import Any, Callable
 
 from litman_core.domain.jobs import JobRequest, JobType, MaterializedCase, PublishedArtifact
 from .common import catalog_digest, publication_catalog, safe_filename, sha256
-from .publication import publication_folder_name
 
 _DRIVE_OPTIONS = {"supportsAllDrives": True}
 _FOLDER_MIME = "application/vnd.google-apps.folder"
@@ -157,14 +156,10 @@ class GoogleDriveArtifactPublisher:
         service: Any,
         temporary_suffix: Callable[[], str] | None = None,
         uploader: Callable[[Path], Any] = _upload,
-        downloader: Callable[[Any, Any], None] = _download,
-        publication_name_factory: Callable[[str], str] = publication_folder_name,
     ) -> None:
         self.service = service
         self._temporary_suffix = temporary_suffix or (lambda: uuid.uuid4().hex)
         self.uploader = uploader
-        self.downloader = downloader
-        self._publication_name_factory = publication_name_factory
 
     def _create_folder(self, name: str, parent: str, app_properties: dict[str, str] | None = None) -> str:
         body: dict[str, Any] = {"name": safe_filename(name), "mimeType": _FOLDER_MIME, "parents": [parent]}

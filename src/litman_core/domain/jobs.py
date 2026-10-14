@@ -41,14 +41,3 @@ class PublishedArtifact:
     name: str
     uri: str
     checksum: str
-
-
-@dataclass(frozen=True)
-class JobResult:
-    job_id: str
-    job_type: JobType
-    status: str
-    publication_id: str
-    local_path: str
-    artifacts: tuple[PublishedArtifact, ...] = ()
-    details: dict[str, Any] = field(default_factory=dict)

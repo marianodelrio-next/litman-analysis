@@ -45,7 +45,7 @@ def test_installed_wheel_runs_outside_checkout(tmp_path):
         "import litman_core, pathlib; "
         "from litman_core.resource_paths import resource_path; "
         "module = pathlib.Path(litman_core.__file__).resolve(); "
-        "resource = resource_path('schemas', 'job.schema.json').resolve(); "
+        "resource = resource_path('schemas', 'assessment.schema.json').resolve(); "
         "assert 'site-packages' in str(module); "
         "assert 'site-packages' in str(resource); "
         "assert resource.read_text(encoding='utf-8').startswith('{')"

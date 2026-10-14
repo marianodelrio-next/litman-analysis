@@ -38,10 +38,6 @@ class JobRunnerResult:
     artifacts: tuple[PublishedArtifact, ...] = ()
     remote: dict[str, Any] | None = None
 
-    @property
-    def run_dir(self) -> Path: return self.local_path
-
-
 class JobRunner:
     def __init__(self, settings: Settings | None = None, *, drive_service_factory: Callable[[Path], Any] = build_drive_service,
                  local_source: Any | None = None, local_publisher: Any | None = None,

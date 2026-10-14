@@ -2,13 +2,9 @@ from __future__ import annotations
 
 import hashlib
 import json
-import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
-
-_SHA256 = re.compile(r"^(?:sha256:)?[0-9a-fA-F]{64}$")
-
 
 @dataclass(frozen=True)
 class CatalogArtifact:
@@ -16,24 +12,12 @@ class CatalogArtifact:
     relative_path: str
     checksum: str
 
-    @property
-    def name(self) -> str:
-        return self.relative_path
-
-
 def sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as stream:
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
-
-
-def validate_checksum(value: str) -> str:
-    if not _SHA256.fullmatch(value):
-        raise ValueError("checksum debe ser SHA-256 hexadecimal de 64 caracteres (opcional sha256:)")
-    return value.removeprefix("sha256:").lower()
-
 
 def safe_filename(value: str) -> str:
     name = Path(value).name
@@ -136,12 +120,3 @@ def publication_inventory(run_dir: Path, job_type: str, include_run_files: bool)
     if not items:
         raise ValueError("El run no contiene archivos publicables")
     return tuple(items)
-
-
-def manifest(job_id: str, publication_id: str, job_type: str, artifacts: Iterable[tuple[str, str, str]]) -> dict:
-    return {"schema_version": 1, "job_id": job_id, "publication_id": publication_id, "job_type": str(job_type),
-            "artifacts": [{"name": n, "sha256": h, "uri": u} for n, h, u in artifacts]}
-
-
-def write_manifest(path: Path, value: dict) -> None:
-    path.write_text(json.dumps(value, ensure_ascii=False, sort_keys=True, indent=2) + "\n", encoding="utf-8")

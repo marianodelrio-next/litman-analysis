@@ -27,8 +27,6 @@ class Settings:
     home_dir: Path = field(default_factory=lambda: _env_path("HOME") or Path("/tmp/litman-core/home"))
     codex_home_dir: Path = field(default_factory=lambda: _env_path("CODEX_HOME") or Path.home() / ".codex")
     google_credentials_file: Path | None = field(default_factory=lambda: _env_path("GOOGLE_APPLICATION_CREDENTIALS"))
-    local_input_dir: Path = field(default_factory=lambda: _env_path("LITMAN_CORE_INPUT_DIR") or Path("/input"))
-    local_output_dir: Path = field(default_factory=lambda: _env_path("LITMAN_CORE_OUTPUT_DIR") or Path("/output"))
 
     @property
     def runs_dir(self) -> Path:
@@ -42,14 +40,3 @@ class Settings:
 def _env_path(name: str) -> Path | None:
     value = os.getenv(name)
     return Path(value).expanduser() if value else None
-
-
-def _env_bool(name: str, default: bool) -> bool:
-    value = os.getenv(name)
-    if value is None:
-        return default
-    if value.lower() in {"1", "true", "yes"}:
-        return True
-    if value.lower() in {"0", "false", "no"}:
-        return False
-    raise ValueError(f"{name} debe ser true o false")

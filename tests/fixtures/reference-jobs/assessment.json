@@ -1,7 +1,0 @@
-{
-  "job_id": "reference-assessment",
-  "job_type": "assessment",
-  "input": {"kind": "local", "location": "case"},
-  "output": {"kind": "local", "location": "output"},
-  "options": {}
-}

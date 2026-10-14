@@ -2,8 +2,6 @@
 from __future__ import annotations
 
 import copy
-import tomllib
-from pathlib import Path
 from typing import Any
 
 DEFAULT_GENERATION: dict[str, Any] = {
@@ -13,28 +11,6 @@ DEFAULT_GENERATION: dict[str, Any] = {
 _KEYS = {"technical_document", "economic_simulator"}
 APPROVED_ARTIFACTS = frozenset({"technical-summary", "bid-preparation-guide", "technical-document", "economic-simulator"})
 _TECHNICAL_KEYS = {"template_id", "content_profile", "output_language", "include_internal_pending", "include_editorial_guidance"}
-
-
-def load_generation_config(path: Path) -> dict[str, Any]:
-    try:
-        data = tomllib.loads(path.read_text(encoding="utf-8"))
-    except FileNotFoundError as exc:
-        raise ValueError(f"No existe la configuración: {path}") from exc
-    except tomllib.TOMLDecodeError as exc:
-        raise ValueError(f"TOML inválido: {exc}") from exc
-    if set(data) != {"analysis"} or not isinstance(data.get("analysis"), dict):
-        raise ValueError("La raíz TOML solo puede contener la tabla analysis")
-    analysis = data["analysis"]
-    if set(analysis) != {"detailed"} or not isinstance(analysis.get("detailed"), dict):
-        raise ValueError("analysis solo puede contener la tabla detailed")
-    detailed = analysis["detailed"]
-    if set(detailed) != {"generation"} or not isinstance(detailed.get("generation"), dict):
-        raise ValueError("detailed solo puede contener la tabla generation")
-    section = detailed["generation"]
-    if not isinstance(section, dict):
-        raise ValueError("La configuración debe contener [analysis.detailed.generation]")
-    return _validate(section)
-
 
 def merge_generation(*layers: dict[str, Any] | None) -> dict[str, Any]:
     result = copy.deepcopy(DEFAULT_GENERATION)
