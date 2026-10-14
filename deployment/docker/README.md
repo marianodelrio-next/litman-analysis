@@ -2,6 +2,9 @@
 
 Docker ejecuta la misma CLI instalada en la imagen. Desde la raíz:
 
+Prepare antes `deployment/config.toml` copiando `deployment/config_example.toml`;
+el archivo operativo puede contener rutas o IDs locales y no se versiona.
+
 ```sh
 docker compose -f deployment/docker/compose.yaml build
 docker compose -f deployment/docker/compose.yaml run --rm litman-core run

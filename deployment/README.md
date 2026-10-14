@@ -2,6 +2,9 @@
 
 `config.toml` es el único contrato operativo. Ejecute desde este directorio:
 
+Para preparar una configuración local, copie [`config_example.toml`](config_example.toml)
+a `config.toml` y ajuste sus rutas o IDs. `config.toml` es local y no se versiona.
+
 ```sh
 litman-core run
 litman-core run --config /ruta/config.toml --env-file /ruta/.env

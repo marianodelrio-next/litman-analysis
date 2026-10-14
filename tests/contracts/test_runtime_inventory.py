@@ -27,7 +27,7 @@ def test_historical_artifact_id_is_not_registered_or_documented():
     from litman_core.generation_config import APPROVED_ARTIFACTS
     assert set(ARTIFACT_GENERATORS) == set(APPROVED_ARTIFACTS)
     assert "summary" not in ARTIFACT_GENERATORS
-    for path in (root / "tests/fixtures", root / "deployment/config.toml", root / "docs"):
+    for path in (root / "tests/fixtures", root / "deployment/config_example.toml", root / "docs"):
         files = [path] if path.is_file() else path.rglob("*")
         for candidate in files:
             if candidate.is_file() and candidate.suffix not in {".pyc", ".pyo"} and "__pycache__" not in candidate.parts:

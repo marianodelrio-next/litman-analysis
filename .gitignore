@@ -1,6 +1,8 @@
 .venv/
 .env
 deployment/.env
+deployment/config*.toml
+!deployment/config_example.toml
 deployment/input/
 deployment/runs/
 deployment/local-secrets/

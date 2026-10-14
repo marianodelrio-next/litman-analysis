@@ -3,6 +3,12 @@
 Esta guía es para contribuir desde el checkout. Requiere Python 3.11, `uv` y
 autenticación explícita de Codex:
 
+Antes de ejecutar por primera vez, cree la configuración local:
+
+```sh
+cp config_example.toml config.toml
+```
+
 ```sh
 uv sync
 cd deployment

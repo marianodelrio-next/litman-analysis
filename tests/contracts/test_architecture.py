@@ -10,7 +10,7 @@ from litman_core.domain.jobs import JobType, StorageKind
 ROOT = Path(__file__).parents[2]
 
 def test_deployment_toml_matches_public_loader() -> None:
-    example = ROOT / "deployment/config.toml"
+    example = ROOT / "deployment/config_example.toml"
     job = load_job(example)
     assert job.job_type is JobType.DETAILED_ANALYSIS
     assert job.input_kind is StorageKind.LOCAL

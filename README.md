@@ -19,6 +19,10 @@ uv run litman-core run
 `run` carga `config.toml` y su `.env` adyacente. La CLI no conoce Docker ni
 traduce rutas del host.
 
+El repositorio incluye `deployment/config_example.toml` como plantilla. Copie
+esa plantilla a `deployment/config.toml` antes de ejecutar; la configuración
+operativa queda ignorada por Git.
+
 Para instalar una wheel sin checkout, sigue [`deployment/local-install`](deployment/local-install/README.md).
 
 El empaquetado de release produce la wheel con `uv build --wheel`; construirla
