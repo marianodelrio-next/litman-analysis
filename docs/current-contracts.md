@@ -15,15 +15,18 @@ Toda la implementación pertenece al paquete `litman_core`; no existe un paquete
 
 ## Job y run
 
-Un job contiene `job_id`, `job_type` (`assessment` o `detailed-analysis`),
-`input` y `output` (`local` o `google-drive`, cada uno con `location`) y
-opciones. `JobRunner` materializa,
+Un job contiene `job.id`, `job.type` (`assessment` o `detailed-analysis`),
+`input.kind` (`local` o `google-drive`), `input.location`,
+`output.directory` y opcionalmente `output.google_drive_folder_id`, además de
+las opciones de publicación y generación. `JobRunner` materializa,
 normaliza, analiza, valida y publica atómicamente.
 
-Un run tiene `input/`, `output/` y `logs/`. Ambos pipelines producen
+Cada ejecución crea una publicación identificada por un `publication_id` y un
+run con `input/`, `output/` y `logs/`. Ambos pipelines producen
 `output/validation.json` y `output/result.json`; detailed-analysis añade
-`dossier.json` y `generation_manifest.json`. `lineage.json`, cuando existe,
-contiene versión, origen, ruta y SHA-256 del dossier.
+`dossier.json`, `generation_manifest.json` y su `lineage.json`, que contiene
+versión, origen, ruta y SHA-256 del dossier. La generación desde un dossier
+externo también conserva lineage, con origen `external`.
 
 ## Publicación
 
@@ -33,7 +36,9 @@ la ficha PDF; detailed-analysis publica los dos resúmenes, un DOCX técnico y
 el simulador económico según el manifiesto. Drive usa carpeta temporal y solo
 la renombra tras completar la subida.
 
-Los hashes se calculan sobre los bytes de cada ejecución. No se comparan entre
+El catálogo público se construye desde el run de cada `publication_id`; los
+archivos internos permanecen en el run local según la configuración de
+publicación. Los hashes se calculan sobre los bytes de cada ejecución. No se comparan entre
 ejecuciones. Un `validation.json` inválido, un artefacto ausente o una subida
 incompleta impide presentar el run como éxito.
 

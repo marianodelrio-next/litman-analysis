@@ -28,7 +28,7 @@ Para instalar una wheel sin checkout, sigue [`deployment/local-install`](deploym
 El empaquetado de release produce la wheel con `uv build --wheel`; construirla
 no equivale a ejecutar el servicio desde una instalación local.
 
-Cada publicación crea una carpeta versionada `<job_id>-<timestamp UTC>`. Ambos destinos usan el mismo catálogo público: assessment contiene únicamente `ficha_oportunidad.pdf`; detailed-analysis contiene `resumen_tecnico.docx`, `guia_preparacion_oferta.docx`, el único DOCX técnico declarado por el manifiesto y `simulador_economico.xlsx`. Runs, logs, resultados JSON, lineage, manifiestos de generación y manifiestos de publicación son internos y no se publican.
+Cada publicación crea una carpeta versionada `<job_id>-<YYYYMMDDTHHMMSS.ffffffZ>`. Ambos destinos usan el mismo catálogo público: assessment contiene únicamente `ficha_oportunidad.pdf`; detailed-analysis contiene `resumen_tecnico.docx`, `guia_preparacion_oferta.docx`, el único DOCX técnico declarado por el manifiesto y `simulador_economico.xlsx`. El run conserva `input/`, `output/` y `logs/`; los archivos internos no forman parte del catálogo público.
 
 ## Docker opcional
 

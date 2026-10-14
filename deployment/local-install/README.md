@@ -27,5 +27,10 @@ El único comando público de ejecución es:
 
 Las rutas relativas del TOML se resuelven respecto al propio archivo. El
 workspace temporal de LitMan usa `/tmp/litman-core` por defecto y se elimina al
-terminar la ejecución. Configura la autenticación de Codex según tu entorno;
-esta guía no crea credenciales ni instaladores.
+terminar la ejecución. El contrato usa `input.kind`/`input.location`,
+`output.directory` y opcionalmente `output.google_drive_folder_id`;
+`publication.include_run_files` controla si se conserva el árbol completo del
+run. Para `detailed-analysis`, la generación se configura bajo
+`analysis.detailed.generation`. Configura la autenticación de Codex y, si usas
+Drive, `GOOGLE_APPLICATION_CREDENTIALS` según tu entorno; esta guía no crea
+credenciales ni instaladores.

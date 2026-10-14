@@ -1,6 +1,9 @@
 # Operación de LitMan Core
 
-`config.toml` es el único contrato operativo. Ejecute desde este directorio:
+`config.toml` es el único contrato operativo. `input.kind` e
+`input.location` definen el origen; `output.directory` define la raíz local de
+los runs y `output.google_drive_folder_id` configura una réplica Drive.
+Ejecute desde este directorio:
 
 Para preparar una configuración local, copie [`config_example.toml`](config_example.toml)
 a `config.toml` y ajuste sus rutas o IDs. `config.toml` es local y no se versiona.
@@ -19,7 +22,9 @@ añade una réplica Drive. `.env` solo contiene autenticación y rutas a
 árbol local y no promueven una carpeta final en Drive.
 
 Use `type = "assessment"` para generar `ficha_oportunidad.pdf`; para
-`detailed-analysis` se generan siempre los cuatro entregables. No se admiten
+`detailed-analysis` se generan siempre los cuatro entregables. La configuración
+de sus generadores está bajo `[analysis.detailed.generation]`, con secciones
+para `technical_document` y `economic_simulator`. No se admiten
 jobs JSON/YAML, `assess`, `analyze`, `check` ni `.local-state`.
 
 Las guías de [desarrollo local](local-dev/README.md),

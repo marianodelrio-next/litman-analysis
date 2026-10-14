@@ -5,6 +5,7 @@ Use this map to locate likely ownership, then verify the current code before edi
 | Area | Paths | Navigation purpose |
 | --- | --- | --- |
 | Package and configuration | `src/litman_core/config.py`, `src/litman_core/resource_paths.py`, `src/litman_core/runtime.py` | Package settings, resource resolution, runtime directories. |
+| Environment and generation configuration | `src/litman_core/environment.py`, `src/litman_core/generation_config.py` | `.env` loading and detailed-analysis generation options. |
 | Host entry points | `src/litman_core/cli.py`, `src/litman_core/execution/job_runner.py` | Public commands and direct job orchestration. |
 | Job contract | `src/litman_core/application/job_loader.py`, `src/litman_core/domain/jobs.py` | Typed `config.toml` loading, validation, and job types. |
 | Document input | `src/litman_core/infrastructure/documents/`, `src/litman_core/infrastructure/storage/local.py`, `src/litman_core/infrastructure/storage/google_drive.py` | Inventory, normalization, local sources, and Drive materialization. |
@@ -14,7 +15,7 @@ Use this map to locate likely ownership, then verify the current code before edi
 | Assessment analysis | `src/litman_core/pipelines/assessment/`, `src/litman_core/resources/pipelines/assessment/v1/` | Assessment preparation, extraction, rules, and prompts. |
 | Detailed analysis | `src/litman_core/pipelines/detailed_analysis/`, `src/litman_core/resources/pipelines/detailed/v1/` | Dossier extraction and detailed-analysis prompts. |
 | Validation | `src/litman_core/domain/validation/`, `src/litman_core/resources/schemas/` | Schema, semantic, and evidence validation. |
-| Document generation | `src/litman_core/generation/service.py`, `src/litman_core/generation/registry.py`, `src/litman_core/generation/*/generator.py`, `src/litman_core/generation/*/renderer.py` | Deterministic artefact planning and DOCX/XLSX/PDF rendering. |
+| Document generation | `src/litman_core/generation/service.py`, `src/litman_core/generation/registry.py`, `src/litman_core/generation/*/generator.py`, `src/litman_core/generation/*/renderer.py` | Deterministic artefact planning and DOCX/XLSX/PDF rendering, including technical summary and bid-preparation guide. |
 | Versioned templates | `src/litman_core/resources/templates/` | Runtime document and spreadsheet templates. |
 | Run metadata | `src/litman_core/infrastructure/runs.py` | Run directories, hashes, manifests, and lineage. |
 | Unit tests: domain/pipelines | `tests/unit/domain/`, `tests/unit/pipelines/`, `tests/unit/test_deployment.py` | Validation, pipeline behavior, and optional deployment configuration. |

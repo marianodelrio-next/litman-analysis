@@ -2,7 +2,7 @@
 
 ## Arquitectura de ejecución
 
-La interfaz pública es `litman-core run`, que carga `config.toml` y ejecuta directamente `JobRunner`. Docker es opcional y se invoca desde `deployment/docker/compose.yaml`; la configuración y sus rutas se resuelven dentro del contenedor.
+La interfaz pública es `litman-core run`, que carga `config.toml` y ejecuta directamente `JobRunner`. Cada ejecución crea un `publication_id` y un `run` persistente bajo `output.directory`. Docker es opcional y se invoca desde `deployment/docker/compose.yaml`; la configuración y sus rutas se resuelven dentro del contenedor.
 
 Dentro del contenedor, el entrypoint `litman-core` ejecuta el `JobRunner` canónico:
 
@@ -48,7 +48,7 @@ Los recursos versionados están en `resources/`; para añadir un origen o public
 
 `output.directory` es la raíz local obligatoria de los runs y publicaciones. Antes de ejecutar se asigna una sola vez el `publication_id` con el formato `<job_id>-<timestamp UTC con microsegundos>Z`; el run persistente se crea directamente en `output.directory/<publication_id>/`. Si se configura una réplica Drive, esa misma identidad nombra la carpeta remota y el inventario inmutable de rutas relativas y hashes se replica desde la carpeta local mediante una carpeta temporal y promoción atómica. Con `publication.include_run_files = false`, la carpeta local completa solo se reduce al catálogo final después de validar el inventario y, si corresponde, completar correctamente la réplica Drive; ante cualquier error se conserva el run completo local. Con `true`, se conserva el árbol completo tanto en local como en Drive. `storageQuotaExceeded` se traduce a una recomendación explícita de Shared Drive.
 
-El catálogo cerrado de `detailed-analysis` contiene `resumen_tecnico.docx` (ficha técnica breve y de lectura rápida para técnico, arquitecto o revisor), `guia_preparacion_oferta.docx` (guía operativa para bid manager o redactor), el único DOCX técnico declarado por `generation_manifest.json` y `simulador_economico.xlsx`. Los dos primeros se generan de forma determinista desde `dossier.json`; el ID canónico de la guía es `bid-preparation-guide`.
+El catálogo cerrado de `detailed-analysis` contiene `resumen_tecnico.docx` (ficha técnica breve y de lectura rápida para técnico, arquitecto o revisor), `guia_preparacion_oferta.docx` (guía operativa para bid manager o redactor), un único DOCX técnico declarado por `generation_manifest.json` y `simulador_economico.xlsx`. El nombre del DOCX técnico lo determina el manifiesto; debe existir exactamente uno. Los dos primeros se generan de forma determinista desde `dossier.json`; el ID canónico de la guía es `bid-preparation-guide`.
 
 La salida del análisis y de todos los entregables es siempre española. Las
 citas de evidencia, identificadores, nombres de archivo, referencias estables o
