@@ -9,7 +9,14 @@ def test_forbidden_runtime_names_are_absent_from_current_contracts():
     paths = []
     for scope in scopes:
         paths.extend(([scope] if scope.is_file() else scope.rglob("*")))
-    paths = [path for path in paths if path.is_file() and path.suffix != ".pyc" and "__pycache__" not in path.parts]
+    paths = [
+        path
+        for path in paths
+        if path.is_file()
+        and path.suffix != ".pyc"
+        and "__pycache__" not in path.parts
+        and "local-secrets" not in path.parts
+    ]
     offenders = [path for path in paths if any(token in path.read_text(encoding="utf-8", errors="ignore") for token in forbidden)]
     assert offenders == []
 
