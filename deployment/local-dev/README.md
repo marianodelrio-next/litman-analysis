@@ -7,7 +7,7 @@ autenticación explícita de Codex:
 uv sync
 cd deployment
 uv run litman-core run
-UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest -q
+uv run pytest -q
 ```
 
 La CLI local ejecuta `JobRunner` directamente desde el código del checkout.

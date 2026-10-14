@@ -18,15 +18,6 @@ uv venv --python 3.11 .venv
 uv pip install --python .venv/bin/python /ruta/a/litman_core-0.1.0-py3-none-any.whl
 ```
 
-Crea rutas persistentes fuera del entorno Python y expórtalas antes de usar la
-CLI. Prepara estas rutas antes de ejecutar:
-
-```sh
-mkdir -p "$HOME/.local/share/litman-core/workspace"
-export LITMAN_CORE_WORKSPACE_DIR="$HOME/.local/share/litman-core/workspace"
-.venv/bin/litman-core run --config /ruta/a/config.toml
-```
-
 El único comando público de ejecución es:
 
 ```sh
@@ -34,5 +25,7 @@ El único comando público de ejecución es:
 .venv/bin/litman-core run --config /ruta/a/config.toml
 ```
 
-Configura y conserva el estado y autenticación de Codex según tu entorno. Esta
-guía no crea credenciales, instaladores ni un workspace gestionado.
+Las rutas relativas del TOML se resuelven respecto al propio archivo. El
+workspace temporal de LitMan usa `/tmp/litman-core` por defecto y se elimina al
+terminar la ejecución. Configura la autenticación de Codex según tu entorno;
+esta guía no crea credenciales ni instaladores.
