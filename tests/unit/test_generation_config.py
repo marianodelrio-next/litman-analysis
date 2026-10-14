@@ -11,13 +11,13 @@ def _base(extra: str = "") -> str:
 
 def test_generation_preferences_are_loaded_from_unified_toml(tmp_path: Path):
     config = tmp_path / "config.toml"
-    config.write_text(_base("[analysis.detailed.generation.technical_document]\noutput_language='es'\n"), encoding="utf-8")
+    config.write_text(_base("[analysis.detailed.generation.technical_document]\ncontent_profile='draft-v1'\n"), encoding="utf-8")
     result = load_job(config).options["generation"]
-    assert result["technical_document"]["output_language"] == "es"
+    assert result["technical_document"]["content_profile"] == "draft-v1"
     assert "artifacts" not in result
 
 
-@pytest.mark.parametrize("body", ["[analysis.detailed.generation]\nunknown=true\n", "[analysis.detailed.generation.technical_document]\noutput_language=1\n"])
+@pytest.mark.parametrize("body", ["[analysis.detailed.generation]\nunknown=true\n", "[analysis.detailed.generation.technical_document]\noutput_language='es'\n"])
 def test_unified_toml_rejects_unknown_generation_keys_and_types(tmp_path: Path, body: str):
     path = tmp_path / "bad.toml"; path.write_text(_base(body), encoding="utf-8")
     with pytest.raises(ValueError): load_job(path)

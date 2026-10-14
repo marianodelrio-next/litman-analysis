@@ -21,8 +21,6 @@ class TechnicalDocumentGenerator:
     version = "technical-document-generator-v4"
 
     def generate(self, context: ArtifactContext) -> dict:
-        if context.output_language not in ("auto", "es"):
-            raise ValueError("La propuesta técnica solo admite salida en español; use 'auto' o 'es'.")
         template_path, manifest = _template(context.template_id)
         shutil.copy2(template_path.parent / "template.yaml", context.run_dir / "input" / "template.yaml")
         plan = build_document_plan(context.dossier, context.template_id)

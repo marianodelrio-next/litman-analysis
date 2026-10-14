@@ -36,6 +36,7 @@ class FakeProvider:
 def test_versioned_prompts_require_spanish_semantics_and_verbatim_sources() -> None:
     assessment = (RESOURCE_ROOT / "pipelines/assessment/v1/system.md").read_text(encoding="utf-8")
     detailed = (RESOURCE_ROOT / "pipelines/detailed/v1/system.md").read_text(encoding="utf-8")
+    detailed_task = (RESOURCE_ROOT / "pipelines/detailed/v1/extraction.md").read_text(encoding="utf-8")
     generation_system = (RESOURCE_ROOT / "pipelines/detailed/v1/generation/system.md").read_text(encoding="utf-8")
     generation_task = (RESOURCE_ROOT / "pipelines/detailed/v1/generation/generation.md").read_text(encoding="utf-8")
     assert "campos semánticos y narrativos, aunque la fuente" in assessment
@@ -48,9 +49,13 @@ def test_versioned_prompts_require_spanish_semantics_and_verbatim_sources() -> N
                     "referencias\n  estables", "página o sección", "fórmulas literales"):
         assert literal in generation_system
     assert "mismo id y\nnivel" in generation_task
-    assert (RESOURCE_ROOT / "pipelines/assessment/v1/VERSION").read_text().strip() == "assessment-prompt-v2"
-    assert (RESOURCE_ROOT / "pipelines/detailed/v1/VERSION").read_text().strip() == "detailed-analysis-prompt-v3"
-    assert (RESOURCE_ROOT / "pipelines/detailed/v1/generation/VERSION").read_text().strip() == "detailed-generation-prompt-v4"
+    assert "obligatorio redactar en español todo contenido" in generation_task
+    assert "estructura_documento_tecnico" in detailed_task
+    assert "subapartados[].titulo" in detailed_task
+    assert "traduce al español sus rótulos ordinarios" in detailed_task
+    assert (RESOURCE_ROOT / "pipelines/assessment/v1/VERSION").read_text().strip() == "assessment-prompt-v3"
+    assert (RESOURCE_ROOT / "pipelines/detailed/v1/VERSION").read_text().strip() == "detailed-analysis-prompt-v4"
+    assert (RESOURCE_ROOT / "pipelines/detailed/v1/generation/VERSION").read_text().strip() == "detailed-generation-prompt-v5"
 
 
 def test_stage_can_prepare_versioned_resources_and_persists_common_files(tmp_path: Path) -> None:

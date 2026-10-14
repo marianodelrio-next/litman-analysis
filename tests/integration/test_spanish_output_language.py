@@ -55,7 +55,7 @@ def _detailed(document_id: str) -> dict:
     value = dossier()
     value["contexto"] = "El expediente requiere una metodología verificable."
     value["memoria_tecnica"]["idioma"] = "en"
-    value["memoria_tecnica"]["secciones"][0]["titulo"] = "Metodología"
+    value["memoria_tecnica"]["secciones"][0]["titulo"] = "Planteamiento del proyecto"
     value["memoria_tecnica"]["secciones"][0]["descripcion"] = "Descripción técnica exacta en español."
     value["evidencias"] = [{"campo": "metodologia", "documento_id": document_id, "pagina": 1, "texto_citado": QUOTE}]
     value["simulador_economico"]["formula_precio"]["expresion_literal"] = PRICE_FORMULA
@@ -66,10 +66,11 @@ def _detailed(document_id: str) -> dict:
     return value
 
 
-def test_english_source_runs_real_stages_with_spanish_scripted_outputs(tmp_path: Path) -> None:
+def test_mixed_english_catalan_source_runs_real_stages_with_spanish_scripted_outputs(tmp_path: Path) -> None:
     case = tmp_path / "case"; case.mkdir()
     source = Path(__file__).parents[1] / "fixtures/spanish-output-language/english-source.md"
     (case / "tender.md").write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
+    assert "Plantejament del projecte" in (case / "tender.md").read_text(encoding="utf-8")
     settings = Settings(runs_root=tmp_path / "runs")
     provider = ScriptedSpanishProvider()
     assessment_run, assessment = AssessmentPipeline(settings, provider).execute(case, case_id="english")
@@ -86,18 +87,19 @@ def test_english_source_runs_real_stages_with_spanish_scripted_outputs(tmp_path:
     detailed = json.loads((detailed_run / "output/dossier.json").read_text())
     evidence = json.loads((assessment_run / "output/evidence-index.json").read_text())
     assert detailed["contexto"].startswith("El expediente requiere")
+    assert detailed["memoria_tecnica"]["secciones"][0]["titulo"] == "Planteamiento del proyecto"
     assert evidence["evidences"][0]["verification"] == "verified"
     assert detailed["evidencias"][0]["texto_citado"] == QUOTE
     assert detailed["simulador_economico"]["formula_precio"]["expresion_literal"] == PRICE_FORMULA
     assert detailed["simulador_economico"]["baja_anormal"]["formula_literal"] == ABNORMAL_FORMULA
     plan = json.loads((detailed_run / "input/document_plan.json").read_text())
-    assert plan["sections"][0]["title"] == "Metodología"
+    assert plan["sections"][0]["title"] == "Planteamiento del proyecto"
     assert plan["sections"][0]["purpose"] == "Descripción técnica exacta en español."
     assert "Apartado técnico" not in json.dumps(plan, ensure_ascii=False)
     assert all("campos semánticos y narrativos" in text or "contenido visible" in text for text in provider.instructions[:2])
     documents = result["generation"]["documents"]
     text = "\n".join("\n".join(p.text for p in Document(path).paragraphs) for path in documents if path.endswith(".docx"))
-    assert "Propuesta técnica" in text and detailed["contexto"] in text and QUOTE not in text
+    assert "Propuesta técnica" in text and "Planteamiento del proyecto" in text and detailed["contexto"] in text and QUOTE not in text
     workbook = load_workbook(next(path for path in documents if path.endswith(".xlsx")), data_only=False)
     cells = "\n".join(str(cell.value) for sheet in workbook.worksheets for row in sheet.iter_rows() for cell in row if cell.value is not None)
     assert PRICE_FORMULA in cells

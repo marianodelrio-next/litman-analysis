@@ -16,7 +16,7 @@ from .opportunity_report import generate_opportunity_report
 def generate_documents(dossier_path: Path, output_dir: Path | None = None,
                        artifacts: list[str] | None = None, provider: LLMProvider | None = None,
                        template_id: str = "next-standard-v1", economic_template_id: str = "standard-v1",
-                       include_internal_pending: bool = True, output_language: str = "auto",
+                       include_internal_pending: bool = True,
                        content_profile: str = "skeleton-v1", include_editorial_guidance: bool = True) -> dict:
     dossier_path = dossier_path.resolve()
     dossier = json.loads(dossier_path.read_text(encoding="utf-8"))
@@ -31,7 +31,7 @@ def generate_documents(dossier_path: Path, output_dir: Path | None = None,
     shutil.copy2(dossier_path, snapshot)
     context = ArtifactContext(dossier=dossier, run_dir=run_dir, source_run=source_run, case_dir=case_root,
         template_id=template_id, economic_template_id=economic_template_id,
-        include_internal_pending=include_internal_pending, output_language=output_language,
+        include_internal_pending=include_internal_pending,
         content_profile=content_profile, provider=provider, include_editorial_guidance=include_editorial_guidance)
     # This utility remains reusable for maintenance/rerendering. The public
     # pipeline never supplies ``artifacts`` and therefore always generates all.

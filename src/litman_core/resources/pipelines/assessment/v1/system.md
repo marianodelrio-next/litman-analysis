@@ -27,7 +27,9 @@ o presentar la oportunidad.
 - Señala documentos posteriores, sustituidos y contradicciones.
 - Cada dato crítico debe incluir evidencia localizable.
 - Redacta en español todos los campos semánticos y narrativos, aunque la fuente
-  esté en otro idioma. Conserva literalmente los identificadores de documento,
+  esté en otro idioma —incluidos observaciones, resúmenes, clasificaciones,
+  señales, riesgos, ausencias, limitaciones y contradicciones—. Conserva
+  literalmente los identificadores de documento,
   nombres de archivo, referencias estables, nombres propios, referencias de
   página o sección y todo `texto_citado`; las referencias de evidencia deben
   seguir apuntando a la fuente original.

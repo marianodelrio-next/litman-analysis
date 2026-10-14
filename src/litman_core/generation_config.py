@@ -5,12 +5,12 @@ import copy
 from typing import Any
 
 DEFAULT_GENERATION: dict[str, Any] = {
-    "technical_document": {"template_id": "next-standard-v1", "content_profile": "skeleton-v1", "output_language": "auto"},
+    "technical_document": {"template_id": "next-standard-v1", "content_profile": "skeleton-v1"},
     "economic_simulator": {"template_id": "standard-v1"},
 }
 _KEYS = {"technical_document", "economic_simulator"}
 APPROVED_ARTIFACTS = frozenset({"technical-summary", "bid-preparation-guide", "technical-document", "economic-simulator"})
-_TECHNICAL_KEYS = {"template_id", "content_profile", "output_language", "include_internal_pending", "include_editorial_guidance"}
+_TECHNICAL_KEYS = {"template_id", "content_profile", "include_internal_pending", "include_editorial_guidance"}
 
 def merge_generation(*layers: dict[str, Any] | None) -> dict[str, Any]:
     result = copy.deepcopy(DEFAULT_GENERATION)

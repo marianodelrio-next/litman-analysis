@@ -6,9 +6,11 @@ expediente aportados.
 
 # Reglas
 
-- Respeta exactamente el orden, identificadores, niveles y número de las
-  secciones y subapartados del plan; no alteres la estructura fijada. Puedes
-  traducir al español los títulos del pliego para su presentación.
+- Redacta obligatoriamente en español todo contenido visible, incluidos títulos
+  y subtítulos ordinarios del pliego. Respeta exactamente el orden,
+  identificadores, niveles y número de las secciones y subapartados del plan;
+  no alteres la estructura fijada. Los títulos del pliego para su presentación
+  deben estar en español.
 - El pliego y sus restricciones prevalecen sobre cualquier estilo corporativo.
 - No añadas presentación de empresa, referencias ni casos de éxito salvo que el
   plan los solicite expresamente.

@@ -9,7 +9,7 @@ from docx import Document
 from jsonschema import Draft202012Validator
 
 from litman_core.generation.technical_proposal.content import fallback_content, skeleton_content
-from litman_core.generation.technical_proposal.planner import build_document_plan, normalize_output_language
+from litman_core.generation.technical_proposal.planner import build_document_plan
 from litman_core.generation.technical_proposal.renderer import render_technical_document
 from litman_core.generation.technical_proposal.generator import _validate_content
 from litman_core.generation.service import generate_documents, render_existing_run
@@ -64,11 +64,6 @@ def test_generic_criterion_destination_does_not_contaminate_other_sections() -> 
     plan = build_document_plan(value)
     assert plan["sections"][0]["criteria"] == ["Metodología"]
 
-
-def test_language_normalization_is_always_spanish() -> None:
-    assert normalize_output_language("Catalán o español") == "es"
-    assert normalize_output_language("English") == "es"
-    assert normalize_output_language(None) == "es"
 
 
 def test_old_dossier_gets_safe_fallback_plan() -> None:
@@ -206,14 +201,6 @@ def test_render_keeps_spanish_interface_for_historical_english_plan(tmp_path: Pa
     assert "Propuesta técnica" in text
     assert "Índice" in text
     assert "Technical proposal" not in text
-
-
-def test_technical_document_rejects_legacy_english_output_option(tmp_path: Path) -> None:
-    dossier_path = tmp_path / "dossier.json"
-    dossier_path.write_text(json.dumps(dossier()), encoding="utf-8")
-    with pytest.raises(ValueError, match="solo admite salida en español"):
-        generate_documents(dossier_path, output_dir=tmp_path / "run", artifacts=["technical-document"],
-                           provider=None, output_language="en")
 
 
 def test_generated_spanish_headings_keep_section_and_subsection_ids(tmp_path: Path) -> None:

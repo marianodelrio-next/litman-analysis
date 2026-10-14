@@ -13,3 +13,9 @@ Analiza el expediente completo y devuelve:
 Revisa todos los documentos antes de responder. Usa siempre el `documento_id`
 del inventario al citar una fuente. No generes una recomendación comercial: las
 reglas de negocio se ejecutarán posteriormente sobre los hechos extraídos.
+
+Redacta en español todos los campos semánticos y narrativos, aunque la fuente
+esté en otro idioma. Esto incluye observaciones, resúmenes, clasificaciones,
+señales, riesgos, ausencias, limitaciones y contradicciones. Conserva en la
+forma fuente únicamente `texto_citado`, identificadores, referencias, nombres
+de archivo, nombres propios y denominaciones oficiales.

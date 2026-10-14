@@ -48,3 +48,12 @@ competidores ni ofertas rivales; regístralos como pendientes económicos.
 
 No redactes una oferta final. Las recomendaciones deben marcarse como tales y
 los datos no presentes en el expediente deben quedar como pendientes.
+
+Redacta en español `estructura_documento_tecnico`,
+`memoria_tecnica.secciones[].titulo` y
+`memoria_tecnica.secciones[].subapartados[].titulo`, además de descripciones,
+requisitos, criterios, advertencias, reglas y pendientes. Al respetar el índice
+del pliego conserva orden, niveles, puntuación, obligatoriedad y relaciones con
+las evidencias, pero traduce al español sus rótulos ordinarios. Conserva en la
+forma fuente solo `texto_citado`, `expresion_literal`, `formula_literal`,
+identificadores, referencias, nombres propios y denominaciones oficiales.

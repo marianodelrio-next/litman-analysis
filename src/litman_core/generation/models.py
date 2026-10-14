@@ -16,7 +16,6 @@ class ArtifactContext:
     template_id: str
     economic_template_id: str
     include_internal_pending: bool
-    output_language: str
     content_profile: str
     provider: LLMProvider | None
     include_editorial_guidance: bool = True

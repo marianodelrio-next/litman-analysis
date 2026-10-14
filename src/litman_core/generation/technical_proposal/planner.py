@@ -13,7 +13,6 @@ DEFAULT_SECTION_TITLES = (
     "Equipo requerido",
 )
 
-SUPPORTED_LANGUAGES = ("es",)
 
 
 def build_document_plan(dossier: dict, template_id: str = "next-standard-v1") -> dict:
@@ -54,10 +53,6 @@ def build_document_plan(dossier: dict, template_id: str = "next-standard-v1") ->
         "pending_decisions": pending,
     }
 
-
-def normalize_output_language(value: str | None) -> str:
-    """La salida del producto es siempre española; el idioma fuente es descriptivo."""
-    return "es"
 
 
 def _specified_section(item: dict, dossier: dict, index: int, language: str) -> dict:

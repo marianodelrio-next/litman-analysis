@@ -37,7 +37,6 @@ class DetailedAnalysisPipeline:
             economic_template_id=economic.get("template_id", "standard-v1"),
             include_internal_pending=technical.get("include_internal_pending", True),
             include_editorial_guidance=technical.get("include_editorial_guidance", True),
-            output_language=technical.get("output_language", "auto"),
             content_profile=technical.get("content_profile", "skeleton-v1"),
         )
         return prepared.run_dir, {"extraction": extraction, "generation": artifacts}

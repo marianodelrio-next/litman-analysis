@@ -54,7 +54,6 @@ La salida del análisis y de todos los entregables es siempre española. Las
 citas de evidencia, identificadores, nombres de archivo, referencias estables o
 de página, nombres propios y fórmulas literales designadas por el schema se
 mantienen textualmente como material fuente. En la propuesta técnica,
-`output_language` solo acepta `auto` o `es`; el valor heredado `en` se rechaza
 para impedir una salida parcial en inglés.
 
 La verificación de evidencias conserva documento y página estrictos. Tolera solamente espacios artificiales introducidos por el layout PDF y registra `verification_method` (`exact` o `layout_whitespace`). Una cita no comprobable produce un informe parcial con advertencias; los fallos estructurales o semánticos continúan siendo bloqueantes.

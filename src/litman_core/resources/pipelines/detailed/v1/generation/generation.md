@@ -14,5 +14,9 @@ El dossier conserva `memoria_tecnica` completo como fuente de estructura,
 formato y restricciones. El plan es el contrato de salida: no crees, elimines,
 renombres ni reordenes sus secciones ni sus subapartados. Devuelve cada
 subapartado del plan como un bloque `subheading` con exactamente el mismo id y
-nivel, en el mismo orden; traduce su título al español cuando proceda. La guía editorial pertenece al plan y no se devuelve en el
+nivel, en el mismo orden. Es obligatorio redactar en español todo contenido
+visible, incluidos títulos y subtítulos ordinarios del pliego; no es opcional ni
+depende del idioma fuente. Conserva literalmente solo citas, identificadores,
+nombres propios, nombres de documentos o archivos, referencias y fórmulas fuente
+cuando corresponda. La guía editorial pertenece al plan y no se devuelve en el
 contenido: no la alteres ni intentes reproducirla como contenido de oferta.
