@@ -20,3 +20,15 @@
   flow requires explicit persistent workspace and runs paths; la configuración
   diagnostic and does not create them. Docker continues to install a built
   wheel in its isolated runtime.
+
+## Technical summary artifact contract
+
+- `resumen_tecnico.docx` is a single compact technical brief generated
+  deterministically from the detailed-analysis dossier. Its stable structure is
+  one title followed by five numbered sections: context, objectives, phases and
+  deliverables, technologies and resources, and key aspects.
+- The artifact preserves critical requirements, criteria, phase deliverables,
+  and explicit empty states; it may abbreviate descriptions deterministically
+  but must not invent content or add a separate cover/detail section.
+- The generator contract version is bumped when this structure changes; the
+  rerender path continues to use only the persisted dossier snapshot.

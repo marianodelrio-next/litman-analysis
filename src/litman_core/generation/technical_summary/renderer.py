@@ -2,75 +2,84 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 from docx import Document
-from ..docx_helpers import (MISSING, abbreviate_text, add_callout, add_checkbox_item, add_fact_table, add_empty_message, add_label_value, amount_value, configure_document, display_value, named_description, set_keep_with_next)
+from ..docx_helpers import MISSING, abbreviate_text, add_callout, add_data_table, add_empty_message, add_fact_table, amount_value, configure_document, display_value, named_description
 
-def _header(h: dict[str, Any]) -> str: return " · ".join(str(x) for x in (h.get("expediente"), h.get("nombre")) if x not in (None, "")) or MISSING
-def _items(x: Any) -> list[Any]: return x if isinstance(x, list) else []
-def _count(x: list[Any], one: str, many: str) -> str: return f"{len(x)} {one if len(x)==1 else many}"
+
+def _items(value: Any) -> list[Any]: return value if isinstance(value, list) else []
+def _compact(value: Any, limit: int = 180) -> str: return abbreviate_text(value, limit)
+def _header(value: dict[str, Any]) -> str:
+    return " · ".join(str(x) for x in (value.get("expediente"), value.get("nombre")) if x not in (None, "")) or MISSING
+
 
 def write_technical_summary(data: dict[str, Any], path: Path) -> None:
-    doc=Document(); h=data.get("cabecera") if isinstance(data.get("cabecera"),dict) else {}
-    configure_document(doc,title="Resumen técnico",subject="Resumen técnico del expediente",document_label="Resumen técnico",header_text=_header(h))
-    _cover(doc,data,h); doc.add_page_break(); _detail(doc,data)
-    path.parent.mkdir(parents=True,exist_ok=True); doc.save(path)
+    doc = Document(); header = data.get("cabecera") if isinstance(data.get("cabecera"), dict) else {}
+    configure_document(doc, title="Resumen técnico", subject="Ficha técnica del expediente", document_label="Resumen técnico", header_text=_header(header))
+    doc.add_heading("RESUMEN TÉCNICO", 1)
+    doc.add_paragraph(display_value(header.get("nombre")), style="LitMan Lead")
+    identity = " · ".join(x for x in (display_value(header.get("organismo")), f"Expediente {header['expediente']}" if header.get("expediente") else "") if x)
+    doc.add_paragraph(identity or MISSING, style="LitMan Metadata")
+    amount = amount_value(header.get("presupuesto_sin_iva"), header.get("moneda"))
+    phases = len(_items(data.get("fases"))) or MISSING
+    add_fact_table(doc, ["EXPEDIENTE", "FECHA LÍMITE", "PRESUPUESTO", "FASES"], [header.get("expediente"), header.get("fecha_limite"), amount, phases])
+    _context(doc, data); _objectives(doc, data.get("objetivos")); _phases(doc, data.get("fases")); _resources(doc, data); _key_aspects(doc, data)
+    path.parent.mkdir(parents=True, exist_ok=True); doc.save(path)
 
-def _cover(doc: Document,d:dict[str,Any],h:dict[str,Any])->None:
-    doc.add_heading("RESUMEN TÉCNICO",1); doc.add_paragraph(display_value(h.get("nombre")),style="LitMan Lead")
-    identity=" · ".join(x for x in (display_value(h.get("organismo")) if h.get("organismo") else "",f"Expediente {h['expediente']}" if h.get("expediente") else "") if x); doc.add_paragraph(identity or MISSING,style="LitMan Metadata")
-    add_fact_table(doc,["EXPEDIENTE","FECHA LÍMITE","PRESUPUESTO","FASES"],[h.get("expediente"),h.get("fecha_limite"),amount_value(h.get("presupuesto_sin_iva"),h.get("moneda")),len(_items(d.get("fases")))])
-    doc.add_heading("Qué se contrata",2); doc.add_paragraph(abbreviate_text(d.get("contexto"),220," Ver detalle en “Comprensión del proyecto”."),style="LitMan Callout")
-    _cover_list(doc,"Objetivos principales",_items(d.get("objetivos")),3,"objetivos"); scope=_items(d.get("alcance")); _cover_list(doc,"Alcance de un vistazo",scope,3,"elementos de alcance")
-    doc.add_paragraph(" · ".join((_count(_items(d.get("trabajos")),"trabajo","trabajos"),_count(_items(d.get("entregables_contrato")),"entregable","entregables"),_count(_items(d.get("fases")),"fase","fases"))),style="LitMan Metadata")
-    req=[x for x in _items(d.get("requisitos_oferta")) if isinstance(x,dict)]; selected=[x for x in req if x.get("obligatorio") is True]+[x for x in req if x.get("obligatorio") is None]
-    doc.add_heading("Condicionantes de la solución",2)
-    if not selected: add_empty_message(doc,"No constan requisitos obligatorios o con obligatoriedad pendiente.")
-    for x in selected[:3]: doc.add_paragraph(("OBLIGATORIO" if x.get("obligatorio") is True else "NO CONSTA OBLIGATORIEDAD")+" · "+abbreviate_text(x.get("descripcion"),100),style="LitMan Compact")
-    if len(selected)>3: doc.add_paragraph(f"Y {len(selected)-3} requisitos adicionales en el detalle.",style="LitMan Metadata")
-    doc.add_heading("Guía para el revisor técnico",2); doc.add_paragraph("AL REVISAR LA PROPUESTA, COMPRUEBA",style="LitMan Card Title")
-    for x in ("Que cubra todo el alcance y los trabajos exigidos.","Que contemple todas las fases y entregables.","Que el equipo satisfaga los perfiles mínimos.","Que la solución respete tecnologías e integraciones.","Que responda a todos los criterios evaluables."): add_checkbox_item(doc,x)
 
-def _cover_list(doc:Document,title:str,values:list[Any],maximum:int, noun:str)->None:
-    doc.add_heading(title,2)
-    if not values: add_empty_message(doc,f"No consta información sobre {title.lower()}."); return
-    for i,x in enumerate(values[:maximum],1): doc.add_paragraph(f"{i}. {abbreviate_text(x,80)}",style="LitMan Compact")
-    if len(values)>maximum: doc.add_paragraph(f"Y {len(values)-maximum} {noun} adicionales en el detalle.",style="LitMan Metadata")
+def _context(doc: Document, data: dict[str, Any]) -> None:
+    doc.add_heading("1. Contexto", 2)
+    doc.add_paragraph(_compact(data.get("contexto")) if data.get("contexto") else MISSING, style="LitMan Callout")
+    scope = "; ".join(display_value(x) for x in _items(data.get("alcance"))) or MISSING
+    work = "; ".join(display_value(x) for x in _items(data.get("trabajos"))) or MISSING
+    add_data_table(doc, ["ELEMENTO", "RESUMEN"], [("Alcance", _compact(scope)), ("Trabajos principales", _compact(work))], [4.2, 12.8])
 
-def _detail(doc:Document,d:dict[str,Any])->None:
-    doc.add_heading("Comprensión del proyecto",2); _paragraph(doc,"Contexto y situación de partida",d.get("contexto"),"No consta una descripción del contexto del proyecto."); _list(doc,"Objetivos",d.get("objetivos"),True); _list(doc,"Alcance",d.get("alcance")); _list(doc,"Trabajos requeridos",d.get("trabajos"))
-    doc.add_heading("Ejecución y resultados",2); _phases(doc,d.get("fases")); _cards(doc,"Entregables del contrato",d.get("entregables_contrato"),"No consta información sobre entregables contractuales.")
-    doc.add_heading("Recursos y tecnología",2); _cards(doc,"Equipo y perfiles exigidos",d.get("equipo"),"No consta información sobre equipo."); _list(doc,"Tecnologías y plataformas",d.get("tecnologias"))
-    doc.add_heading("Condiciones de la solución",2); _requirements(doc,d.get("requisitos_oferta")); _criteria(doc,d.get("criterios_adjudicacion")); _quality(doc,d.get("calidad"))
 
-def _paragraph(doc:Document,title:str,value:Any,empty:str)->None: doc.add_heading(title,3); doc.add_paragraph(display_value(value) if value not in (None,"") else empty)
-def _list(doc:Document,title:str,value:Any,numbered:bool=False)->None:
-    doc.add_heading(title,3); values=_items(value)
-    if not values: add_empty_message(doc,f"No consta información sobre {title.lower()}."); return
-    for i,x in enumerate(values,1): doc.add_paragraph((f"{i}. " if numbered else "• ")+display_value(x),style="LitMan Card Body")
-def _cards(doc:Document,title:str,value:Any,empty:str)->None:
-    doc.add_heading(title,3); values=_items(value)
-    if not values: add_empty_message(doc,empty); return
-    for x in values:
-        item=x if isinstance(x,dict) else {"nombre":x}; p=doc.add_paragraph(display_value(item.get("nombre")),style="LitMan Card Title"); set_keep_with_next(p); doc.add_paragraph(display_value(item.get("descripcion")),style="LitMan Card Body")
-def _phases(doc:Document,value:Any)->None:
-    doc.add_heading("Fases, plazos y entregables",3); values=_items(value)
-    if not values: add_empty_message(doc,"No consta información sobre fases."); return
-    for i,x in enumerate(values,1):
-        item=x if isinstance(x,dict) else {}; p=doc.add_paragraph(f"FASE {i:02d} · {display_value(item.get('nombre'))}",style="LitMan Card Title"); set_keep_with_next(p)
-        for label,key in (("Plazo","plazo"),("Descripción","descripcion")):
-            add_label_value(doc,label,item.get(key))
-        p=doc.add_paragraph("Entregables",style="LitMan Fact Label"); set_keep_with_next(p)
-        for e in _items(item.get("entregables")) or [MISSING]: doc.add_paragraph("• "+named_description(e),style="LitMan Compact")
-def _requirements(doc:Document,value:Any)->None:
-    doc.add_heading("Requisitos",3)
-    values=_items(value)
-    if not values: add_empty_message(doc,"No constan requisitos de la oferta."); return
-    for x in values:
-        item=x if isinstance(x,dict) else {}; label="OBLIGATORIO" if item.get("obligatorio") is True else "NO OBLIGATORIO" if item.get("obligatorio") is False else "OBLIGATORIEDAD NO INDICADA"; add_callout(doc,label+" · "+display_value(item.get("tipo")),item.get("descripcion")); add_label_value(doc,"Dónde responder",item.get("donde_responder"))
-def _criteria(doc:Document,value:Any)->None:
-    doc.add_heading("Criterios",3)
-    values=_items(value)
-    if not values: add_empty_message(doc,"No constan criterios de adjudicación."); return
-    for x in values:
-        item=x if isinstance(x,dict) else {}; points=f"{item['puntuacion_maxima']} puntos" if item.get("puntuacion_maxima") is not None else "Puntuación no indicada"; add_callout(doc,display_value(item.get("nombre"))+" · "+points,item.get("descripcion")); add_label_value(doc,"Tipo",item.get("tipo")); add_label_value(doc,"Dónde responder",item.get("donde_responder"))
-def _quality(doc:Document,value:Any)->None:
-    q=value if isinstance(value,dict) else {}; limits=_items(q.get("limitaciones")); state=display_value(q.get("estado")).lower(); kind="success" if state=="suficiente" else "warning" if state=="parcial" else "danger" if state=="insuficiente" else "warning"; add_callout(doc,"CALIDAD DEL ANÁLISIS: "+display_value(q.get("estado")).upper(),"; ".join(display_value(x) for x in limits) if limits else "No se han registrado limitaciones relevantes.",kind=kind)
+def _objectives(doc: Document, value: Any) -> None:
+    doc.add_heading("2. Objetivos", 2); values = _items(value)
+    if not values: add_empty_message(doc, "No consta información sobre objetivos."); return
+    for index, item in enumerate(values, 1): doc.add_paragraph(f"{index}. {_compact(item, 160)}", style="LitMan Compact")
+
+
+def _phases(doc: Document, value: Any) -> None:
+    doc.add_heading("3. Fases y entregables", 2); values = _items(value)
+    if not values: add_empty_message(doc, "No consta información sobre fases."); return
+    rows = []
+    for raw in values:
+        item = raw if isinstance(raw, dict) else {}
+        deliverables = _items(item.get("entregables"))
+        if not deliverables: deliverables = [MISSING]
+        for deliverable in deliverables:
+            if isinstance(deliverable, dict):
+                name = display_value(deliverable.get("nombre"))
+                description = deliverable.get("descripcion")
+                deliverable_text = name if not description else f"{name} — {_compact(description)}"
+            else:
+                deliverable_text = display_value(deliverable)
+            rows.append((display_value(item.get("nombre")), _compact(item.get("descripcion")), display_value(item.get("plazo")), deliverable_text))
+    add_data_table(doc, ["FASE", "ACTIVIDAD / DESCRIPCIÓN", "PLAZO", "ENTREGABLES"], rows, [3.0, 6.0, 2.5, 5.5])
+
+
+def _resources(doc: Document, data: dict[str, Any]) -> None:
+    doc.add_heading("4. Tecnologías y recursos", 2)
+    technologies = "; ".join(display_value(x) for x in _items(data.get("tecnologias"))) or MISSING
+    profiles = "; ".join(named_description(x) for x in _items(data.get("equipo"))) or MISSING
+    add_data_table(doc, ["TECNOLOGÍAS Y PLATAFORMAS", "PERFILES / RECURSOS"], [(_compact(technologies, 240), _compact(profiles, 240))], [8.0, 9.0])
+
+
+def _key_aspects(doc: Document, data: dict[str, Any]) -> None:
+    doc.add_heading("5. Aspectos clave", 2)
+    requirements = [x for x in _items(data.get("requisitos_oferta")) if isinstance(x, dict)]
+    if requirements:
+        doc.add_paragraph("Requisitos", style="LitMan Card Title")
+        for item in requirements:
+            label = "OBLIGATORIO" if item.get("obligatorio") is True else "NO OBLIGATORIO" if item.get("obligatorio") is False else "OBLIGATORIEDAD NO INDICADA"
+            add_callout(doc, label + " · " + display_value(item.get("tipo")), _compact(item.get("descripcion")))
+    else: add_empty_message(doc, "No constan requisitos de la oferta.")
+    criteria = [x for x in _items(data.get("criterios_adjudicacion")) if isinstance(x, dict)]
+    if criteria:
+        doc.add_paragraph("Criterios de adjudicación", style="LitMan Card Title")
+        for item in criteria:
+            points = f"{item['puntuacion_maxima']} puntos" if item.get("puntuacion_maxima") is not None else "Puntuación no indicada"
+            add_callout(doc, display_value(item.get("nombre")) + " · " + points, _compact(item.get("descripcion")))
+    else: add_empty_message(doc, "No constan criterios de adjudicación.")
+    quality = data.get("calidad") if isinstance(data.get("calidad"), dict) else {}; limits = _items(quality.get("limitaciones"))
+    if limits: add_callout(doc, "ALERTA: LIMITACIONES DEL ANÁLISIS", "; ".join(display_value(x) for x in limits), kind="warning")

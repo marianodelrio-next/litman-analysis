@@ -1,97 +1,75 @@
-import json
 import copy
+import json
 from pathlib import Path
-
 from docx import Document
 from docx.shared import Cm
-
 from conftest import dossier
 from litman_core.generation.technical_summary import TechnicalSummaryGenerator
 from litman_core.generation.technical_summary.renderer import write_technical_summary
-
 
 def _text(path: Path) -> str:
     doc = Document(path)
     return "\n".join([p.text for p in doc.paragraphs] + [cell.text for table in doc.tables for row in table.rows for cell in row.cells])
 
-
-def test_technical_summary_contains_dossier_context_and_not_operational_sections(tmp_path: Path) -> None:
-    output = tmp_path / "resumen_tecnico.docx"
-    write_technical_summary(dossier(), output)
-    text = _text(output)
-    for value in ("RESUMEN TÉCNICO", "Contexto y situación de partida", "Mejorar la calidad", "Trabajos requeridos", "Plan de trabajo", "Entregables del contrato", "Jefe de proyecto", "Criterios", "CALIDAD DEL ANÁLISIS"):
-        assert value in text
-    assert "Pendientes para preparar la oferta" not in text
-    assert "Documentos que presentar con la oferta" not in text
-    assert "None" not in text
-
-
-def test_technical_summary_rerenders_snapshot_with_its_stable_contract(tmp_path: Path) -> None:
-    run = tmp_path / "run"; (run / "input").mkdir(parents=True); (run / "output").mkdir()
-    (run / "input" / "dossier.json").write_text(json.dumps(dossier()), encoding="utf-8")
-    result = TechnicalSummaryGenerator().rerender(run)
-    assert Path(result["documents"][0]).name == "resumen_tecnico.docx"
-    assert result["id"] == "technical-summary"
-    assert result["generator_version"] == "technical-summary-generator-v2"
-    assert result["pending"] == [] and result["metadata"]["format"] == "docx"
-
-
-def test_technical_summary_keeps_cover_brief_and_detail_complete(tmp_path: Path) -> None:
-    objectives = ["Objetivo muy extenso " + str(i) + " " + "x" * 160 for i in range(5)]
-    scope = ["Alcance muy extenso " + str(i) + " " + "x" * 160 for i in range(5)]
-    requirements = [{"descripcion": "Requisito extenso " + str(i) + " " + "x" * 180, "obligatorio": True} for i in range(5)]
-    data = dossier(contexto="Contexto " + "x" * 500, objetivos=objectives, alcance=scope, requisitos_oferta=requirements)
-    output = tmp_path / "summary.docx"; write_technical_summary(data, output)
-    doc = Document(output); paragraphs = doc.paragraphs
-    break_index = next(i for i, p in enumerate(paragraphs) if 'w:type="page"' in p._p.xml)
-    cover = "\n".join(p.text for p in paragraphs[:break_index])
-    detail = "\n".join(p.text for p in paragraphs[break_index + 1:])
-    assert len(cover) < 2000 and cover.count("Objetivo muy extenso") == 3
-    assert "Y 2 objetivos adicionales en el detalle." in cover
-    assert all(item in detail for item in objectives + scope)
-
-
-def test_technical_summary_uses_explicit_empty_states_instead_of_fake_cards(tmp_path: Path) -> None:
-    output = tmp_path / "empty.docx"
-    write_technical_summary(dossier(requisitos_oferta=[], criterios_adjudicacion=[], fases=[], entregables_contrato=[], equipo=[], tecnologias=[]), output)
-    text = _text(output)
-    assert "No constan requisitos de la oferta." in text
-    assert "No constan criterios de adjudicación." in text
-    assert "OBLIGATORIEDAD NO INDICADA" not in text
-
-
-def test_technical_summary_callouts_are_visual_cards_with_textual_labels(tmp_path: Path) -> None:
-    output = tmp_path / "card.docx"; write_technical_summary(dossier(), output)
-    doc = Document(output)
-    card = next(p for p in doc.paragraphs if p.text.startswith("CALIDAD DEL ANÁLISIS:"))
-    assert "w:pBdr" in card._p.xml and "w:shd" in card._p.xml
-    assert card.paragraph_format.keep_with_next is True
-    assert "CALIDAD DEL ANÁLISIS" in card.text
-
-
-def test_technical_summary_has_accessible_document_structure_and_keeps_input(tmp_path: Path) -> None:
-    data = dossier(); original = copy.deepcopy(data)
-    output = tmp_path / "structure.docx"; write_technical_summary(data, output)
-    doc = Document(output); section = doc.sections[0]
-    assert data == original
-    tolerance = Cm(.01)
-    assert abs(section.page_width - Cm(21)) < tolerance and abs(section.page_height - Cm(29.7)) < tolerance
-    assert abs(section.left_margin - Cm(2)) < tolerance and abs(section.right_margin - Cm(2)) < tolerance
-    assert doc.styles["Normal"].font.name == "Arial"
+def test_summary_has_one_title_and_five_sections_in_order(tmp_path: Path) -> None:
+    output = tmp_path / "summary.docx"; write_technical_summary(dossier(), output)
+    doc = Document(output); text = _text(output)
+    assert [p.text for p in doc.paragraphs if p.style.name == "Heading 2"] == ["1. Contexto", "2. Objetivos", "3. Fases y entregables", "4. Tecnologías y recursos", "5. Aspectos clave"]
     assert sum(p.style.name == "Heading 1" for p in doc.paragraphs) == 1
-    assert any(p._p.xpath('.//w:br[@w:type="page"]') for p in doc.paragraphs)
-    assert section.header.paragraphs[0].text
-    assert section.footer._element.xpath('.//w:fldSimple[contains(@w:instr,"PAGE")]')
-    assert all(len(table.columns) <= 4 for table in doc.tables)
+    assert "Guía para el revisor técnico" not in text and "Comprensión del proyecto" not in text and "None" not in text
+
+def test_summary_preserves_compact_content_and_no_forced_cover_break(tmp_path: Path) -> None:
+    data = dossier(contexto="Contexto " + "x" * 500, objetivos=["Objetivo " + str(i) + " x" * 100 for i in range(5)])
+    output = tmp_path / "summary.docx"; write_technical_summary(data, output); doc = Document(output); text = _text(output)
+    assert "Objetivo 0" in text and "Objetivo 4" in text and not any(p._p.xpath('.//w:br[@w:type="page"]') for p in doc.paragraphs)
+
+def test_summary_has_explicit_empty_states_and_conditional_alert(tmp_path: Path) -> None:
+    data = dossier(objetivos=[], fases=[], tecnologias=[], equipo=[], requisitos_oferta=[], criterios_adjudicacion=[], calidad={"limitaciones": []})
+    output = tmp_path / "empty.docx"; write_technical_summary(data, output); text = _text(output)
+    for value in ("No consta información sobre objetivos.", "No consta información sobre fases.", "No constan requisitos de la oferta.", "No constan criterios de adjudicación.", "No consta"): assert value in text
+    assert "ALERTA: LIMITACIONES" not in text
+    output = tmp_path / "alert.docx"; write_technical_summary(dossier(), output); assert "ALERTA: LIMITACIONES DEL ANÁLISIS" in _text(output)
+
+def test_summary_has_horizontal_phase_table_and_accessible_layout(tmp_path: Path) -> None:
+    output = tmp_path / "structure.docx"; data = dossier(); original = copy.deepcopy(data); write_technical_summary(data, output)
+    doc = Document(output); section = doc.sections[0]; tolerance = Cm(.01)
+    assert data == original and abs(section.page_width - Cm(21)) < tolerance and abs(section.page_height - Cm(29.7)) < tolerance
+    assert abs(section.left_margin - Cm(2)) < tolerance and abs(section.right_margin - Cm(2)) < tolerance and doc.styles["Normal"].font.name == "Arial"
+    assert section.header.paragraphs[0].text and section.footer._element.xpath('.//w:fldSimple[contains(@w:instr,"PAGE")]')
     for table in doc.tables:
-        assert table.rows[0]._tr.xpath('./w:trPr/w:tblHeader')
-        assert all(row._tr.xpath('./w:trPr/w:cantSplit') for row in table.rows)
+        assert table.rows[0]._tr.xpath('./w:trPr/w:tblHeader') and all(row._tr.xpath('./w:trPr/w:cantSplit') for row in table.rows)
 
+def test_summary_rerenders_snapshot_with_new_version(tmp_path: Path) -> None:
+    run = tmp_path / "run"; (run / "input").mkdir(parents=True); (run / "output").mkdir(); (run / "input" / "dossier.json").write_text(json.dumps(dossier()), encoding="utf-8")
+    result = TechnicalSummaryGenerator().rerender(run)
+    assert Path(result["documents"][0]).name == "resumen_tecnico.docx" and result["id"] == "technical-summary" and result["generator_version"] == "technical-summary-generator-v3"
 
-def test_technical_summary_cover_explains_absent_conditioning_requirements(tmp_path: Path) -> None:
-    output = tmp_path / "without-conditioners.docx"
-    write_technical_summary(dossier(requisitos_oferta=[{
-        "descripcion": "Opcional", "tipo": "técnico", "obligatorio": False,
-        "donde_responder": None,
-    }]), output)
-    assert "No constan requisitos obligatorios o con obligatoriedad pendiente." in _text(output)
+def test_summary_header_complete_and_partial_has_no_none(tmp_path: Path) -> None:
+    complete = dossier()
+    complete["cabecera"].update({"fecha_limite": "2026-10-20", "presupuesto_sin_iva": 1200, "moneda": "EUR"})
+    partial = dossier()
+    partial["cabecera"].update({"fecha_limite": None, "presupuesto_sin_iva": 1200, "moneda": None})
+    for index, data in enumerate((complete, partial)):
+        output = tmp_path / f"header-{index}.docx"; write_technical_summary(data, output)
+        text = _text(output)
+        assert "EXP-1" in text and "Servicio de analítica" in text
+        assert "None" not in text
+    assert "1200 EUR" in _text(tmp_path / "header-0.docx")
+    assert "1200" in _text(tmp_path / "header-1.docx")
+
+def test_summary_handles_phases_with_missing_fields(tmp_path: Path) -> None:
+    data = dossier(fases=[{}, {"nombre": "Fase incompleta", "entregables": []}])
+    output = tmp_path / "missing-phase-fields.docx"; write_technical_summary(data, output)
+    text = _text(output)
+    assert "Fase incompleta" in text and "No consta" in text and "None" not in text
+
+def test_summary_preserves_all_phase_deliverables_and_abbreviates_only_description(tmp_path: Path) -> None:
+    description = "Descripción extensa " + "x" * 500
+    data = dossier(fases=[{"nombre": "Ejecución", "descripcion": "Actividad", "plazo": "1 mes", "entregables": [
+        "Entregable crítico A", "Entregable crítico B", {"nombre": "Entregable crítico C", "descripcion": description},
+    ]}])
+    output = tmp_path / "deliverables.docx"; write_technical_summary(data, output)
+    text = _text(output)
+    assert all(value in text for value in ("Entregable crítico A", "Entregable crítico B", "Entregable crítico C"))
+    assert len(description) > 180 and "Descripción extensa" in text and description not in text
+    assert "None" not in text
