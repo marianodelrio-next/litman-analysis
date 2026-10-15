@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "litman-harness"
+version = "0.1.0"
+description = "Local, user-authorized Drive harness for LitMan"
+requires-python = ">=3.11"
+dependencies = ["google-api-python-client>=2.0", "google-auth>=2.0"]
+
+[dependency-groups]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+litman = "litman_harness.cli:main"
+litman-mcp = "litman_harness.mcp:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
