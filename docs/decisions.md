@@ -17,9 +17,9 @@
 - Docker remains the external distribution and isolation boundary; domain and pipelines do not select or branch on runtime.
 - Local development and local wheel consumption are documented as separate
   flows (`deployment/local-dev/` and `deployment/local-install/`). The wheel
-  flow requires explicit persistent workspace and runs paths; la configuración
-  diagnostic and does not create them. Docker continues to install a built
-  wheel in its isolated runtime.
+  flow takes its workspace and runs paths from `config.toml` and the
+  environment. Docker continues to install a built wheel in its
+  isolated runtime.
 
 ## Technical summary artifact contract
 
@@ -30,8 +30,7 @@
 - The artifact preserves critical requirements, criteria, phase deliverables,
   and explicit empty states; it may abbreviate descriptions deterministically
   but must not invent content or add a separate cover/detail section.
-- The generator contract version is bumped when this structure changes; the
-  rerender path continues to use only the persisted dossier snapshot.
+- The generator contract version is bumped when this structure changes.
 
 ## Bid preparation guide artifact contract
 
@@ -46,8 +45,7 @@
   analysis results.
 - Missing format data is grouped into one `No consta` notice, and unknown
   values use that same convention. The generator contract version is bumped
-  when this structure changes; rerender continues to use only the persisted
-  dossier snapshot.
+  when this structure changes.
 
 ## Harness de expediente
 
@@ -82,7 +80,7 @@
   por existencia/papelera/pertenencia de raíz, carpetas y oferta; nunca por la
   `version` de Drive, que cambia sin cambios reales.
 - El harness sólo usa el contrato público de la CLI de Core (código de salida y
-  JSON de stdout con `artifacts[{name, checksum}]`, `include_run_files=false`)
+  JSON de stdout con `artifacts[{name, uri, checksum}]`, `include_run_files=false`)
   y no lee archivos internos del run.
 - Los recursos creados llevan `appProperties` (`litman_operation_id`,
   `litman_action_id`) para reintentos idempotentes.

@@ -68,6 +68,7 @@ cada persona, ejecuta este Core en local y publica sus resultados. Ver
 
 ```bash
 UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest -q
+(cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest -q)
 docker compose -f deployment/docker/compose.yaml config --quiet
 ```
 

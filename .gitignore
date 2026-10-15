@@ -19,7 +19,6 @@ runs/
 *.egg-info/
 build/
 dist/
-.local-state/
 .agent-work/
 auth.json
 
@@ -34,9 +33,3 @@ licitaciones/
 Thumbs.db
 *.swp
 *.swo
-
-# Documento maestro local situado en la raíz
-/Copy of Plantilla Master.docx
-
-scripts/*
-examples/*

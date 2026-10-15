@@ -288,7 +288,7 @@ verifica forma y procedencia, nunca la veracidad.
   `model_reasoning_effort = "low"`, `sandbox_mode = "read-only"`, instrucciones
   de usar sólo `status` y `read_document`.
 
-Prueba manual (la instalación automática es la tarea 06): registrar `litman-mcp`
+Prueba manual (la instalación automática está pendiente): registrar `litman-mcp`
 como servidor MCP `litman`; en Claude Code copiar el `.md` a
 `.claude/agents/` (proyecto) o `~/.claude/agents/` y las skills a
 `.claude/skills/`; en Codex copiar el `.toml` a su directorio de agentes y las
@@ -347,7 +347,7 @@ publicación y oferta viva) → refrescar el resumen → la persona decide.
   `~/.codex/config.toml`: `[mcp_servers.litman]` con `tool_timeout_sec = 1800`.
   En Claude Code, `MCP_TOOL_TIMEOUT` (milisegundos). Si un cliente no lo
   permite, una ejecución en segundo plano con sondeo es candidata para la
-  tarea 06.
+  tarea de instalación.
 
 ## Validación humana pendiente
 
@@ -365,7 +365,7 @@ visual del Google Doc de la oferta convertida fue correcta. Pendiente:
    `diagnose`, `inspect` y `status` que recupera el expediente por ID.
 2. **Descubrimiento MCP y subagente.** Registrar `litman-mcp`, las skills y
    `lector-licitacion` en Codex App, Claude Desktop y Claude Code (la
-   instalación automática es la tarea 06), comprobar que aparecen las
+   instalación automática está pendiente), comprobar que aparecen las
    herramientas con su descripción, que `status` responde y que el subagente
    propone el resumen sólo leyendo vía MCP. Smoke local previo,
    con un JSON de metadatos temporal en `LITMAN_HARNESS_METADATA`: enviar por

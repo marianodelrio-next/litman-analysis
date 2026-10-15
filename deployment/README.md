@@ -24,8 +24,7 @@ añade una réplica Drive. `.env` solo contiene autenticación y rutas a
 Use `type = "assessment"` para generar `ficha_oportunidad.pdf`; para
 `detailed-analysis` se generan siempre los cuatro entregables. La configuración
 de sus generadores está bajo `[analysis.detailed.generation]`, con secciones
-para `technical_document` y `economic_simulator`. No se admiten
-jobs JSON/YAML, `assess`, `analyze`, `check` ni `.local-state`.
+para `technical_document` y `economic_simulator`.
 
 Las guías de [desarrollo local](local-dev/README.md),
 [instalación wheel](local-install/README.md) y [Docker](docker/README.md)

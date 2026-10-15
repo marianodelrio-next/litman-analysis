@@ -2,9 +2,9 @@
 
 LitMan Core is a Python 3.11 application implemented exclusively under `src/litman_core`; no alternate Core package is shipped. The separate `litman-harness` distribution under `harness/` is a client of Core (see «Harness de expediente»), not an alternate implementation. The CLI validates a job and invokes `JobRunner` in the current Python process. `JobRunner` materializes local or Google Drive files, builds a `DocumentBundle`, normalizes documents, and runs either `assessment` or `detailed-analysis`.
 
-Pipelines use `infrastructure/llm/CodexProvider` for structured analysis. Schema, semantic, and evidence validation complete before publishing. `generation/` creates deliverables from the dossier and versioned resources; `infrastructure/storage/` publishes locally or to Drive.
+Pipelines use the `LLMProvider` port (Codex by default or Claude Code, see «Proveedores LLM locales») for structured analysis. Schema, semantic, and evidence validation complete before publishing. `generation/` creates deliverables from the dossier and versioned resources; `infrastructure/storage/` publishes locally or to Drive.
 
-Versioned prompts, rules, schemas, and templates are under `resources/`. The product invokes an explicitly configured Codex CLI in its execution environment, local or containerized; `.codex/` and `.agents/` are development-only configuration and are not part of the product runtime.
+Versioned prompts, rules, schemas, and templates are under `resources/`. The product invokes the configured LLM CLI in its execution environment, local or containerized; `.codex/` and `.agents/` are development-only configuration and are not part of the product runtime.
 
 ## Core y Docker
 

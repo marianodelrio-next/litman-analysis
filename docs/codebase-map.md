@@ -10,7 +10,7 @@ Use this map to locate likely ownership, then verify the current code before edi
 | Job contract | `src/litman_core/application/job_loader.py`, `src/litman_core/domain/jobs.py` | Typed `config.toml` loading, validation, and job types. |
 | Document input | `src/litman_core/infrastructure/documents/`, `src/litman_core/infrastructure/storage/local.py`, `src/litman_core/infrastructure/storage/google_drive.py` | Inventory, normalization, local sources, and Drive materialization. |
 | Drive integration | `src/litman_core/infrastructure/storage/google_drive.py`, `src/litman_core/infrastructure/storage/publication.py` | Google API setup, Drive reads, staged publication, publication naming. |
-| LLM providers | `src/litman_core/infrastructure/llm/factory.py`, `claude_code.py`, `codex_cli.py`, `codex_auth.py`, `codex_events.py` | Shared provider composition, Ubuntu Claude Code/Codex execution, authentication, events, and failures. |
+| LLM providers | `src/litman_core/infrastructure/llm/factory.py`, `resolution.py`, `claude_code.py`, `codex_cli.py`, `codex_auth.py`, `codex_events.py` | Shared provider composition, provider/model resolution, Ubuntu Claude Code/Codex execution, authentication, events, and failures. |
 | Pipeline framework | `src/litman_core/pipelines/runner.py`, `src/litman_core/pipelines/registry.py`, `src/litman_core/pipelines/models.py` | Versioned resource loading and common pipeline execution. |
 | Assessment analysis | `src/litman_core/pipelines/assessment/`, `src/litman_core/resources/pipelines/assessment/v1/` | Assessment preparation, extraction, rules, and prompts. |
 | Detailed analysis | `src/litman_core/pipelines/detailed_analysis/`, `src/litman_core/resources/pipelines/detailed/v1/` | Dossier extraction and detailed-analysis prompts. |
@@ -19,7 +19,7 @@ Use this map to locate likely ownership, then verify the current code before edi
 | Versioned templates | `src/litman_core/resources/templates/` | Runtime document and spreadsheet templates. |
 | Run metadata | `src/litman_core/infrastructure/runs.py` | Run directories, hashes, manifests, and lineage. |
 | Unit tests: domain/pipelines | `tests/unit/domain/`, `tests/unit/pipelines/`, `tests/unit/test_deployment.py` | Validation, pipeline behavior, and optional deployment configuration. |
-| Unit tests: infrastructure | `tests/unit/infrastructure/` | Storage, normalization, product Codex CLI, and auth. |
+| Unit tests: infrastructure | `tests/unit/infrastructure/` | Storage, normalization, product Codex CLI and Claude Code providers, LLM resolution, and auth. |
 | Unit tests: generation | `tests/unit/generation/` | Artefact generation and rendering. |
 | Contracts and integration | `tests/contracts/`, `tests/integration/test_job_runner.py` | Public job and architecture contracts; end-to-end job orchestration. |
 | Personal Drive harness | `harness/src/litman_harness/{dossier,analysis,adapters,interfaces,plans}/`, `harness/agent/` (skills, `claude/` and `codex/` subagents), `harness/tests/` | Separate user-OAuth dossier client (CLI `litman`, MCP `litman-mcp`, one operation registry); manifest/context, incorporation, publication and tender summary write shared Drive state through Drive v2 `If-Match` (`adapters/drive_state.py`); development metadata stays read-only. See `docs/harness-development.md`. |

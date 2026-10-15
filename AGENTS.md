@@ -1,15 +1,15 @@
 # Codex Development
 
-LitMan Analysis is a Python 3.11 service that analyzes procurement files in Docker. This repository also contains a Codex-only development workflow; it is separate from the product runtime.
+This repository contains two independent Python 3.11 distributions: LitMan Core (`litman-core`, `src/`), which analyzes procurement files locally or optionally in Docker, and the dossier harness (`litman-harness`, `harness/`), which runs Core as a process and publishes to Google Drive. It also contains a Codex-only development workflow, separate from the product runtime.
 
 - Make the smallest scoped change and follow existing architecture and conventions.
 - Prefer conventional, deterministic code, scripts, rules, and templates; do not delegate work to an LLM that they can solve reliably.
 - Do not add dependencies, abstractions, refactors, or product changes outside the authorized scope.
 - Functional changes require relevant tests, real results, and affected documentation updates. Do not claim completion before acceptance criteria are checked.
 - Do not use real credentials, Drive, destructive operations, or production resources without explicit authorization.
-- Do not alter the product Codex CLI invocation, Docker isolation, product prompts, schemas, templates, or pipelines unless explicitly requested.
+- Do not alter the product LLM CLI invocation (Codex or Claude Code), Docker isolation, product prompts, schemas, templates, or pipelines unless explicitly requested.
 
-Run `UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest -q`; when relevant, also run `docker compose config --quiet` and `docker compose build`.
+Run `UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest -q` from the repository root for Core and from `harness/` for the harness; when Docker is relevant, also run `docker compose -f deployment/docker/compose.yaml config --quiet` and `docker compose -f deployment/docker/compose.yaml build`.
 
 Start with `AGENTS.md`, then use the [codebase map](docs/codebase-map.md) to locate relevant code. Read [architecture](docs/architecture.md) and [decisions](docs/decisions.md) only when relevant; verify the actual code and expand exploration only as needed.
 

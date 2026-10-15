@@ -1,14 +1,14 @@
-# Guía de LitMan Analysis
+# Guía de LitMan Core
 
 ## Arquitectura de ejecución
 
 La interfaz pública es `litman-core run`, que carga `config.toml` y ejecuta directamente `JobRunner`. Cada ejecución crea un `publication_id` y un `run` persistente bajo `output.directory`. Docker es opcional y se invoca desde `deployment/docker/compose.yaml`; la configuración y sus rutas se resuelven dentro del contenedor.
 
-Dentro del contenedor, el entrypoint `litman-core` ejecuta el `JobRunner` canónico:
+En local y dentro del contenedor, `litman-core` ejecuta el mismo `JobRunner`:
 
 ```text
-CLI host → un contenedor → origen → inventario/normalización → Codex
-                    → validación → publicador → limpieza temporal
+litman-core run → origen → inventario/normalización → LLM (Codex o Claude Code)
+               → validación → publicador → limpieza temporal
 ```
 
 El runner no conoce Docker. Selecciona `LocalDocumentSource` o `GoogleDriveDocumentSource`, construye un único `DocumentBundle`, ejecuta `AssessmentPipeline` o `DetailedAnalysisPipeline`, valida el run completo y solo entonces usa `LocalArtifactPublisher` o `GoogleDriveArtifactPublisher`. Los IDs y MIME types de Drive se incorporan al bundle en memoria; los hashes se calculan sobre los bytes descargados y llegan a manifests, evidencias y lineage.
@@ -20,7 +20,7 @@ El runner no conoce Docker. Selecciona `LocalDocumentSource` o `GoogleDriveDocum
 | Google Drive | Local | Soportada |
 | Google Drive | Google Drive | Soportada |
 
-## Persistencia y seguridad
+## Persistencia y seguridad en Docker
 
 - `/app/config.toml` y `/app/input` son mounts de solo lectura.
 - `/app/runs` y `/var/lib/litman-core/codex` son persistentes y escribibles.
@@ -29,7 +29,7 @@ El runner no conoce Docker. Selecciona `LocalDocumentSource` o `GoogleDriveDocum
 - El workspace privado se elimina en `finally`; el run y sus diagnósticos no.
 - El proceso usa el UID/GID del host y no root.
 
-Codex comparte ahora el contenedor con las credenciales Google. Su entorno conserva solo las variables operativas necesarias y la autenticación elegida; los prompts no mencionan contenido de secretos. `auth.json` debe tener modo `0600`. Nunca guardes claves en jobs, imágenes, manifests o resultados.
+En Docker, Codex comparte el contenedor con las credenciales Google. Su entorno conserva solo las variables operativas necesarias y la autenticación elegida; los prompts no mencionan contenido de secretos. `auth.json` debe tener modo `0600`. Nunca guardes claves en jobs, imágenes, manifests o resultados.
 
 No se instala Bubblewrap ni existe un sandbox anidado. Codex se ejecuta con
 `--dangerously-bypass-approvals-and-sandbox` y puede acceder al filesystem, la
@@ -53,9 +53,9 @@ El catálogo cerrado de `detailed-analysis` contiene `resumen_tecnico.docx` (fic
 La salida del análisis y de todos los entregables es siempre española. Las
 citas de evidencia, identificadores, nombres de archivo, referencias estables o
 de página, nombres propios y fórmulas literales designadas por el schema se
-mantienen textualmente como material fuente. En la propuesta técnica,
-para impedir una salida parcial en inglés.
+mantienen textualmente como material fuente; la generación no admite otro
+idioma de salida.
 
 La verificación de evidencias conserva documento y página estrictos. Tolera solamente espacios artificiales introducidos por el layout PDF y registra `verification_method` (`exact` o `layout_whitespace`). Una cita no comprobable produce un informe parcial con advertencias; los fallos estructurales o semánticos continúan siendo bloqueantes.
 
-Consulta el README para autenticación y comandos. Las salidas quedan en el destino indicado y los runs/diagnósticos bajo `runs/`. Antes de cerrar cambios ejecuta pytest, `docker compose -f deployment/docker/compose.yaml config --quiet` y `docker compose -f deployment/docker/compose.yaml build`. Las llamadas reales a Drive requieren autorización explícita; los tests usan fakes.
+Consulta el README para autenticación y comandos. Las salidas quedan en el destino indicado y los runs/diagnósticos bajo `output.directory`. Antes de cerrar cambios ejecuta pytest, `docker compose -f deployment/docker/compose.yaml config --quiet` y `docker compose -f deployment/docker/compose.yaml build`. Las llamadas reales a Drive requieren autorización explícita; los tests usan fakes.

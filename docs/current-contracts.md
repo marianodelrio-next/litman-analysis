@@ -1,32 +1,33 @@
 # Contratos vigentes de LitMan Core
 
-Este documento fija la línea base de la fase 0. Describe el comportamiento
-actual, no una API futura.
+Describe el comportamiento actual de Core, no una API futura.
 
 ## Comandos y ciclo de vida
 
 | Comando | Audiencia | Ciclo | Estado |
 |---|---|---|---|
-| `litman-core run JOB` | integración/operación | carga un job y ejecuta `JobRunner` directamente | canónico |
-| `litman-core run` | usuario local | carga `./config.toml` y delega | canónico |
-| `litman-core run --config RUTA` | usuario local | carga una configuración explícita | canónico |
+| `litman-core run` | usuario local | carga `./config.toml` (y su `.env` adyacente) y ejecuta `JobRunner` | canónico |
+| `litman-core run --config RUTA [--env-file RUTA]` | usuario local, integración (harness) | carga una configuración y un `.env` explícitos | canónico |
 
-Toda la implementación pertenece al paquete `litman_core`; no existe un paquete Python alternativo de compatibilidad.
+Con éxito, `run` imprime por stdout un JSON con `job_id`, `publication_id`,
+`status` (`succeeded`), `local_path`, `artifacts[{name, uri, checksum}]`
+(SHA-256) y, si hay réplica Drive, `remote`. Con error, sale con código 1 y
+escribe en stderr `{"status": "failed", "error", "local_path"?}`.
 
 ## Job y run
 
 Un job contiene `job.id`, `job.type` (`assessment` o `detailed-analysis`),
 `input.kind` (`local` o `google-drive`), `input.location`,
-`output.directory` y opcionalmente `output.google_drive_folder_id`, además de
-las opciones de publicación y generación. `JobRunner` materializa,
+`output.directory` y opcionalmente `output.google_drive_folder_id`, `[llm]`
+(`provider` `codex` o `claude-code` y `model`), además de las opciones de
+publicación y generación. `JobRunner` materializa,
 normaliza, analiza, valida y publica atómicamente.
 
 Cada ejecución crea una publicación identificada por un `publication_id` y un
 run con `input/`, `output/` y `logs/`. Ambos pipelines producen
 `output/validation.json` y `output/result.json`; detailed-analysis añade
 `dossier.json`, `generation_manifest.json` y su `lineage.json`, que contiene
-versión, origen, ruta y SHA-256 del dossier. La generación desde un dossier
-externo también conserva lineage, con origen `external`.
+versión, origen, ruta y SHA-256 del dossier.
 
 ## Publicación
 

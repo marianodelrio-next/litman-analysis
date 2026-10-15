@@ -1,19 +1,17 @@
 # Desarrollo local desde checkout
 
 Esta guía es para contribuir desde el checkout. Requiere Python 3.11, `uv` y
-autenticación explícita de Codex:
+la autenticación de Codex o, en Ubuntu, de Claude Code
+(`LITMAN_CORE_LLM_PROVIDER=claude-code`).
 
-Antes de ejecutar por primera vez, cree la configuración local:
-
-```sh
-cp config_example.toml config.toml
-```
+Desde la raíz del repositorio:
 
 ```sh
 uv sync
+uv run pytest -q
+cp deployment/config_example.toml deployment/config.toml
 cd deployment
 uv run litman-core run
-uv run pytest -q
 ```
 
 La CLI local ejecuta `JobRunner` directamente desde el código del checkout.
