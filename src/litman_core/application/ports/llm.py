@@ -13,12 +13,13 @@ class LLMOutputPaths:
     summary: Path
 
 
-def output_paths_for_run(run_dir: Path) -> LLMOutputPaths:
+def output_paths_for_run(run_dir: Path, invocation_id: str | None = None) -> LLMOutputPaths:
+    suffix = f"-{invocation_id}" if invocation_id else ""
     return LLMOutputPaths(
-        events=run_dir / "logs" / "codex-events.jsonl",
-        stderr=run_dir / "logs" / "codex-stderr.log",
-        response=run_dir / "output" / "codex-response.json",
-        summary=run_dir / "output" / "codex-summary.json",
+        events=run_dir / "logs" / f"llm-events{suffix}.jsonl",
+        stderr=run_dir / "logs" / f"llm-stderr{suffix}.log",
+        response=run_dir / "output" / f"llm-response{suffix}.json",
+        summary=run_dir / "output" / f"llm-summary{suffix}.json",
     )
 
 

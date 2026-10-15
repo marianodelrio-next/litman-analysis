@@ -34,3 +34,10 @@ run. Para `detailed-analysis`, la generación se configura bajo
 `analysis.detailed.generation`. Configura la autenticación de Codex y, si usas
 Drive, `GOOGLE_APPLICATION_CREDENTIALS` según tu entorno; esta guía no crea
 credenciales ni instaladores.
+
+Para Claude Code en Ubuntu, autentícate previamente con `claude`, configura
+`LITMAN_CORE_LLM_PROVIDER=claude-code` y, opcionalmente,
+`LITMAN_CORE_CLAUDE_CONFIG_DIR` (Core lo reenvía internamente como
+`CLAUDE_CONFIG_DIR`).
+LitMan nunca copia ni inspecciona tokens. El smoke autenticado de Codex/Claude
+queda pendiente de ejecutarse manualmente en una terminal del usuario.

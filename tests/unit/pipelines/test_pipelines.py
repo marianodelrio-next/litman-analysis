@@ -23,8 +23,6 @@ from litman_core.pipelines.detailed_analysis.stage import definition as detailed
 from litman_core.pipelines.models import StageDefinition, StageOutcome, StagePreparation, StageResources
 from litman_core.pipelines.runner import prepare_stage, run_stage
 from litman_core.resource_paths import RESOURCE_ROOT
-
-
 class FakeProvider:
     def generate(self, **_kwargs):
         return LLMResult(
@@ -95,7 +93,7 @@ def test_stage_can_prepare_versioned_resources_and_persists_common_files(tmp_pat
     prepared = prepare_stage(definition, case, settings)
     request = json.loads((prepared.run_dir / "input" / "request.json").read_text())
     assert request == {
-        "provider": "codex_cli",
+        "provider": "codex",
         "model": "gpt-5.5",
         "prompt_version": "v-test",
         "config_version": "config-test",
@@ -284,3 +282,9 @@ def test_failed_stage_persists_validation_diagnostics_before_raising(tmp_path: P
     with pytest.raises(ValueError, match="validación"):
         run_stage(definition, prepared, FakeProvider())
     assert json.loads((prepared.run_dir / "output" / "validation.json").read_text(encoding="utf-8"))["schema_errors"] == ["canary"]
+def test_claude_environment_model_is_used_for_stage_metadata(monkeypatch):
+    monkeypatch.setenv("LITMAN_CORE_LLM_PROVIDER", "claude-code")
+    monkeypatch.setenv("LITMAN_CORE_CLAUDE_MODEL", "sonnet")
+    settings = Settings()
+    from litman_core.pipelines.detailed_analysis.stage import _request_metadata
+    assert _request_metadata(settings, None, None, {}) == {"model": "sonnet"}

@@ -14,6 +14,7 @@ from litman_core.infrastructure.documents.inventory import inventory
 from litman_core.infrastructure.documents.normalize import normalize_documents
 from litman_core.application.ports.llm import LLMProvider, output_paths_for_run
 from litman_core.infrastructure.runs import new_run_dir
+from litman_core.infrastructure.llm.resolution import resolve_model
 
 from .models import LoadedResources, PreparedStage, StageDefinition
 
@@ -49,7 +50,9 @@ def prepare_stage(definition: StageDefinition, case_dir: Path, settings: Any, *,
     (run_dir / "input" / definition.files.prompt).write_text(
         f"{loaded.instructions}\n\n---\n\n{preparation.prompt}", encoding="utf-8"
     )
-    request = {"provider": "codex_cli", "model": settings.codex_model or "codex_default",
+    configured_provider = getattr(settings, "llm_provider", "codex")
+    resolved_model = resolve_model(settings, configured_provider)
+    request = {"provider": configured_provider, "model": resolved_model,
                "prompt_version": loaded.prompt_version, "config_version": loaded.config["version"],
                "schema_id": loaded.schema.get("$id")}
     if loaded.version_bundle is not None:
@@ -89,10 +92,10 @@ def _build_agent_workspace(prepared: PreparedStage, settings: Any) -> PreparedSt
 
 
 def run_stage(definition: StageDefinition, prepared: PreparedStage, provider: LLMProvider) -> dict[str, Any]:
-    print(f"[{definition.identifier} llm] iniciando Codex", file=sys.stderr, flush=True)
+    print(f"[{definition.identifier} llm] iniciando proveedor LLM", file=sys.stderr, flush=True)
     response = provider.generate(instructions=prepared.resources.instructions, prompt=prepared.prompt,
                                  schema_path=prepared.schema_path, case_dir=prepared.case_dir,
-                                 output_paths=output_paths_for_run(prepared.run_dir))
+                                 output_paths=output_paths_for_run(prepared.run_dir, definition.identifier))
     print(f"[{definition.identifier} llm] respuesta recibida", file=sys.stderr, flush=True)
     validation = definition.validate(response.data, prepared)
     print(f"[{definition.identifier} validación] {'correcta' if validation['valid'] else 'con errores'}", file=sys.stderr, flush=True)

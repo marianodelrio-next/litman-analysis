@@ -26,6 +26,8 @@ class JobRequest:
     google_drive_folder_id: str | None = None
     include_run_files: bool = False
     codex_model: str | None = None
+    llm_provider: str | None = None
+    llm_model: str | None = None
     options: dict[str, Any] = field(default_factory=dict)
 
 

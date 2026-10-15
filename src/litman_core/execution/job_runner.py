@@ -14,8 +14,8 @@ from litman_core.domain.jobs import JobRequest, JobType, PublishedArtifact, Stor
 from litman_core.infrastructure.documents.bundle import DocumentBundle
 from litman_core.infrastructure.documents.inventory import inventory
 from litman_core.infrastructure.documents.normalize import normalize_documents
-from litman_core.infrastructure.llm.codex_auth import CodexAuthentication
-from litman_core.infrastructure.llm.codex_cli import CodexProvider
+from litman_core.infrastructure.llm.factory import build_provider
+from litman_core.infrastructure.llm.resolution import resolve_llm
 from litman_core.infrastructure.storage import GoogleDriveArtifactPublisher, GoogleDriveDocumentSource, LocalArtifactPublisher, LocalDocumentSource
 from litman_core.infrastructure.storage.common import publication_inventory
 from litman_core.infrastructure.storage.google_drive import build_drive_service
@@ -43,15 +43,15 @@ class JobRunner:
                  local_source: Any | None = None, local_publisher: Any | None = None,
                  drive_source_factory: Callable[[Any, int], Any] | None = None,
                  drive_publisher_factory: Callable[[Any], Any] = GoogleDriveArtifactPublisher,
-                 provider_factory: Callable[..., Any] = CodexProvider,
-                 authentication_factory: Callable[..., Any] = CodexAuthentication.from_environment,
+                 provider_factory: Callable[..., Any] | None = None,
+                 authentication_factory: Callable[..., Any] | None = None,
                  assessment_factory: Callable[..., Any] = AssessmentPipeline,
                  detailed_factory: Callable[..., Any] = DetailedAnalysisPipeline,
                  preflight: Callable[[Settings], Any] | None = None) -> None:
         self.settings = settings or Settings(); self.drive_service_factory = drive_service_factory
         self.local_source = local_source or LocalDocumentSource(); self.local_publisher = local_publisher or LocalArtifactPublisher()
         self.drive_source_factory = drive_source_factory or (lambda service, limit: GoogleDriveDocumentSource(service, max_file_mb=limit))
-        self.drive_publisher_factory = drive_publisher_factory; self.provider_factory = provider_factory
+        self.drive_publisher_factory = drive_publisher_factory; self.provider_factory = provider_factory or build_provider
         self.authentication_factory = authentication_factory; self.assessment_factory = assessment_factory; self.detailed_factory = detailed_factory; self.preflight = preflight
 
     def run(self, job: JobRequest) -> JobRunnerResult:
@@ -70,9 +70,10 @@ class JobRunner:
             source = self.local_source if job.input_kind is StorageKind.LOCAL else self.drive_source_factory(service, settings.max_file_mb)
             materialized = source.materialize(job, workspace); bundle = self._bundle(materialized.directory, materialized.source_metadata, workspace)
             if not any(item.status == "ready" for item in bundle.normalized): raise ValueError("El expediente no produjo documentos normalizados listos para análisis")
-            if self.preflight is not None and settings.codex_preflight: self.preflight(settings)
-            authentication = self.authentication_factory(codex_home=settings.codex_home_dir)
-            provider = self.provider_factory(binary=settings.codex_binary, model=job.codex_model or settings.codex_model, timeout_seconds=settings.codex_timeout_seconds, authentication=authentication, home=settings.home_dir, codex_home=settings.codex_home_dir, tool_failure_policy="warn")
+            resolved_provider, resolved_model = resolve_llm(settings, job)
+            settings = replace(settings, llm_provider=resolved_provider, llm_model=resolved_model)
+            if self.preflight is not None and settings.codex_preflight and resolved_provider == "codex": self.preflight(settings)
+            provider = self.provider_factory(settings, job)
             pipeline = self.assessment_factory(settings, provider) if job.job_type is JobType.ASSESSMENT else self.detailed_factory(settings, provider)
             kwargs = {"case_id": job.job_id, "bundle": bundle, "run_dir": run_dir}
             if job.job_type is JobType.DETAILED_ANALYSIS: kwargs["generation"] = job.options["generation"]

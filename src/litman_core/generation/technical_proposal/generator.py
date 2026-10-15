@@ -98,7 +98,7 @@ def _generate_content(context, plan):
     (context.run_dir / "input" / "prompt.md").write_text(f"{instructions}\n\n---\n\n{prompt}", encoding="utf-8")
     response = context.provider.generate(instructions=instructions, prompt=prompt,
         schema_path=resource_path("schemas", "technical-content.schema.json"), case_dir=context.case_dir,
-        output_paths=output_paths_for_run(context.run_dir))
+        output_paths=output_paths_for_run(context.run_dir, "draft-v1"))
     return response.data, {"mode": "llm", "provider": response.provider, "model": response.model,
         "response_id": response.response_id, "prompt_version": (prompt_dir / "VERSION").read_text(encoding="utf-8").strip(),
         "usage": response.usage, "execution": response.execution, "profile": context.content_profile}

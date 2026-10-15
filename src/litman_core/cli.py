@@ -25,7 +25,7 @@ def main(argv: list[str] | None = None) -> None:
         if args.env_file or env_file.is_file():
             load_env_file(env_file)
         job = load_job(config)
-        settings = Settings(codex_model=job.codex_model or "gpt-5.5")
+        settings = Settings()
         result = JobRunner(settings).run(job)
         payload = {"job_id": result.job_id, "publication_id": result.publication_id,
                    "status": result.status, "local_path": str(result.local_path),

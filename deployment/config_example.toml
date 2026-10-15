@@ -13,6 +13,11 @@ directory = "./runs"
 [codex]
 model = "gpt-5.5"
 
+# Proveedor local opcional: codex (predeterminado) o claude-code.
+# [llm]
+# provider = "claude-code"
+# model = "sonnet"
+
 [publication]
 include_run_files = false
 

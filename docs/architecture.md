@@ -18,3 +18,11 @@ frontera de aislamiento y construye la wheel en una etapa intermedia para
 instalarla en la imagen final; no usa `src/` como runtime.
 
 `litman-core` es la única CLI pública. El comando `run` carga el contrato único `config.toml` en el proceso actual; no existe una interfaz worker en el paquete.
+## Proveedores LLM locales
+
+Core usa un único puerto `LLMProvider` y una factoría validada que selecciona
+Codex (por defecto) o Claude Code en Ubuntu. La precedencia es `[llm]` del job,
+variables del `.env` y valores por defecto; las credenciales permanecen en el
+CLI del usuario. Claude recibe únicamente herramientas de lectura y sus cuatro
+diagnósticos neutrales se conservan dentro del run. Windows, Docker con Claude
+y cancelación explícita no forman parte de este contrato.

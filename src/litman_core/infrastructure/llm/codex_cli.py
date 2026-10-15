@@ -226,7 +226,7 @@ class CodexProvider:
         )
         return LLMResult(
             data=data,
-            provider="codex_cli",
+            provider="codex",
             model=self.model or "codex_default",
             response_id=event_summary.thread_id,
             usage=event_summary.usage,

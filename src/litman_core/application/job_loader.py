@@ -9,7 +9,7 @@ from typing import Any
 from litman_core.domain.jobs import JobRequest, JobType, StorageKind
 from litman_core.generation_config import merge_generation
 
-_ROOT = {"job", "input", "output", "codex", "publication", "analysis"}
+_ROOT = {"job", "input", "output", "codex", "llm", "publication", "analysis"}
 
 
 def load_job(path: Path) -> JobRequest:
@@ -40,14 +40,22 @@ def load_job(path: Path) -> JobRequest:
     if not isinstance(codex, dict): raise ValueError("codex debe ser una tabla")
     _keys(codex, {"model"}, "codex")
     model = codex.get("model")
-    if model is not None and not isinstance(model, str): raise ValueError("codex.model debe ser texto")
+    if model is not None and (not isinstance(model, str) or not model.strip()): raise ValueError("codex.model debe ser texto no vacío")
+    llm = data.get("llm", {})
+    if not isinstance(llm, dict): raise ValueError("llm debe ser una tabla")
+    _keys(llm, {"provider", "model"}, "llm")
+    provider = llm.get("provider")
+    llm_model = llm.get("model")
+    if provider is not None and (not isinstance(provider, str) or not provider.strip()): raise ValueError("llm.provider debe ser texto no vacío")
+    if provider not in (None, "codex", "claude-code"): raise ValueError("llm.provider tiene un valor no admitido")
+    if llm_model is not None and (not isinstance(llm_model, str) or not llm_model.strip()): raise ValueError("llm.model debe ser texto no vacío")
     publication = data.get("publication", {})
     if not isinstance(publication, dict): raise ValueError("publication debe ser una tabla")
     _keys(publication, {"include_run_files"}, "publication")
     include = publication.get("include_run_files", False)
     if type(include) is not bool: raise ValueError("publication.include_run_files debe ser booleano")
     generation = _generation(data, job_type)
-    return JobRequest(job_id, job_type, input_kind, location, output_directory, drive_id, include, model, {"generation": generation} if generation else {})
+    return JobRequest(job_id, job_type, input_kind, location, output_directory, drive_id, include, model, provider, llm_model, {"generation": generation} if generation else {})
 
 
 def _generation(data: dict[str, Any], job_type: JobType) -> dict[str, Any] | None:
