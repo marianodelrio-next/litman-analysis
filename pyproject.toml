@@ -11,12 +11,14 @@ dependencies = [
   "google-api-python-client>=2.0",
   "google-auth>=2.0",
   "jsonschema>=4.19",
-  "pytest>=8.0",
   "python-docx>=1.1",
   "pypdf>=5.0",
   "openpyxl>=3.1",
   "PyYAML>=6.0",
 ]
+
+[dependency-groups]
+dev = ["pytest>=8.0"]
 
 [project.scripts]
 litman-core = "litman_core.cli:main"

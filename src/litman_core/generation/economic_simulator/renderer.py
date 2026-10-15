@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from openpyxl import Workbook, load_workbook
+from openpyxl import load_workbook
 from openpyxl.formatting.rule import FormulaRule
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
@@ -19,50 +19,6 @@ GREY = "E7EAED"
 GREEN = "008000"
 RED = "C00000"
 WHITE = "FFFFFF"
-
-
-def create_clean_template(path: Path) -> None:
-    workbook = Workbook()
-    simulator = workbook.active
-    simulator.title = "Simulador"
-    criteria = workbook.create_sheet("Criterios y ayuda")
-    checks = workbook.create_sheet("Comprobaciones")
-    pending = workbook.create_sheet("Pendientes")
-    neutral_plan = {
-        "tender": {"name": "Licitación", "reference": None,
-                   "budget_without_tax": None, "currency": "EUR"},
-        "total_points": None,
-        "price_formula": {"type": "no_localizada", "literal": None,
-                          "max_points": None, "supported": False, "evidence": None},
-        "criteria": [{"id": "criterion-001", "name": "Criterio configurable",
-                      "type": "juicio_valor", "max_points": None,
-                      "description": "Se sustituye con los criterios del pliego.",
-                      "evidence": None}],
-        "abnormally_low": {"aplica": None, "maximo_cualitativo": None,
-                           "comparador": None, "reglas": []},
-        "warnings": ["Plantilla neutra: generar desde un dossier validado."],
-    }
-    neutral_inputs = {
-        "scenarios": [{
-            "id": "scenario-01", "name": "Escenario configurable",
-            "bidders": [
-                {"name": "NUESTRA OFERTA", "price": None, "technical_score": None},
-                {"name": "LICITADOR 1", "price": None, "technical_score": None},
-            ],
-        }],
-        "notes": ["Completar al generar una licitación concreta."],
-    }
-    _render_simulator(simulator, neutral_plan, neutral_inputs)
-    _render_criteria(criteria, neutral_plan)
-    _render_checks(checks, neutral_plan, neutral_inputs)
-    _render_pending(pending, neutral_plan, neutral_inputs)
-    workbook.calculation.fullCalcOnLoad = True
-    workbook.calculation.forceFullCalc = True
-    workbook.calculation.calcMode = "auto"
-    workbook.properties.title = "Plantilla de simulador económico interno"
-    workbook.properties.subject = "Plantilla neutra; sin datos de licitación ni oferta"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    workbook.save(path)
 
 
 def render_economic_workbook(template_path: Path, plan: dict, inputs: dict, output_path: Path) -> dict:
@@ -270,7 +226,7 @@ def _threshold_formula(plan: dict, row: int, price_range: str, coefficient_col: 
 
 
 def _bidder_technical_score(bidder: dict, criteria: list[dict]):
-    """Use v2 aggregate input, or derive it for legacy v1 rerendering only."""
+    """Use v2 aggregate input, or derive it from a legacy v1 breakdown."""
     if "technical_score" in bidder and "criterion_scores" in bidder:
         raise ValueError("Un licitador no puede mezclar technical_score y criterion_scores.")
     if "technical_score" in bidder:

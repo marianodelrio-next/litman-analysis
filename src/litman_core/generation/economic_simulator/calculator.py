@@ -38,7 +38,7 @@ def _price_points(plan: dict, price, minimum):
 
 
 def _technical_score(plan: dict, bidder: dict):
-    """Read exactly one input contract; v1 is retained for old run rerenders."""
+    """Read exactly one input contract (v2 aggregate or legacy v1 breakdown)."""
     has_aggregate = "technical_score" in bidder
     has_legacy = "criterion_scores" in bidder
     if has_aggregate and has_legacy:

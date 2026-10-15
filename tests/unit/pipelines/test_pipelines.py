@@ -70,7 +70,7 @@ def test_stage_can_prepare_versioned_resources_and_persists_common_files(tmp_pat
     case = tmp_path / "case"
     case.mkdir()
     (case / "source.txt").write_text("contenido")
-    settings = Settings(project_root=project)
+    settings = Settings()
 
     definition = StageDefinition(
         identifier="test-stage",
@@ -90,7 +90,7 @@ def test_stage_can_prepare_versioned_resources_and_persists_common_files(tmp_pat
         ),
     )
 
-    prepared = prepare_stage(definition, case, settings)
+    prepared = prepare_stage(definition, case, settings, run_dir=tmp_path / "run")
     request = json.loads((prepared.run_dir / "input" / "request.json").read_text())
     assert request == {
         "provider": "codex",
@@ -121,10 +121,10 @@ def test_pipeline_definitions_keep_their_domain_hooks_and_facades() -> None:
     assert "evidence-index.json" in assessment.output_files
     assert "dossier.json" in detailed.output_files
     assert list(inspect.signature(prepare_assessment).parameters) == [
-        "case_dir", "settings", "bundle", "run_case_id", "run_dir",
+        "case_dir", "settings", "run_dir", "bundle",
     ]
     assert list(inspect.signature(prepare_detailed_analysis).parameters) == [
-        "case_dir", "settings", "bundle", "assessment_result", "run_case_id", "run_dir",
+        "case_dir", "settings", "run_dir", "bundle", "assessment_result",
     ]
     assert list(inspect.signature(run_assessment).parameters) == ["prepared", "provider"]
     assert list(inspect.signature(run_detailed_analysis).parameters) == ["prepared", "provider"]
@@ -189,7 +189,7 @@ def test_prepare_assessment_persists_version_bundle(tmp_path: Path) -> None:
     (case / "source.txt").write_text("contenido", encoding="utf-8")
 
     prepared = prepare_assessment(
-        case, Settings(project_root=project, resource_root=project)
+        case, Settings(resource_root=project), run_dir=tmp_path / "run"
     )
     request = json.loads(
         (prepared.run_dir / "input" / "request.json").read_text(encoding="utf-8")
@@ -278,7 +278,7 @@ def test_failed_stage_persists_validation_diagnostics_before_raising(tmp_path: P
         validate=lambda *_args: {"valid": False, "schema_errors": ["canary"]},
         build_outcome=lambda *_args: pytest.fail("no debe construir output"),
     )
-    prepared = prepare_stage(definition, case, Settings(project_root=tmp_path))
+    prepared = prepare_stage(definition, case, Settings(), run_dir=tmp_path / "run")
     with pytest.raises(ValueError, match="validación"):
         run_stage(definition, prepared, FakeProvider())
     assert json.loads((prepared.run_dir / "output" / "validation.json").read_text(encoding="utf-8"))["schema_errors"] == ["canary"]

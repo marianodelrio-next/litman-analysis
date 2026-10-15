@@ -4,7 +4,7 @@ from typing import Any
 
 from .prompt import build_prompt
 from .rules import evaluate_rules, load_rules
-from litman_core.generation.service import generate_opportunity_report
+from litman_core.generation.opportunity_report import generate_opportunity_report
 from litman_core.pipelines.registry import PIPELINES
 from litman_core.domain.validation import validate_extraction
 from litman_core.domain.validation.evidence import build_evidence_index, verification_errors

@@ -17,14 +17,14 @@ class DetailedAnalysisPipeline:
         self.settings = settings
         self.provider = provider
 
-    def execute(self, case_dir: Path, *, case_id: str | None = None,
+    def execute(self, case_dir: Path, *, run_dir: Path,
                 assessment_result: dict | None = None,
                 generation: dict[str, Any] | None = None,
-                bundle: DocumentBundle | None = None, run_dir: Path | None = None) -> tuple[Path, dict]:
+                bundle: DocumentBundle | None = None) -> tuple[Path, dict]:
         generation = generation or {}
         prepared = prepare_detailed_analysis(
             case_dir, self.settings, assessment_result=assessment_result,
-            run_case_id=case_id, bundle=bundle, run_dir=run_dir,
+            bundle=bundle, run_dir=run_dir,
         )
         extraction = run_detailed_analysis(prepared, self.provider)
         dossier = prepared.run_dir / "output" / "dossier.json"

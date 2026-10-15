@@ -5,7 +5,6 @@ import shutil
 from pathlib import Path
 
 import yaml
-from jsonschema import Draft202012Validator
 
 from .calculator import calculate_scenario
 from .planner import build_economic_plan, skeleton_economic_inputs
@@ -30,30 +29,6 @@ def generate_economic_artifact(dossier: dict, run_dir: Path,
     _write_json(run_dir / "input" / "economic_plan.json", plan)
     _write_json(run_dir / "output" / "economic_inputs.json", inputs)
     return _render(run_dir, template_path, plan, inputs, manifest)
-
-
-def render_existing_economic_run(run_dir: Path) -> dict:
-    run_dir = run_dir.resolve()
-    plan_path = run_dir / "input" / "economic_plan.json"
-    previous_plan = json.loads(plan_path.read_text(encoding="utf-8"))
-    dossier_path = run_dir / "input" / "dossier.json"
-    if dossier_path.exists():
-        dossier = json.loads(dossier_path.read_text(encoding="utf-8"))
-        plan = build_economic_plan(dossier, previous_plan.get("template_id", "standard-v1"))
-        _write_json(plan_path, plan)
-    else:
-        plan = previous_plan
-    inputs_path = run_dir / "output" / "economic_inputs.json"
-    inputs = json.loads(inputs_path.read_text(encoding="utf-8"))
-    schema = json.loads(resource_path("schemas", "economic_inputs.schema.json").read_text(encoding="utf-8"))
-    errors = [f"{'.'.join(map(str, error.path)) or 'root'}: {error.message}"
-              for error in Draft202012Validator(schema).iter_errors(inputs)]
-    if errors:
-        raise ValueError("economic_inputs.json inválido:\n- " + "\n- ".join(errors))
-    template_id = plan.get("template_id", "standard-v1")
-    template_dir = resource_path("templates", "economic-simulator", template_id)
-    manifest = yaml.safe_load((template_dir / "template.yaml").read_text(encoding="utf-8"))
-    return _render(run_dir, template_dir / "template.xlsx", plan, inputs, manifest)
 
 
 def _render(run_dir: Path, template_path: Path, plan: dict, inputs: dict, manifest: dict) -> dict:
@@ -106,9 +81,6 @@ class EconomicSimulatorGenerator:
 
     def generate(self, context: ArtifactContext) -> dict:
         return self._result(generate_economic_artifact(context.dossier, context.run_dir, context.economic_template_id), context.run_dir)
-
-    def rerender(self, run_dir: Path, **options: object) -> dict:
-        return self._result(render_existing_economic_run(run_dir), run_dir)
 
     def _result(self, result: dict, run_dir: Path) -> dict:
         pending_path = run_dir / "output" / "economic_pending.json"

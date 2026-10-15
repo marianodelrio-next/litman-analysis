@@ -11,7 +11,7 @@ from litman_core.domain.validation.semantic import detailed_analysis_economic_se
 from litman_core.infrastructure.runs import dossier_lineage
 
 from litman_core.pipelines.models import PreparedStage, StageDefinition, StageOutcome, StagePreparation, StageResources
-from litman_core.infrastructure.llm.resolution import resolve_model
+from litman_core.infrastructure.llm.resolution import resolve_llm
 
 
 def definition() -> StageDefinition:
@@ -38,8 +38,7 @@ def _prepare_prompt(resources, documents, normalized, context: dict[str, Any]) -
 
 
 def _request_metadata(settings, resources, normalized, context) -> dict:
-        provider = getattr(settings, "llm_provider", "codex")
-        return {"model": resolve_model(settings, provider)}
+    return {"model": resolve_llm(settings)[1]}
 
 
 def _validate(data: dict, prepared: PreparedStage) -> dict:

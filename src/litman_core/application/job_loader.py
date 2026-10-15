@@ -9,7 +9,7 @@ from typing import Any
 from litman_core.domain.jobs import JobRequest, JobType, StorageKind
 from litman_core.generation_config import merge_generation
 
-_ROOT = {"job", "input", "output", "codex", "llm", "publication", "analysis"}
+_ROOT = {"job", "input", "output", "llm", "publication", "analysis"}
 
 
 def load_job(path: Path) -> JobRequest:
@@ -36,11 +36,6 @@ def load_job(path: Path) -> JobRequest:
     drive_id = output.get("google_drive_folder_id")
     if drive_id is not None and (not isinstance(drive_id, str) or not drive_id):
         raise ValueError("output.google_drive_folder_id debe ser texto no vacío")
-    codex = data.get("codex", {})
-    if not isinstance(codex, dict): raise ValueError("codex debe ser una tabla")
-    _keys(codex, {"model"}, "codex")
-    model = codex.get("model")
-    if model is not None and (not isinstance(model, str) or not model.strip()): raise ValueError("codex.model debe ser texto no vacío")
     llm = data.get("llm", {})
     if not isinstance(llm, dict): raise ValueError("llm debe ser una tabla")
     _keys(llm, {"provider", "model"}, "llm")
@@ -55,7 +50,7 @@ def load_job(path: Path) -> JobRequest:
     include = publication.get("include_run_files", False)
     if type(include) is not bool: raise ValueError("publication.include_run_files debe ser booleano")
     generation = _generation(data, job_type)
-    return JobRequest(job_id, job_type, input_kind, location, output_directory, drive_id, include, model, provider, llm_model, {"generation": generation} if generation else {})
+    return JobRequest(job_id, job_type, input_kind, location, output_directory, drive_id, include, provider, llm_model, {"generation": generation} if generation else {})
 
 
 def _generation(data: dict[str, Any], job_type: JobType) -> dict[str, Any] | None:

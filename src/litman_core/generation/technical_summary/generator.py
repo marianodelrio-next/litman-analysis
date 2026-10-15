@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 from ..models import ArtifactContext
@@ -17,15 +16,7 @@ class TechnicalSummaryGenerator:
         write_technical_summary(context.dossier, output)
         return self._result(output)
 
-    def rerender(self, run_dir: Path, **options: object) -> dict:
-        output = run_dir / "output" / self.filename
-        write_technical_summary(_snapshot(run_dir), output)
-        return self._result(output)
-
     def _result(self, output: Path) -> dict:
         return {"id": self.id, "generator_version": self.version, "documents": [str(output)],
                 "validation": {"valid": True}, "pending": [], "metadata": {"format": "docx"}}
 
-
-def _snapshot(run_dir: Path) -> dict:
-    return json.loads((run_dir / "input" / "dossier.json").read_text(encoding="utf-8"))

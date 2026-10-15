@@ -44,15 +44,13 @@ class JobRunner:
                  drive_source_factory: Callable[[Any, int], Any] | None = None,
                  drive_publisher_factory: Callable[[Any], Any] = GoogleDriveArtifactPublisher,
                  provider_factory: Callable[..., Any] | None = None,
-                 authentication_factory: Callable[..., Any] | None = None,
                  assessment_factory: Callable[..., Any] = AssessmentPipeline,
-                 detailed_factory: Callable[..., Any] = DetailedAnalysisPipeline,
-                 preflight: Callable[[Settings], Any] | None = None) -> None:
+                 detailed_factory: Callable[..., Any] = DetailedAnalysisPipeline) -> None:
         self.settings = settings or Settings(); self.drive_service_factory = drive_service_factory
         self.local_source = local_source or LocalDocumentSource(); self.local_publisher = local_publisher or LocalArtifactPublisher()
         self.drive_source_factory = drive_source_factory or (lambda service, limit: GoogleDriveDocumentSource(service, max_file_mb=limit))
         self.drive_publisher_factory = drive_publisher_factory; self.provider_factory = provider_factory or build_provider
-        self.authentication_factory = authentication_factory; self.assessment_factory = assessment_factory; self.detailed_factory = detailed_factory; self.preflight = preflight
+        self.assessment_factory = assessment_factory; self.detailed_factory = detailed_factory
 
     def run(self, job: JobRequest) -> JobRunnerResult:
         self._validate(job)
@@ -72,10 +70,9 @@ class JobRunner:
             if not any(item.status == "ready" for item in bundle.normalized): raise ValueError("El expediente no produjo documentos normalizados listos para análisis")
             resolved_provider, resolved_model = resolve_llm(settings, job)
             settings = replace(settings, llm_provider=resolved_provider, llm_model=resolved_model)
-            if self.preflight is not None and settings.codex_preflight and resolved_provider == "codex": self.preflight(settings)
             provider = self.provider_factory(settings, job)
             pipeline = self.assessment_factory(settings, provider) if job.job_type is JobType.ASSESSMENT else self.detailed_factory(settings, provider)
-            kwargs = {"case_id": job.job_id, "bundle": bundle, "run_dir": run_dir}
+            kwargs = {"bundle": bundle, "run_dir": run_dir}
             if job.job_type is JobType.DETAILED_ANALYSIS: kwargs["generation"] = job.options["generation"]
             actual_dir, _ = pipeline.execute(materialized.directory, **kwargs)
             if actual_dir.resolve() != run_dir: raise RuntimeError("El pipeline no usó el directorio de ejecución asignado")

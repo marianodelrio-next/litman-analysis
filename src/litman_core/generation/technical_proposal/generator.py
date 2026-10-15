@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import shutil
-from pathlib import Path
 
 import yaml
 from jsonschema import Draft202012Validator
@@ -29,28 +28,6 @@ class TechnicalDocumentGenerator:
         _write_json(context.run_dir / "output" / "content.json", content)
         return self._render(context.run_dir, context.dossier, plan, content, manifest,
                             context.include_internal_pending, context.include_editorial_guidance, generation)
-
-    def rerender(self, run_dir: Path, **options: object) -> dict:
-        run_dir = run_dir.resolve()
-        dossier = json.loads((run_dir / "input" / "dossier.json").read_text(encoding="utf-8"))
-        plan = json.loads((run_dir / "input" / "document_plan.json").read_text(encoding="utf-8"))
-        # Un refresh explícito es la única ocasión en que se migra el esqueleto
-        # histórico; queda persistido y no altera rerenders ordinarios.
-        if bool(options.get("refresh_skeleton", False)) and plan.get("version") != "document-plan-v2":
-            plan = build_document_plan(dossier, plan.get("template_id", "next-standard-v1"))
-            _write_json(run_dir / "input" / "document_plan.json", plan)
-        if plan.get("language") != "es":
-            raise ValueError("No se puede rerenderizar un plan histórico que no sea de salida en español.")
-        content_path = run_dir / "output" / "content.json"
-        refresh = bool(options.get("refresh_skeleton", False))
-        content = skeleton_content(dossier, plan) if refresh else json.loads(content_path.read_text(encoding="utf-8"))
-        if refresh: _write_json(content_path, content)
-        _, manifest = _template(plan.get("template_id", "next-standard-v1"))
-        result = self._render(run_dir, dossier, plan, content, manifest,
-                              bool(options.get("include_internal_pending", True)),
-                              bool(options.get("include_editorial_guidance", True)), None)
-        return dict(result, status="completed", run_dir=str(run_dir), content_refreshed=refresh,
-                    document=result["documents"][0])
 
     def _render(self, run_dir, dossier, plan, content, manifest, include_pending, include_guidance, generation):
         validation = _validate_content(content, plan)
@@ -126,11 +103,7 @@ def _validate_content(content, plan):
 
 def _document_filename(plan: dict) -> str:
     import re
-    identity = plan.get("identity")
-    # Rerender v1 preserves the historical public name rather than adding a
-    # second generic document to an existing run.
-    if not identity:
-        return "propuesta_tecnica_base.docx"
+    identity = plan["identity"]
     reference = identity.get("tender_reference") or ""
     title = identity.get("short_title") or ""
     pieces = ["Propuesta técnica", str(reference), str(title)]

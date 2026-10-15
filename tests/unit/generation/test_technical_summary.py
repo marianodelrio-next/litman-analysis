@@ -39,11 +39,6 @@ def test_summary_has_horizontal_phase_table_and_accessible_layout(tmp_path: Path
     for table in doc.tables:
         assert table.rows[0]._tr.xpath('./w:trPr/w:tblHeader') and all(row._tr.xpath('./w:trPr/w:cantSplit') for row in table.rows)
 
-def test_summary_rerenders_snapshot_with_new_version(tmp_path: Path) -> None:
-    run = tmp_path / "run"; (run / "input").mkdir(parents=True); (run / "output").mkdir(); (run / "input" / "dossier.json").write_text(json.dumps(dossier()), encoding="utf-8")
-    result = TechnicalSummaryGenerator().rerender(run)
-    assert Path(result["documents"][0]).name == "resumen_tecnico.docx" and result["id"] == "technical-summary" and result["generator_version"] == "technical-summary-generator-v3"
-
 def test_summary_header_complete_and_partial_has_no_none(tmp_path: Path) -> None:
     complete = dossier()
     complete["cabecera"].update({"fecha_limite": "2026-10-20", "presupuesto_sin_iva": 1200, "moneda": "EUR"})

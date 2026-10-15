@@ -6,8 +6,8 @@ import uuid
 from pathlib import Path
 from typing import Any, Callable
 
-from litman_core.domain.jobs import JobRequest, JobType, MaterializedCase, PublishedArtifact
-from .common import catalog_digest, publication_catalog, safe_filename, sha256
+from litman_core.domain.jobs import JobRequest, MaterializedCase, PublishedArtifact
+from .common import catalog_digest, safe_filename, sha256
 
 _DRIVE_OPTIONS = {"supportsAllDrives": True}
 _FOLDER_MIME = "application/vnd.google-apps.folder"

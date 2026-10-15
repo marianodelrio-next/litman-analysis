@@ -37,13 +37,12 @@ class DetailedAnalysisPreparation:
     def config_version(self): return self.stage.resources.config["version"]
 
 
-def prepare_detailed_analysis(case_dir: Path, settings: Settings | None = None,
+def prepare_detailed_analysis(case_dir: Path, settings: Settings | None = None, *, run_dir: Path,
                      bundle: DocumentBundle | None = None,
-                     assessment_result: dict | None = None,
-                     run_case_id: str | None = None, run_dir: Path | None = None) -> DetailedAnalysisPreparation:
+                     assessment_result: dict | None = None) -> DetailedAnalysisPreparation:
     settings = settings or Settings()
     return DetailedAnalysisPreparation(prepare_stage(definition(), case_dir, settings, bundle=bundle,
-                                           context={"assessment_result": assessment_result}, run_case_id=run_case_id, run_dir=run_dir))
+                                           context={"assessment_result": assessment_result}, run_dir=run_dir))
 
 
 def run_detailed_analysis(prepared: DetailedAnalysisPreparation, provider: LLMProvider) -> dict:

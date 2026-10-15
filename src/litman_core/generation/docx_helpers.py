@@ -1,7 +1,7 @@
 """Neutral, deterministic presentation helpers shared by DOCX renderers."""
 from __future__ import annotations
 
-from typing import Any, Callable
+from typing import Any
 
 from docx import Document
 from docx.enum.style import WD_STYLE_TYPE
@@ -44,10 +44,6 @@ def named_description(value: Any) -> str:
 
 def amount_value(value: Any, currency: Any) -> str:
     return MISSING if value is None else f"{value} {currency}" if currency not in (None, "") else str(value)
-
-
-def truncate_value(value: Any, limit: int = 500) -> str:
-    return abbreviate_text(value, limit, " [cita abreviada]")
 
 
 def abbreviate_text(value: Any, limit: int = 500, suffix: str = "") -> str:
@@ -153,9 +149,3 @@ def set_keep_together(paragraph: Any) -> None: paragraph.paragraph_format.keep_t
 
 def add_table(doc: Document, headers: list[str], rows: list[tuple[Any, ...]]) -> None:
     add_data_table(doc, headers, rows)
-
-
-def add_table_or_missing(doc: Document, headers: list[str], values: Any,
-                         row: Callable[[dict[str, Any]], tuple[Any, ...]]) -> None:
-    rows = [row(item) for item in values if isinstance(item, dict)] if isinstance(values, list) else []
-    add_table(doc, headers, rows or [tuple(MISSING for _ in headers)])

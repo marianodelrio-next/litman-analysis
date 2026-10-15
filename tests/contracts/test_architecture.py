@@ -32,3 +32,20 @@ def test_summary_artifacts_remain_independent_components() -> None:
     assert isinstance(ARTIFACT_GENERATORS["bid-preparation-guide"], BidPreparationGuideGenerator)
     assert ARTIFACT_GENERATORS["technical-summary"].id != ARTIFACT_GENERATORS["bid-preparation-guide"].id
     assert ARTIFACT_GENERATORS["technical-summary"].filename != ARTIFACT_GENERATORS["bid-preparation-guide"].filename
+
+
+def test_core_resources_are_packaged_and_registry_matches_approved_artifacts() -> None:
+    from litman_core.generation.registry import ARTIFACT_GENERATORS
+    from litman_core.generation_config import APPROVED_ARTIFACTS
+    from litman_core.resource_paths import resource_path
+
+    assert resource_path("schemas", "assessment.schema.json").is_file()
+    assert set(ARTIFACT_GENERATORS) == set(APPROVED_ARTIFACTS)
+
+
+def test_job_runner_does_not_depend_on_docker() -> None:
+    import inspect
+
+    from litman_core import JobRunner
+
+    assert "docker" not in inspect.getsource(JobRunner).lower()

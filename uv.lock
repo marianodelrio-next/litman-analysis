@@ -481,9 +481,13 @@ dependencies = [
     { name = "jsonschema" },
     { name = "openpyxl" },
     { name = "pypdf" },
-    { name = "pytest" },
     { name = "python-docx" },
     { name = "pyyaml" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "pytest" },
 ]
 
 [package.metadata]
@@ -493,10 +497,12 @@ requires-dist = [
     { name = "jsonschema", specifier = ">=4.19" },
     { name = "openpyxl", specifier = ">=3.1" },
     { name = "pypdf", specifier = ">=5.0" },
-    { name = "pytest", specifier = ">=8.0" },
     { name = "python-docx", specifier = ">=1.1" },
     { name = "pyyaml", specifier = ">=6.0" },
 ]
+
+[package.metadata.requires-dev]
+dev = [{ name = "pytest", specifier = ">=8.0" }]
 
 [[package]]
 name = "lxml"

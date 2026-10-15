@@ -12,7 +12,7 @@ from litman_core.generation.technical_proposal.content import fallback_content, 
 from litman_core.generation.technical_proposal.planner import build_document_plan
 from litman_core.generation.technical_proposal.renderer import render_technical_document
 from litman_core.generation.technical_proposal.generator import _validate_content
-from litman_core.generation.service import generate_documents, render_existing_run
+from litman_core.generation.service import generate_documents
 from litman_core.cli import main
 from litman_core.resource_paths import RESOURCE_ROOT
 
@@ -132,8 +132,9 @@ def test_identity_pending_and_guidance_toggle_are_rendered_from_plan(tmp_path: P
     generate_documents(dossier_path, output_dir=run, artifacts=["technical-document"], provider=None)
     pending = json.loads((run / "output/pending.json").read_text(encoding="utf-8"))
     assert sum("nombre ni expediente" in item["description"] for item in pending) == 1
-    result = render_existing_run(run, include_editorial_guidance=False)
-    clean = Document(result["document"])
+    manifest = generate_documents(dossier_path, output_dir=tmp_path / "clean", artifacts=["technical-document"],
+                                  provider=None, include_editorial_guidance=False)
+    clean = Document(manifest["documents"][0])
     assert not any("Guía de redacción" in p.text for p in clean.paragraphs)
     assert all("EEF5F8" not in str(table._tbl.xml) for table in clean.tables)
 
@@ -301,43 +302,3 @@ def test_skeleton_content_has_contextual_subsections_and_editorial_guidance() ->
     assert subheading["id"].startswith(section["id"])
     assert plan["sections"][0]["guidance"]["purpose"]
     assert content["warnings"] == ["Documento esqueleto: no contiene una propuesta técnica redactada."]
-def test_existing_run_can_refresh_skeleton_without_provider(tmp_path: Path) -> None:
-    dossier_path = tmp_path / "case" / "detailed-analysis" / "run-1" / "output" / "dossier.json"
-    dossier_path.parent.mkdir(parents=True)
-    dossier_path.write_text(json.dumps(dossier(), ensure_ascii=False), encoding="utf-8")
-    run_dir = tmp_path / "generation-run"
-    generate_documents(dossier_path, output_dir=run_dir, artifacts=["technical-document"], provider=None)
-    content_path = run_dir / "output" / "content.json"
-    old_content = json.loads(content_path.read_text(encoding="utf-8"))
-    old_content["sections"][0]["blocks"] = []
-    content_path.write_text(json.dumps(old_content, ensure_ascii=False), encoding="utf-8")
-    result = render_existing_run(run_dir, refresh_skeleton=True)
-    refreshed = json.loads(content_path.read_text(encoding="utf-8"))
-    assert result["content_refreshed"]
-    assert any(block["type"] == "subheading" for block in refreshed["sections"][0]["blocks"])
-    assert "Ejemplo de subapartado" not in "\n".join(
-        paragraph.text for paragraph in Document(result["document"]).paragraphs
-    )
-
-
-def test_rerender_refreshes_pending_and_rejects_unplanned_coverage(tmp_path: Path) -> None:
-    dossier_path = tmp_path / "case" / "detailed-analysis" / "run-1" / "output" / "dossier.json"
-    dossier_path.parent.mkdir(parents=True)
-    dossier_path.write_text(json.dumps(dossier(), ensure_ascii=False), encoding="utf-8")
-    run_dir = tmp_path / "generation-run"
-    generate_documents(dossier_path, output_dir=run_dir, artifacts=["technical-document"], provider=None)
-    content_path = run_dir / "output" / "content.json"
-    content = json.loads(content_path.read_text(encoding="utf-8"))
-    content["sections"][0]["pending"] = ["Revisión humana"]
-    content_path.write_text(json.dumps(content, ensure_ascii=False), encoding="utf-8")
-    render_existing_run(run_dir)
-    pending = json.loads((run_dir / "output" / "pending.json").read_text(encoding="utf-8"))
-    assert any(item["section_id"] == content["sections"][0]["id"] for item in pending)
-    content["sections"][0]["requirements_covered"] = ["No corresponde"]
-    content_path.write_text(json.dumps(content, ensure_ascii=False), encoding="utf-8")
-    try:
-        render_existing_run(run_dir)
-    except ValueError as error:
-        assert "no respeta" in str(error)
-    else:
-        raise AssertionError("Debe rechazar cobertura fuera del plan")

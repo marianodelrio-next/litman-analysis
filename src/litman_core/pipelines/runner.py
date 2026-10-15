@@ -13,15 +13,13 @@ from litman_core.infrastructure.documents.bundle import DocumentBundle
 from litman_core.infrastructure.documents.inventory import inventory
 from litman_core.infrastructure.documents.normalize import normalize_documents
 from litman_core.application.ports.llm import LLMProvider, output_paths_for_run
-from litman_core.infrastructure.runs import new_run_dir
-from litman_core.infrastructure.llm.resolution import resolve_model
+from litman_core.infrastructure.llm.resolution import resolve_llm
 
 from .models import LoadedResources, PreparedStage, StageDefinition
 
 
-def prepare_stage(definition: StageDefinition, case_dir: Path, settings: Any, *,
-                  bundle: DocumentBundle | None = None, context: dict[str, Any] | None = None,
-                  run_case_id: str | None = None, run_dir: Path | None = None) -> PreparedStage:
+def prepare_stage(definition: StageDefinition, case_dir: Path, settings: Any, *, run_dir: Path,
+                  bundle: DocumentBundle | None = None, context: dict[str, Any] | None = None) -> PreparedStage:
     case_dir = case_dir.resolve()
     documents = bundle.documents if bundle else inventory(case_dir, settings.max_file_mb)
     print(f"[{definition.identifier} inventario] {len(documents)} documentos detectados", file=sys.stderr, flush=True)
@@ -33,7 +31,6 @@ def prepare_stage(definition: StageDefinition, case_dir: Path, settings: Any, *,
                              resource_paths.prompt_version_path or resource_paths.prompt_dir / "VERSION",
                              resource_paths.config_path, resource_paths.schema_path, resource_paths.rules_path,
                              resource_paths.version_bundle)
-    run_dir = run_dir or new_run_dir(settings.runs_dir, case_dir, definition.identifier, case_name=run_case_id)
     for name in ("input", "output", "logs"):
         (run_dir / name).mkdir(parents=True, exist_ok=True)
     normalized = bundle.normalized if bundle else normalize_documents(documents, run_dir / "input" / "documents")
@@ -50,8 +47,7 @@ def prepare_stage(definition: StageDefinition, case_dir: Path, settings: Any, *,
     (run_dir / "input" / definition.files.prompt).write_text(
         f"{loaded.instructions}\n\n---\n\n{preparation.prompt}", encoding="utf-8"
     )
-    configured_provider = getattr(settings, "llm_provider", "codex")
-    resolved_model = resolve_model(settings, configured_provider)
+    configured_provider, resolved_model = resolve_llm(settings)
     request = {"provider": configured_provider, "model": resolved_model,
                "prompt_version": loaded.prompt_version, "config_version": loaded.config["version"],
                "schema_id": loaded.schema.get("$id")}

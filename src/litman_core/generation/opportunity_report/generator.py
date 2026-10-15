@@ -7,7 +7,6 @@ import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
-import yaml
 from pypdf import PdfReader
 
 from .model import build_report_model

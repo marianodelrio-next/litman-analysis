@@ -162,8 +162,6 @@ def test_artifact_failure_identifies_generator(tmp_path: Path, monkeypatch) -> N
         version = "test-v1"
         def generate(self, context):
             raise RuntimeError("fallo controlado")
-        def rerender(self, run_dir, **options):
-            raise RuntimeError("fallo controlado")
 
     monkeypatch.setitem(ARTIFACT_GENERATORS, "bid-preparation-guide", BrokenSummary())
     try:

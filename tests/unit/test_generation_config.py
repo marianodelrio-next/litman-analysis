@@ -24,20 +24,18 @@ def test_unified_toml_rejects_unknown_generation_keys_and_types(tmp_path: Path, 
     with pytest.raises(ValueError): load_job(path)
 
 
-@pytest.mark.parametrize("section", ["codex", "llm"])
 @pytest.mark.parametrize("value", ["", " ", " \t "])
-def test_model_rejects_blank_values(tmp_path: Path, section: str, value: str):
+def test_model_rejects_blank_values(tmp_path: Path, value: str):
     path = tmp_path / "bad.toml"
-    path.write_text(_base(f"[{section}]\nmodel={json.dumps(value)}\n"), encoding="utf-8")
-    with pytest.raises(ValueError, match=rf"{section}\.model"):
+    path.write_text(_base(f"[llm]\nmodel={json.dumps(value)}\n"), encoding="utf-8")
+    with pytest.raises(ValueError, match=r"llm\.model"):
         load_job(path)
 
 
 def test_model_preserves_valid_whitespace_around_value(tmp_path: Path):
     path = tmp_path / "config.toml"
-    path.write_text(_base("[codex]\nmodel='  gpt-test  '\n[llm]\nmodel='  sonnet  '\n"), encoding="utf-8")
+    path.write_text(_base("[llm]\nmodel='  sonnet  '\n"), encoding="utf-8")
     result = load_job(path)
-    assert result.codex_model == "  gpt-test  "
     assert result.llm_model == "  sonnet  "
 
 

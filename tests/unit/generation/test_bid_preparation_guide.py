@@ -22,11 +22,6 @@ def test_bid_guide_uses_suggested_structure_when_imposed_sections_are_absent(tmp
     data = dossier(memoria_tecnica={"secciones": [], "formato": {}}, estructura_documento_tecnico=["Propuesta sugerida"]); output = tmp_path / "guide.docx"; write_bid_preparation_guide(data, output); text = _text(output)
     assert "Estructura sugerida de la memoria" in text and "Propuesta sugerida" in text
 
-def test_bid_guide_rerenders_snapshot_with_new_version(tmp_path: Path) -> None:
-    run = tmp_path / "run"; (run / "input").mkdir(parents=True); (run / "output").mkdir(); data = dossier(); (run / "input" / "dossier.json").write_text(json.dumps(data), encoding="utf-8")
-    result = BidPreparationGuideGenerator().rerender(run)
-    assert Path(result["documents"][0]).name == "guia_preparacion_oferta.docx" and result["id"] == "bid-preparation-guide" and result["generator_version"] == "bid-preparation-guide-generator-v4" and result["pending"] == data["pendientes"]
-
 def test_bid_guide_groups_unknown_format_fields(tmp_path: Path) -> None:
     data = dossier(memoria_tecnica={"formato": {}, "portada_computa_limite": None, "indice_computa_limite": False, "anexos_computan_limite": True}); output = tmp_path / "format.docx"; write_bid_preparation_guide(data, output); text = _text(output)
     assert text.count("No consta: fuente") == 1 and "tamaño" in text and "margen superior" in text and "□ REVISAR" not in text and "□ El índice no computa en el límite." in text

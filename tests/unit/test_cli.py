@@ -37,10 +37,3 @@ def test_cli_loads_adjacent_env_without_overwriting_inherited_value(tmp_path, mo
     cli.main(["run", "--config", str(config)])
     assert __import__("os").environ["TEST_CLI_ENV"] == "inherited"
     capsys.readouterr()
-
-
-@pytest.mark.parametrize("command", ["assess", "analyze", "check"])
-def test_removed_commands_are_rejected(command):
-    with pytest.raises(SystemExit) as error:
-        cli.main([command])
-    assert error.value.code == 2

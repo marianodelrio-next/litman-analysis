@@ -7,7 +7,7 @@ from openpyxl import load_workbook
 
 from litman_core.generation.service import generate_documents
 from litman_core.generation.economic_simulator.calculator import calculate_scenario
-from litman_core.generation.economic_simulator.generator import _pending, render_existing_economic_run
+from litman_core.generation.economic_simulator.generator import _pending
 from litman_core.generation.economic_simulator.planner import build_economic_plan, skeleton_economic_inputs
 from litman_core.generation.economic_simulator.renderer import render_economic_workbook
 from litman_core.resource_paths import RESOURCE_ROOT
@@ -31,7 +31,7 @@ def _multiple_criteria_dossier() -> dict:
     return value
 
 
-def test_economic_simulator_uses_one_technical_column_and_is_rerenderable(tmp_path: Path) -> None:
+def test_economic_simulator_uses_one_technical_column(tmp_path: Path) -> None:
     dossier_path = tmp_path / "case" / "detailed-analysis" / "run-1" / "output" / "dossier.json"
     dossier_path.parent.mkdir(parents=True)
     dossier_path.write_text(json.dumps(_multiple_criteria_dossier(), ensure_ascii=False), encoding="utf-8")
@@ -67,11 +67,6 @@ def test_economic_simulator_uses_one_technical_column_and_is_rerenderable(tmp_pa
     assert inputs["scenarios"][0]["bidders"][0] == {"name": "NEXT", "price": None, "technical_score": None}
     pending = json.loads((run_dir / "output" / "economic_pending.json").read_text(encoding="utf-8"))
     assert any(item["description"] == "Definir la puntuación técnica esperada de NEXT." for item in pending)
-    inputs["scenarios"][0]["bidders"][0].update(price=150000, technical_score=90)
-    inputs_path.write_text(json.dumps(inputs, ensure_ascii=False), encoding="utf-8")
-    result = render_existing_economic_run(run_dir)
-    assert result["validation"]["valid"]
-    assert result["validation"]["calculations"]["scenario-01"][0]["total_points"] == 100
 
 
 def test_aggregated_score_calculates_total_threshold_and_zero() -> None:
@@ -131,27 +126,6 @@ def test_economic_plan_normalizes_percentage_bases() -> None:
     assert plan["abnormally_low"]["reglas"][0]["base"] == 0.85
     assert any("normalizada" in warning for warning in plan["warnings"])
     assert any("suman 90" in warning and "usa 93" in warning for warning in plan["warnings"])
-
-
-def test_rerender_accepts_legacy_v1_criterion_scores(tmp_path: Path) -> None:
-    dossier_path = tmp_path / "case" / "detailed-analysis" / "run-1" / "output" / "dossier.json"
-    dossier_path.parent.mkdir(parents=True)
-    dossier_path.write_text(json.dumps(_multiple_criteria_dossier()), encoding="utf-8")
-    run_dir = tmp_path / "generation-run"
-    generate_documents(dossier_path, output_dir=run_dir, artifacts=["economic-simulator"], provider=None)
-    inputs_path = run_dir / "output" / "economic_inputs.json"
-    inputs = json.loads(inputs_path.read_text(encoding="utf-8"))
-    inputs["version"] = "economic-inputs-v1"
-    for scenario in inputs["scenarios"]:
-        for bidder in scenario["bidders"]:
-            bidder.pop("technical_score")
-            bidder["criterion_scores"] = {"criterion-001": 50, "criterion-002": 40}
-    inputs["scenarios"][0]["bidders"][0]["price"] = 150000
-    inputs_path.write_text(json.dumps(inputs), encoding="utf-8")
-    result = render_existing_economic_run(run_dir)
-    assert result["validation"]["valid"]
-    workbook = load_workbook(run_dir / "output" / "simulador_economico.xlsx", data_only=False)
-    assert workbook["Simulador"]["D15"].value == 90
 
 
 def test_economic_template_is_neutral() -> None:

@@ -4,7 +4,6 @@ import re
 import unicodedata
 import hashlib
 import json
-from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -16,16 +15,6 @@ def slug(value: str) -> str:
     value = unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode().lower()
     value = re.sub(r"[^a-z0-9]+", "-", value).strip("-")
     return value or "caso"
-
-
-def new_run_dir(runs_dir: Path, case_dir: Path, stage: str, *, case_name: str | None = None) -> Path:
-    run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ")
-    path = runs_dir / slug(case_name) if case_name else runs_dir / case_id(case_dir)
-    path = path / stage / run_id
-    path.mkdir(parents=True, exist_ok=False)
-    for name in ("input", "output", "logs"):
-        (path / name).mkdir()
-    return path
 
 
 LINEAGE_CONTRACT_VERSION = "dossier-lineage-v1"

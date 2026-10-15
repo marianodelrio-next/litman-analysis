@@ -11,9 +11,9 @@ forma individual para su trazabilidad en `Criterios y ayuda`, pero la hoja
 principal solicita una única puntuación técnica agregada por licitador. Los
 precios y puntuaciones siguen siendo hipótesis internas, no hechos del expediente.
 
-Los nuevos runs usan `economic-inputs-v2`. El rerenderizado admite
-`economic-inputs-v1` de runs antiguos y deriva su puntuación técnica sumando el
-desglose existente; un mismo licitador no puede mezclar ambos formatos.
+Los runs usan `economic-inputs-v2`. El esquema y el cálculo aún aceptan
+`economic-inputs-v1` y derivan su puntuación técnica sumando el desglose; un
+mismo licitador no puede mezclar ambos formatos.
 
 Las fórmulas no reconocidas no se ejecutan: quedan señaladas como pendientes.
 El libro solicita recálculo completo al abrirse en una aplicación compatible.

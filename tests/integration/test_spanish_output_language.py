@@ -71,9 +71,9 @@ def test_mixed_english_catalan_source_runs_real_stages_with_spanish_scripted_out
     source = Path(__file__).parents[1] / "fixtures/spanish-output-language/english-source.md"
     (case / "tender.md").write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
     assert "Plantejament del projecte" in (case / "tender.md").read_text(encoding="utf-8")
-    settings = Settings(runs_root=tmp_path / "runs")
+    settings = Settings()
     provider = ScriptedSpanishProvider()
-    assessment_run, assessment = AssessmentPipeline(settings, provider).execute(case, case_id="english")
+    assessment_run, assessment = AssessmentPipeline(settings, provider).execute(case, run_dir=tmp_path / "assessment-run")
     assert assessment["validation"]["valid"]
     assessment_json = json.loads((assessment_run / "output/extraction.json").read_text())
     assert assessment_json["ficha"]["resumen"].startswith("El pliego exige")
@@ -83,7 +83,7 @@ def test_mixed_english_catalan_source_runs_real_stages_with_spanish_scripted_out
     for report in (report_text, html_text):
         assert "El pliego exige describir la metodología" in report
         assert QUOTE in report
-    detailed_run, result = DetailedAnalysisPipeline(settings, provider).execute(case, case_id="english", assessment_result=assessment)
+    detailed_run, result = DetailedAnalysisPipeline(settings, provider).execute(case, run_dir=tmp_path / "detailed-run", assessment_result=assessment)
     detailed = json.loads((detailed_run / "output/dossier.json").read_text())
     evidence = json.loads((assessment_run / "output/evidence-index.json").read_text())
     assert detailed["contexto"].startswith("El expediente requiere")

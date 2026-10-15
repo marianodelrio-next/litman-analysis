@@ -6,14 +6,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from litman_core.application.ports.llm import LLMProvider
-from litman_core.infrastructure.runs import dossier_lineage, new_run_dir, read_json, sha256_file
+from litman_core.infrastructure.runs import dossier_lineage, read_json, sha256_file
 
-from .registry import ARTIFACT_GENERATORS, resolve_artifact_generators
+from .registry import resolve_artifact_generators
 from .models import ArtifactContext, ArtifactGenerator
-from .opportunity_report import generate_opportunity_report
 
 
-def generate_documents(dossier_path: Path, output_dir: Path | None = None,
+def generate_documents(dossier_path: Path, output_dir: Path,
                        artifacts: list[str] | None = None, provider: LLMProvider | None = None,
                        template_id: str = "next-standard-v1", economic_template_id: str = "standard-v1",
                        include_internal_pending: bool = True,
@@ -25,7 +24,7 @@ def generate_documents(dossier_path: Path, output_dir: Path | None = None,
     case = source["case"]
     case_root = Path(case["path"])
     source_run = Path(source["run"]["path"]) if source.get("run") else None
-    run_dir = output_dir or new_run_dir(case_root.parent, case_root, "generation")
+    run_dir = output_dir
     _ensure_layout(run_dir)
     snapshot = run_dir / "input" / "dossier.json"
     shutil.copy2(dossier_path, snapshot)
@@ -33,8 +32,7 @@ def generate_documents(dossier_path: Path, output_dir: Path | None = None,
         template_id=template_id, economic_template_id=economic_template_id,
         include_internal_pending=include_internal_pending,
         content_profile=content_profile, provider=provider, include_editorial_guidance=include_editorial_guidance)
-    # This utility remains reusable for maintenance/rerendering. The public
-    # pipeline never supplies ``artifacts`` and therefore always generates all.
+    # The public pipeline never supplies ``artifacts`` and therefore always generates all.
     results = [_generate(generator, context) for generator in resolve_artifact_generators(artifacts)]
     # El snapshot conserva exactamente la entrada utilizada para generar los entregables.
     output_lineage = dict(lineage)
@@ -44,16 +42,6 @@ def generate_documents(dossier_path: Path, output_dir: Path | None = None,
     _write_json(run_dir / "output" / "generation_manifest.json", manifest)
     _write_json(run_dir / "lineage.json", output_lineage)
     return manifest
-
-
-def render_existing_run(run_dir: Path, *, include_internal_pending: bool = True,
-                        include_editorial_guidance: bool = True, refresh_skeleton: bool = False) -> dict:
-    generator = ARTIFACT_GENERATORS["technical-document"]
-    try:
-        return generator.rerender(run_dir.resolve(), include_internal_pending=include_internal_pending,
-                                  include_editorial_guidance=include_editorial_guidance, refresh_skeleton=refresh_skeleton)
-    except Exception as error:
-        raise ValueError(f"Error al rerenderizar el artefacto '{generator.id}': {error}") from error
 
 
 def _generate(generator: ArtifactGenerator, context: ArtifactContext) -> dict:

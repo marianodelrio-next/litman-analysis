@@ -29,8 +29,7 @@ restricciones tipográficas extraídas del pliego siguen teniendo prioridad.
 La identidad de licitación (tipo documental, título oficial, expediente,
 título completo y título corto de archivo) se conserva en `document_plan.json`.
 La guía editorial estructurada se conserva en `content.json` y puede excluirse
-al rerenderizar mediante `include_editorial_guidance=false`, sin repetir la
-extracción. Las puntuaciones confirmadas forman parte del título visible en el
+con `include_editorial_guidance = false` en la configuración de generación. Las puntuaciones confirmadas forman parte del título visible en el
 índice y en el cuerpo; el título canónico permanece intacto para validar el
 plan.
 
@@ -39,7 +38,5 @@ Los subapartados con origen `tender` reproducen el pliego; los de origen
 inventa el renderizador. La puntuación procede primero de la sección del
 pliego y, sólo ante una relación inequívoca, de uno o varios criterios.
 
-Los runs `document-plan-v1` conservan su nombre histórico al rerenderizar sin
-`refresh_skeleton`; un refresh explícito los migra y persiste el plan v2. El
-nombre de salida v2 conserva espacios, expediente, siglas y términos
+El nombre de salida conserva espacios, expediente, siglas y términos
 significativos del título, con saneamiento y límite portable.
