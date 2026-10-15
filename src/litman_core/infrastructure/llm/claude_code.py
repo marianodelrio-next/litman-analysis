@@ -9,6 +9,21 @@ class ClaudeCodeProvider:
     def __init__(self, *, binary="claude", model=None, timeout_seconds=1800, config_dir=None, **_):
         self.binary, self.model, self.timeout_seconds, self.config_dir = binary, model, timeout_seconds, config_dir
 
+    @staticmethod
+    def _prepare_schema(schema_path: Path) -> str:
+        """Prepare Core's schema for Claude Code's JSON-schema validator.
+
+        Claude Code currently rejects schemas declaring the Draft 2020-12
+        meta-schema.  The declaration is metadata and is not needed for the
+        CLI, so remove it only from the in-memory copy sent to Claude while
+        preserving the canonical schema on disk and all its constraints.
+        """
+        schema = json.loads(schema_path.read_text(encoding="utf-8"))
+        if not isinstance(schema, dict):
+            raise ValueError("El schema de Claude Code debe ser un objeto JSON")
+        schema.pop("$schema", None)
+        return json.dumps(schema, ensure_ascii=False, separators=(",", ":"))
+
     def generate(self, *, instructions, prompt, schema_path, case_dir, output_paths):
         _prepare_output_paths(output_paths)
         output_paths.events.touch()
@@ -18,7 +33,23 @@ class ClaudeCodeProvider:
             output_paths.response.write_text("", encoding="utf-8")
             output_paths.summary.write_text(json.dumps({"provider":"claude-code","model":self.model or "claude_default","status":"binary_missing","duration_seconds":0,"output":str(output_paths.response),"usage":{},"error":"binary_missing"}, indent=2), encoding="utf-8")
             raise RuntimeError(f"No se encuentra Claude Code CLI ({self.binary!r}); revisa {output_paths.summary.name}")
-        command = [executable, "-p", "--output-format", "json", "--json-schema", schema_path.read_text(encoding="utf-8"), "--safe-mode", "--restricted", "--permission-mode", "dontAsk", "--permission-prompts", "none", "--tools", "Read"]
+        try:
+            prepared_schema = self._prepare_schema(schema_path)
+        except (OSError, json.JSONDecodeError, ValueError) as exc:
+            message = f"No se pudo preparar el schema para Claude Code: {exc}"
+            output_paths.stderr.write_text(message, encoding="utf-8")
+            output_paths.response.write_text("", encoding="utf-8")
+            output_paths.summary.write_text(json.dumps({
+                "provider": "claude-code",
+                "model": self.model or "claude_default",
+                "status": "schema",
+                "duration_seconds": 0,
+                "output": str(output_paths.response),
+                "usage": {},
+                "error": "schema",
+            }, indent=2), encoding="utf-8")
+            raise RuntimeError(f"No se pudo preparar el schema de Claude Code; revisa {output_paths.stderr.name}") from exc
+        command = [executable, "-p", "--output-format", "json", "--json-schema", prepared_schema, "--safe-mode", "--restricted", "--permission-mode", "dontAsk", "--permission-prompts", "none", "--tools", "Read"]
         if self.model: command += ["--model", self.model]
         allowed = {"PATH", "LANG", "LC_ALL", "LC_CTYPE", "SSL_CERT_FILE", "REQUESTS_CA_BUNDLE", "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "HOME"}
         env = {k: v for k, v in os.environ.items() if k in allowed}
