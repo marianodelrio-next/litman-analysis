@@ -9,6 +9,7 @@ deployment/local-secrets/
 local-data/
 local-secrets/
 credentials*.json
+client_secret*.json
 service-account*.json
 __pycache__/
 *.py[cod]

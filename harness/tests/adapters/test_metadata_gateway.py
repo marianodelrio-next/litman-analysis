@@ -1,0 +1,23 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+
+from litman_harness.adapters.metadata import MetadataGateway
+from litman_harness.errors import HarnessError
+
+
+def test_metadata_gateway_is_read_only(harness_env, tmp_path):
+    gateway = MetadataGateway(Path(harness_env["LITMAN_HARNESS_METADATA"]))
+    assert [item.id for item in gateway.children("root", "shared")] == ["source"]
+    for call in (lambda: gateway.create_folder("x", "root", "op"), lambda: gateway.download("source", tmp_path / "x")):
+        with pytest.raises(HarnessError) as raised:
+            call()
+        assert raised.value.code == "read_only_adapter"
+
+
+def test_unreadable_metadata_is_a_configuration_error(tmp_path):
+    with pytest.raises(HarnessError) as raised:
+        MetadataGateway(tmp_path / "missing.json")
+    assert raised.value.code == "adapter_not_configured"

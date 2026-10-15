@@ -1,0 +1,103 @@
+from __future__ import annotations
+
+import importlib.util
+from pathlib import Path
+
+import litman_harness
+from litman_harness.errors import HarnessError
+from litman_harness.interfaces.tools import invoke, registry, tool_descriptors
+
+OPERATIONS = {"identity", "diagnose", "inspect", "status", "preview_incorporation", "apply_incorporation",
+              "preview_analysis", "execute_analysis", "discard_analysis", "preview_publication", "apply_publication",
+              "read_document", "preview_summary", "apply_summary", "recover"}
+
+
+def test_registry_exposes_operations_with_schema_and_kind():
+    assert set(registry()) == OPERATIONS and "login" not in registry()
+    for descriptor in tool_descriptors():
+        assert descriptor["inputSchema"]["type"] == "object"
+        assert descriptor["description"].startswith(("Consulta", "Mutación"))
+    incorporation = registry()["preview_incorporation"].input_schema["properties"]
+    assert incorporation["overwrite_context"]["type"] == "boolean"
+    assert {tool.name for tool in registry().values() if tool.mutates} == {"apply_incorporation", "execute_analysis",
+                                                                              "discard_analysis", "apply_publication",
+                                                                              "apply_summary"}
+
+
+def test_invalid_arguments_are_invalid_request_before_building_services():
+    def factory():
+        raise AssertionError("services must not be built for invalid arguments")
+
+    for args in ({}, {"folder_id": 3}, {"folder_id": "root", "extra": True}, []):
+        envelope = invoke("inspect", args, factory)
+        assert envelope["ok"] is False and envelope["error"]["code"] == "invalid_request"
+    envelope = invoke("preview_analysis", {"folder_id": "r", "original_ids": ["a", 1], "job_type": "assessment",
+                                           "provider": "codex"}, factory)
+    assert envelope["error"]["code"] == "invalid_request"
+    envelope = invoke("preview_analysis", {"folder_id": "r", "original_ids": ["a"], "job_type": "assessment",
+                                           "provider": "other"}, factory)
+    assert envelope["error"]["code"] == "invalid_request"
+
+
+def test_harness_errors_keep_their_code_and_unknown_operations_fail():
+    def factory():
+        raise HarnessError("adapter_not_configured", "sin configurar", details={"hint": "x"})
+
+    assert invoke("identity", {}, factory) == {"ok": False, "error": {
+        "code": "adapter_not_configured", "message": "sin configurar", "details": {"hint": "x"}}}
+    assert invoke("publish", {}, factory)["error"]["code"] == "unknown_operation"
+
+
+def test_diagnose_works_without_configuration(unconfigured_env):
+    envelope = invoke("diagnose", {})
+    assert envelope["ok"] is True
+    report = envelope["result"]
+    assert report["adapter"] == "oauth" and report["token_exposed"] is False
+    assert report["shared_state"] == {"available": False, "mechanism": "unavailable"}
+    assert report["oauth"]["token_present"] is False
+    assert report["errors"][0]["code"] == "oauth_login_required"
+
+
+def test_diagnose_reports_metadata_identity_without_paths(harness_env):
+    report = invoke("diagnose", {})["result"]
+    assert report["adapter"] == "metadata" and report["read_only"] is True
+    assert report["identity"]["permission_id"] == "person-1"
+    assert report["paths_configured"]["LITMAN_HARNESS_METADATA"] is True
+    assert report["paths_configured"]["LITMAN_HARNESS_OAUTH_TOKEN"] is False
+    assert isinstance(report["core_executable_found"], bool)
+    assert report["shared_state"] == {"available": False, "mechanism": "unavailable"}
+    assert harness_env["LITMAN_HARNESS_METADATA"] not in repr(report)
+
+
+def test_execute_analysis_takes_only_plan_id(harness_env):
+    envelope = invoke("execute_analysis", {"plan_id": "a" * 64, "provider": "codex"})
+    assert envelope["error"]["code"] == "invalid_request"
+    assert invoke("execute_analysis", {"plan_id": "a" * 64})["error"]["code"] == "unknown_plan"
+
+
+def test_old_flat_modules_and_compatibility_reexports_are_gone():
+    package = Path(litman_harness.__file__).parent
+    for name in ("models", "service", "analysis", "drive", "configured", "cli", "mcp"):
+        assert not (package / f"{name}.py").exists()
+    for name in ("models", "service", "drive", "configured", "cli", "mcp"):
+        assert importlib.util.find_spec(f"litman_harness.{name}") is None
+    assert not hasattr(litman_harness, "ExpedienteService")
+
+
+def test_local_paths_inside_checkout_are_configuration_errors(harness_env, monkeypatch):
+    from litman_harness.local_paths import checkout_root
+    monkeypatch.setenv("LITMAN_HARNESS_WORK_DIR", str(checkout_root() / "work"))
+    assert invoke("identity", {})["error"]["code"] == "unsafe_local_path"
+
+
+def test_unexpected_errors_use_the_safe_message(harness_env, monkeypatch):
+    monkeypatch.setenv("LITMAN_HARNESS_OAUTH_CLIENT", "/home/p/secret-client.json")
+
+    class Boom:
+        @property
+        def expediente(self):
+            raise RuntimeError("leer /home/p/secret-client.json falló")
+
+    envelope = invoke("identity", {}, Boom)
+    assert envelope["error"]["code"] == "internal_error"
+    assert "/home/p" not in envelope["error"]["details"]["error"]

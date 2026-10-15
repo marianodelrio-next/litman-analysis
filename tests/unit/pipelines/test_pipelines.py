@@ -94,7 +94,7 @@ def test_stage_can_prepare_versioned_resources_and_persists_common_files(tmp_pat
     request = json.loads((prepared.run_dir / "input" / "request.json").read_text())
     assert request == {
         "provider": "codex",
-        "model": "gpt-5.5",
+        "model": "gpt-5.6-luna",
         "prompt_version": "v-test",
         "config_version": "config-test",
         "schema_id": "schema-test",

@@ -22,5 +22,6 @@ Use this map to locate likely ownership, then verify the current code before edi
 | Unit tests: infrastructure | `tests/unit/infrastructure/` | Storage, normalization, product Codex CLI, and auth. |
 | Unit tests: generation | `tests/unit/generation/` | Artefact generation and rendering. |
 | Contracts and integration | `tests/contracts/`, `tests/integration/test_job_runner.py` | Public job and architecture contracts; end-to-end job orchestration. |
+| Personal Drive harness | `harness/src/litman_harness/{dossier,analysis,adapters,interfaces,plans}/`, `harness/agent/` (skills, `claude/` and `codex/` subagents), `harness/tests/` | Separate user-OAuth dossier client (CLI `litman`, MCP `litman-mcp`, one operation registry); manifest/context, incorporation, publication and tender summary write shared Drive state through Drive v2 `If-Match` (`adapters/drive_state.py`); development metadata stays read-only. See `docs/harness-development.md`. |
 
 Project-level operating guidance is in `AGENTS.md`; concise architecture and durable decisions are in `docs/architecture.md` and `docs/decisions.md`.

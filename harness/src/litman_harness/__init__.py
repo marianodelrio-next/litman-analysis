@@ -4,9 +4,8 @@ This package deliberately does not import ``litman_core`` or its service-account
 Drive publisher.  It is a separate user-OAuth client.
 """
 
-from .models import HarnessError, Manifest, Plan
-from .service import ExpedienteService
+from .errors import HarnessError
 
 __version__ = "0.1.0"
 
-__all__ = ["ExpedienteService", "HarnessError", "Manifest", "Plan"]
+__all__ = ["HarnessError", "__version__"]

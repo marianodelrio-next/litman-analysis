@@ -15,7 +15,7 @@ class Settings:
     project_root: Path = PROJECT_ROOT
     resource_root: Path = RESOURCE_ROOT
     codex_binary: str = field(default_factory=lambda: os.getenv("LITMAN_CORE_CODEX_BINARY", "codex"))
-    codex_model: str | None = "gpt-5.5"
+    codex_model: str | None = "gpt-5.6-luna"
     llm_provider: str = field(default_factory=lambda: os.getenv("LITMAN_CORE_LLM_PROVIDER", "codex"))
     llm_model: str | None = field(default_factory=lambda: os.getenv("LITMAN_CORE_LLM_MODEL"))
     llm_timeout_seconds: int = 1800

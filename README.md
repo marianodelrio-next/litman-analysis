@@ -57,6 +57,13 @@ no root, filesystem de solo lectura, capabilities eliminadas y
 
 Las comprobaciones de seguridad o preflight pertenecen al despliegue Docker, no al contrato de `litman_core`. No se deben incluir credenciales en jobs, logs, prompts ni en el contexto de build.
 
+## Harness de expediente
+
+`harness/` es una distribución separada (`litman-harness`, CLI `litman` y MCP
+`litman-mcp`) que conecta una licitación de Google Drive con la cuenta OAuth de
+cada persona, ejecuta este Core en local y publica sus resultados. Ver
+[docs/harness-development.md](docs/harness-development.md).
+
 ## Desarrollo
 
 ```bash
