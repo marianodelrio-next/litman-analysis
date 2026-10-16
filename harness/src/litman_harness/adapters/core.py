@@ -10,7 +10,7 @@ import os
 import platform
 from pathlib import Path
 import subprocess
-import sys
+import sysconfig
 from typing import Any, Callable
 
 from ..errors import HarnessError
@@ -32,10 +32,22 @@ CORE_ERROR_MESSAGES: dict[str, str] = {
 Runner = Callable[..., subprocess.CompletedProcess]
 
 
+def script_path(name: str) -> Path:
+    """Return the path a script named ``name`` would have in the active environment.
+
+    Uses ``sysconfig.get_path("scripts")`` (the active environment's scripts
+    folder) rather than ``sys.executable``'s resolved parent: with
+    ``uv tool install``, ``sys.executable`` is a symlink to a Python managed
+    outside the tool's own virtual environment, so resolving it does not find
+    the tool's scripts folder.
+    """
+    exe = f"{name}.exe" if platform.system() == "Windows" else name
+    return Path(sysconfig.get_path("scripts")) / exe
+
+
 def core_command() -> str:
-    """Return the Core script installed alongside the harness interpreter."""
-    name = f"{CORE_EXECUTABLE}.exe" if platform.system() == "Windows" else CORE_EXECUTABLE
-    return str(Path(sys.executable).resolve().parent / name)
+    """Return the Core script installed in the active environment's scripts folder."""
+    return str(script_path(CORE_EXECUTABLE))
 
 
 def core_executable() -> str | None:
@@ -112,7 +124,8 @@ def run_core(config_path: Path, run: Runner = subprocess.run) -> dict[str, Any]:
 
 
 def core_info(run: Runner = subprocess.run) -> dict[str, Any] | None:
-    """``litman-core info`` payload (``{"contract", "version", "providers"}``); ``None`` if it cannot be read."""
+    """``litman-core info`` payload (``{"contract", "version", "providers"}``, optionally
+    ``"environment"``); ``None`` if it cannot be read."""
     try:
         command = _required_core_command() if run is subprocess.run else core_command()
         result = run([command, "info"], text=True, encoding="utf-8", errors="replace", capture_output=True,

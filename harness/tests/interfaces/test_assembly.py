@@ -41,11 +41,42 @@ def test_diagnose_reports_the_drive_mechanism_with_usable_oauth(unconfigured_env
     assert report["shared_state"] == {"available": True, "mechanism": "drive_v2_if_match"}
 
 
-def test_diagnose_reports_setup_and_contract_without_configuration(unconfigured_env):
+def test_diagnose_reports_setup_and_contract_without_configuration(unconfigured_env, monkeypatch):
+    from litman_harness.adapters import core
+    monkeypatch.setattr(core, "core_info", lambda run=None: None)
+    monkeypatch.setattr(core, "core_executable", lambda: None)
     report = assembly.diagnose()
     assert report["setup"] == {"configured": False, "provider": None, "model": None}
-    assert report["core"] == {"contract": None, "version": None, "compatible": False}
+    assert report["core"] == {"contract": None, "version": None, "compatible": False, "environment": None}
     assert "settings.toml" not in repr(report)
+
+
+def test_diagnose_reports_installation_not_installed_without_a_manifest(unconfigured_env):
+    report = assembly.diagnose()
+    assert report["installation"] == {"installed": False}
+
+
+def test_diagnose_reports_installation_and_core_environment(unconfigured_env, monkeypatch, tmp_path: Path):
+    from litman_harness import installation
+    from litman_harness.adapters import core
+
+    monkeypatch.setattr(installation, "script_path", lambda name: tmp_path / "scripts" / name)
+    monkeypatch.setenv("CODEX_HOME", str(tmp_path / "home" / ".codex"))
+    env = {"XDG_STATE_HOME": str(tmp_path / "state"), "XDG_CONFIG_HOME": str(tmp_path / "config"),
+           "CODEX_HOME": str(tmp_path / "home" / ".codex")}
+    repo = Path(__file__).parents[3]
+    installation.install(app="codex", source=repo, home=tmp_path / "home", env=env)
+    original_status = installation.status
+    monkeypatch.setattr(installation, "status", lambda env: original_status(env=env, home=tmp_path / "home"))
+
+    environment = {"providers": {"codex": {"cli": True, "session": True}}, "pdf_browser": False}
+    monkeypatch.setattr(core, "core_info", lambda run=None: {"contract": core.CONTRACT, "version": "0.1.0",
+                                                             "environment": environment})
+    report = assembly.diagnose()
+    assert report["installation"]["installed"] is True
+    assert report["installation"]["app"] == "codex"
+    assert report["core"]["environment"] == environment
+    assert str(tmp_path) not in repr(report)
 
 
 def test_diagnose_reports_the_saved_setup(harness_env, tmp_path: Path):

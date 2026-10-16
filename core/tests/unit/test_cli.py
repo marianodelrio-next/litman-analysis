@@ -155,4 +155,48 @@ def test_cli_argparse_misuse_exits_2_without_json(capsys):
 def test_cli_info_emits_contract_version_and_providers(capsys):
     cli.main(["info"])
     payload = json.loads(capsys.readouterr().out)
-    assert payload == {"contract": 1, "version": __version__, "providers": ["claude-code", "codex"]}
+    assert payload["contract"] == 1
+    assert payload["version"] == __version__
+    assert payload["providers"] == ["claude-code", "codex"]
+    assert "environment" in payload
+
+
+@pytest.mark.parametrize("codex_cli,claude_cli,codex_session,claude_session,browser", [
+    (True, True, True, True, True),
+    (False, False, False, False, False),
+])
+def test_cli_info_environment_reports_presence(
+    tmp_path, monkeypatch, capsys, codex_cli, claude_cli, codex_session, claude_session, browser,
+):
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    if codex_cli:
+        (bin_dir / "codex").write_text("#!/bin/sh\n"); (bin_dir / "codex").chmod(0o755)
+    if claude_cli:
+        (bin_dir / "claude").write_text("#!/bin/sh\n"); (bin_dir / "claude").chmod(0o755)
+    monkeypatch.setenv("PATH", str(bin_dir))
+
+    codex_home = tmp_path / "codex_home"
+    codex_home.mkdir()
+    if codex_session:
+        (codex_home / "auth.json").write_text("{}")
+    monkeypatch.setenv("CODEX_HOME", str(codex_home))
+
+    claude_config_dir = tmp_path / "claude_config"
+    claude_config_dir.mkdir()
+    if claude_session:
+        (claude_config_dir / ".credentials.json").write_text("{}")
+    monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(claude_config_dir))
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+
+    monkeypatch.setattr(
+        "litman_core.generation.opportunity_report.generator._find_browser",
+        lambda browser_name: "/usr/bin/google-chrome" if browser else None,
+    )
+
+    cli.main(["info"])
+    payload = json.loads(capsys.readouterr().out)
+    env = payload["environment"]
+    assert env["providers"]["codex"] == {"cli": codex_cli, "session": codex_session}
+    assert env["providers"]["claude-code"] == {"cli": claude_cli, "session": claude_session}
+    assert env["pdf_browser"] == browser

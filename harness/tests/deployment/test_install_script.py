@@ -1,0 +1,177 @@
+"""Smoke tests for `install.sh`/`uninstall.sh`: never touches the real HOME,
+`~/.codex`, `~/.claude` or any account; never invokes `claude` or `codex`.
+"""
+from __future__ import annotations
+
+import json
+import os
+from pathlib import Path
+import platform
+import shutil
+import subprocess
+
+import pytest
+
+DEPLOYMENT = Path(__file__).parents[2] / "deployment"
+INSTALL_SH = DEPLOYMENT / "install.sh"
+UNINSTALL_SH = DEPLOYMENT / "uninstall.sh"
+INSTALL_PS1 = DEPLOYMENT / "install.ps1"
+UNINSTALL_PS1 = DEPLOYMENT / "uninstall.ps1"
+REPO_ROOT = Path(__file__).parents[3]
+
+NETWORK_MARKERS = (
+    "Temporary failure in name resolution", "Name or service not known", "Could not resolve host",
+    "Failed to download", "Download interrupted", "download was interrupted", "Could not connect to",
+    "Failed to connect to", "Connection refused", "Connection reset", "Network is unreachable",
+)
+
+pytestmark = pytest.mark.skipif(platform.system() == "Windows", reason="install.sh is POSIX-specific")
+
+
+def _skip_if_network_error(result: subprocess.CompletedProcess) -> None:
+    text = (result.stdout + result.stderr).lower()
+    if any(marker.lower() in text for marker in NETWORK_MARKERS):
+        pytest.skip(f"red no disponible: {(result.stdout + result.stderr)[-400:]}")
+
+
+def _run(command, *, env, cwd=None, timeout=300):
+    return subprocess.run(command, env=env, cwd=cwd, capture_output=True, text=True, timeout=timeout)
+
+
+def test_without_git_stops_with_the_official_link(tmp_path: Path):
+    empty_bin = tmp_path / "empty-bin"
+    empty_bin.mkdir()
+    home = tmp_path / "home"
+    env = {"PATH": str(empty_bin), "HOME": str(home), "LITMAN_APP": "codex"}
+    result = _run(["/bin/sh", str(INSTALL_SH)], env=env)
+    assert result.returncode != 0
+    assert "git-scm.com" in result.stdout + result.stderr
+    assert not home.exists()
+
+
+def test_without_uv_stops_with_the_official_command(tmp_path: Path):
+    git_bin = tmp_path / "git-bin"
+    git_bin.mkdir()
+    real_git = shutil.which("git")
+    assert real_git
+    (git_bin / "git").symlink_to(real_git)
+    home = tmp_path / "home"
+    env = {"PATH": str(git_bin), "HOME": str(home), "LITMAN_APP": "codex"}
+    result = _run(["/bin/sh", str(INSTALL_SH)], env=env)
+    assert result.returncode != 0
+    assert "astral.sh/uv/install.sh" in result.stdout + result.stderr
+    assert not home.exists()
+
+
+def test_without_litman_app_stops_with_a_clear_message(tmp_path: Path):
+    env = {"PATH": os.environ.get("PATH", ""), "HOME": str(tmp_path / "home")}
+    result = _run(["/bin/sh", str(INSTALL_SH)], env=env)
+    assert result.returncode != 0
+    assert "LITMAN_APP" in result.stdout + result.stderr
+
+
+@pytest.fixture
+def committed_repo_copy(tmp_path: Path) -> Path:
+    """A git repo with one commit of the current working tree (tests the actual code)."""
+    bare_source = tmp_path / "repo-source"
+    bare_source.mkdir()
+    files = subprocess.run(["git", "ls-files", "-co", "--exclude-standard"], cwd=REPO_ROOT, capture_output=True,
+                           text=True, check=True).stdout.splitlines()
+    for rel in files:
+        src = REPO_ROOT / rel
+        if not src.is_file():
+            continue
+        dest = bare_source / rel
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dest)
+    subprocess.run(["git", "init", "--quiet"], cwd=bare_source, check=True)
+    subprocess.run(["git", "config", "user.email", "test@example.test"], cwd=bare_source, check=True)
+    subprocess.run(["git", "config", "user.name", "Test"], cwd=bare_source, check=True)
+    subprocess.run(["git", "add", "-A"], cwd=bare_source, check=True)
+    subprocess.run(["git", "commit", "--quiet", "-m", "snapshot"], cwd=bare_source, check=True)
+    return bare_source
+
+
+def test_install_sh_end_to_end_then_idempotent_then_uninstall(tmp_path: Path, committed_repo_copy: Path):
+    home = tmp_path / "home"
+    home.mkdir()
+    fake_bin = tmp_path / "fake-bin"
+    fake_bin.mkdir()
+    (fake_bin / "codex").write_text("#!/bin/sh\nexit 0\n")
+    (fake_bin / "codex").chmod(0o755)
+
+    uv_path = shutil.which("uv")
+    assert uv_path
+    uv_dir = Path(uv_path).parent
+    real_python_install_dir = subprocess.run(["uv", "python", "dir"], capture_output=True, text=True,
+                                             check=True).stdout.strip()
+
+    env = {
+        "HOME": str(home),
+        "PATH": f"{fake_bin}:{uv_dir}:/usr/bin:/bin",
+        "LITMAN_APP": "codex",
+        "LITMAN_REPO": str(committed_repo_copy),
+        "LITMAN_SRC_DIR": str(home / "src"),
+        "UV_CACHE_DIR": "/tmp/licitaBot-uv-cache",
+        "UV_TOOL_DIR": str(tmp_path / "uv-tools"),
+        "UV_TOOL_BIN_DIR": str(tmp_path / "uv-bin"),
+        "UV_PYTHON_INSTALL_DIR": real_python_install_dir,
+    }
+
+    result = _run(["/bin/sh", str(INSTALL_SH)], env=env, timeout=600)
+    _skip_if_network_error(result)
+    assert result.returncode == 0, result.stdout + result.stderr
+
+    litman_bin = Path(env["UV_TOOL_BIN_DIR"]) / "litman"
+    assert litman_bin.is_file()
+    diagnose = subprocess.run([str(litman_bin), "diagnose"], env={**os.environ, **env}, capture_output=True,
+                              text=True, check=True)
+    payload = json.loads(diagnose.stdout)
+    assert payload["ok"] is True
+    report = payload["result"]
+    assert report["core_executable_found"] is True
+    assert report["core"]["compatible"] is True
+    assert report["installation"]["installed"] is True
+
+    codex_config = home / ".codex" / "config.toml"
+    config_text = codex_config.read_text(encoding="utf-8")
+    assert config_text.count("# >>> litman") == 1
+
+    # Idempotent re-run: a single MCP block, no failure.
+    second = _run(["/bin/sh", str(INSTALL_SH)], env=env, timeout=600)
+    _skip_if_network_error(second)
+    assert second.returncode == 0, second.stdout + second.stderr
+    assert codex_config.read_text(encoding="utf-8").count("# >>> litman") == 1
+
+    uninstall_result = _run(["/bin/sh", str(UNINSTALL_SH)], env=env, timeout=300)
+    assert uninstall_result.returncode == 0, uninstall_result.stdout + uninstall_result.stderr
+    assert "# >>> litman" not in codex_config.read_text(encoding="utf-8")
+    assert not (home / ".agents" / "skills" / "preparar-equipo").exists()
+    assert not (home / ".codex" / "agents" / "lector-licitacion.toml").exists()
+    assert (home / "LitMan").exists()  # workspace is only removed with --remove-workspace
+
+
+def test_install_and_uninstall_ps1_contain_the_official_links_and_no_elevation():
+    install_text = INSTALL_PS1.read_text(encoding="utf-8")
+    uninstall_text = UNINSTALL_PS1.read_text(encoding="utf-8")
+    assert "git-scm.com/downloads/win" in install_text
+    assert "astral.sh/uv/install.ps1" in install_text
+    assert "LITMAN_APP" in install_text
+    assert "ErrorActionPreference" in install_text and "ErrorActionPreference" in uninstall_text
+    for text in (install_text, uninstall_text):
+        for forbidden in ("winget", "choco", "-Verb RunAs", "Start-Process"):
+            assert forbidden not in text
+
+    try:
+        import subprocess as _subprocess
+        pwsh = shutil.which("pwsh")
+    except Exception:  # noqa: BLE001
+        pwsh = None
+    if pwsh is None:
+        pytest.skip("pwsh no disponible: sólo validación estática")
+    for script in (INSTALL_PS1, UNINSTALL_PS1):
+        parse = _subprocess.run(
+            [pwsh, "-NoProfile", "-Command",
+             f"[System.Management.Automation.Language.Parser]::ParseFile('{script}', [ref]$null, [ref]$null)"],
+            capture_output=True, text=True)
+        assert parse.returncode == 0, parse.stderr

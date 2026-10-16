@@ -13,8 +13,9 @@ _GATE = (" Escribe en Drive con OAuth; con el adaptador de metadatos (sólo lect
 TOOLS = (
     Tool("identity", "Consulta (no escribe): cuenta activa del adaptador configurado.", schema(),
          lambda ctx, args: ctx.services().expediente.identity()),
-    Tool("diagnose", "Consulta (no escribe): adaptador, scopes, litman-core, puerta de concurrencia y rutas "
-                     "configuradas, sin tokens ni secretos.", schema(),
+    Tool("diagnose", "Consulta (no escribe): adaptador, scopes, litman-core (incluido su entorno), puerta de "
+                     "concurrencia, rutas configuradas y estado de la instalación (`litman install`), sin tokens "
+                     "ni secretos ni rutas locales.", schema(),
          lambda ctx, args: diagnose()),
     Tool("inspect", "Consulta (no escribe): inventario de la carpeta de la licitación y next_actions justificadas.",
          schema({"folder_id": _FOLDER_ID}, ("folder_id",)),

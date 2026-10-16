@@ -11,6 +11,24 @@
     "providers": {
       "type": "array",
       "items": { "type": "string" }
+    },
+    "environment": {
+      "type": "object",
+      "description": "Optional, local-only checks; never executes a provider CLI or a browser. false means not detected.",
+      "properties": {
+        "providers": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "cli": { "type": "boolean" },
+              "session": { "type": "boolean" }
+            },
+            "required": ["cli", "session"]
+          }
+        },
+        "pdf_browser": { "type": "boolean" }
+      }
     }
   },
   "additionalProperties": true

@@ -26,10 +26,15 @@ harness/src/litman_harness/
                        escritorio y proceso `litman-core`
   interfaces/          assembly (configuración), registro de operaciones
                        (tools/), CLI y MCP
-harness/agent/skills/{conectar-licitacion,resumir-licitacion}/SKILL.md   skills de producto
+  installation.py      instalación/desinstalación idempotente guiada
+                       (`litman install`/`uninstall`): workspace, skills,
+                       subagente, registro del MCP, manifiesto
+harness/agent/skills/{conectar-licitacion,resumir-licitacion,preparar-equipo}/SKILL.md   skills de producto
+harness/agent/workspace/AGENTS.md                   plantilla de la carpeta LitMan ({{LITMAN_BIN}})
 harness/agent/claude/agents/lector-licitacion.md    subagente lector (Claude Code)
 harness/agent/codex/agents/lector-licitacion.toml   subagente lector (Codex)
-harness/tests/{dossier,analysis,adapters,interfaces,plans}/
+harness/deployment/{install,uninstall}.sh|.ps1      scripts de instalación guiada (ver deployment/README.md)
+harness/tests/{dossier,analysis,adapters,interfaces,plans,deployment}/
 ```
 
 `dossier/membership.py` contiene la única comprobación de pertenencia: sigue la
@@ -80,7 +85,7 @@ enumerados, sin propiedades extra) → `invalid_request`.
 | Operación | Tipo | Efecto |
 | --- | --- | --- |
 | `identity` | consulta | cuenta activa |
-| `diagnose` | consulta | adaptador, identidad, scopes, disponibilidad y contrato de `litman-core` instalado, proveedor fijado por `setup`, mecanismo de estado compartido y rutas configuradas (sí/no); nunca tokens ni rutas |
+| `diagnose` | consulta | adaptador, identidad, scopes, disponibilidad, contrato y entorno (`environment`) de `litman-core` instalado, proveedor fijado por `setup`, mecanismo de estado compartido, estado de la instalación guiada (`installation`: workspace, skills, subagente, MCP, cliente OAuth) y rutas configuradas (sí/no); nunca tokens ni rutas |
 | `inspect` | consulta | inventario de todo el árbol de la carpeta (`tree`, `candidates`, sugerencias) y `next_actions` |
 | `status` | consulta | inspección + manifiesto: `unadopted`, `partial`, `adopted`, `degraded`, `unsupported_manifest`; publicaciones locales pendientes; `recommended_action` |
 | `preview_incorporation` | consulta | plan con sólo lo que falta: fase, carpetas (`folder_ids` para registrar existentes), originales, oferta viva existente, contexto y manifiesto |
@@ -304,19 +309,24 @@ verifica forma y procedencia, nunca la veracidad.
   subagentes (Claude Desktop no: lo hace el chat principal).
 - `skills/conectar-licitacion`: tras publicar, pregunta una vez si prepara el
   resumen; nunca lo aplica por iniciativa propia.
+- `skills/preparar-equipo`: instalación guiada en lenguaje de negocio
+  (`diagnose` → cliente OAuth → `litman login` → sesión del proveedor →
+  `setup` → `diagnose` final → `conectar-licitacion`); también
+  actualizar/reparar/desinstalar. No ejecuta Git, uv, la CLI del proveedor ni
+  un navegador por su cuenta.
 - `claude/agents/lector-licitacion.md`: `model: haiku`, `tools:` sólo
   `mcp__litman__status` y `mcp__litman__read_document` (servidor MCP `litman`).
 - `codex/agents/lector-licitacion.toml`: `gpt-5.6-luna`,
   `model_reasoning_effort = "low"`, `sandbox_mode = "read-only"`, instrucciones
   de usar sólo `status` y `read_document`.
 
-Prueba manual (la instalación automática está pendiente): registrar `litman-mcp`
-como servidor MCP `litman`; en Claude Code copiar el `.md` a
-`.claude/agents/` (proyecto) o `~/.claude/agents/` y las skills a
-`.claude/skills/`; en Codex copiar el `.toml` a su directorio de agentes y las
-skills al de skills. Tras publicar un análisis en la carpeta de prueba, aceptar
-la sugerencia y comprobar que el subagente sólo lee y que `contexto.md` muestra
-el resumen con sus fuentes.
+Instalación: `litman install --app <codex|claude> --source <repo>` (que
+ejecutan `harness/deployment/install.sh`/`.ps1`) copia las skills y el
+subagente a las rutas que leen Codex/Claude y registra el servidor MCP
+`litman`; ver [`deployment/README.md`](../deployment/README.md) para el
+detalle y las rutas exactas por sistema. Tras publicar un análisis en la
+carpeta de prueba, aceptar la sugerencia y comprobar que el subagente sólo
+lee y que `contexto.md` muestra el resumen con sus fuentes.
 
 ## Recorrido guiado
 
@@ -365,11 +375,14 @@ publicación y oferta viva) → refrescar el resumen → la persona decide.
   ejecutar Core ni a subir lo ya subido (`apply_publication` del plan enlazado
   también sirve).
 - **Tiempo máximo de las herramientas MCP.** `execute_analysis` dura minutos.
-  En Codex amplíe el límite del servidor (por defecto 60 s) en
-  `~/.codex/config.toml`: `[mcp_servers.litman]` con `tool_timeout_sec = 1800`.
-  En Claude Code, `MCP_TOOL_TIMEOUT` (milisegundos). Si un cliente no lo
-  permite, una ejecución en segundo plano con sondeo es candidata para la
-  tarea de instalación.
+  `litman install` registra el servidor con `tool_timeout_sec = 7200` en
+  `~/.codex/config.toml` (Codex) y fija `MCP_TOOL_TIMEOUT = "7200000"`
+  (milisegundos) en `~/.claude/settings.json` sólo si la persona no tenía ya
+  un valor propio (Claude Code). La eficacia real de ese límite con un
+  análisis síncrono, no sólo su registro, está pendiente de validación
+  humana: ver [`docs/validacion_manual_instalacion.md`](../../docs/validacion_manual_instalacion.md)
+  §1. Si algún cliente no lo respeta en la práctica, una ejecución en
+  segundo plano con sondeo es la alternativa a retomar.
 
 ## Validación humana pendiente
 
@@ -385,11 +398,15 @@ visual del Google Doc de la oferta convertida fue correcta. Pendiente:
 1. **Segunda cuenta.** Con el cliente OAuth corporativo (scope `drive`), ejecutar
    `litman login` en otra instalación con otra cuenta y comprobar con
    `diagnose`, `inspect` y `status` que recupera el expediente por ID.
-2. **Descubrimiento MCP y subagente.** Registrar `litman-mcp`, las skills y
-   `lector-licitacion` en Codex App, Claude Desktop y Claude Code (la
-   instalación automática está pendiente), comprobar que aparecen las
-   herramientas con su descripción, que `status` responde y que el subagente
-   propone el resumen sólo leyendo vía MCP. Smoke local previo,
-   con un JSON de metadatos temporal en `LITMAN_HARNESS_METADATA`: enviar por
-   stdin `initialize`, `notifications/initialized`, `tools/list` y un
-   `tools/call` de `inspect`.
+2. **Descubrimiento MCP y subagente en las apps reales.** `litman install`
+   automatiza el registro de `litman-mcp`, las skills y `lector-licitacion`;
+   falta comprobar en Codex App, Claude Desktop y Claude Code reales (equipo
+   Windows, cuentas autorizadas) que aparecen las herramientas con su
+   descripción, que `status` responde y que el subagente propone el resumen
+   sólo leyendo vía MCP. Ver
+   [`docs/validacion_manual_instalacion.md`](../../docs/validacion_manual_instalacion.md)
+   para el resto de la validación de la instalación guiada (Windows, timeout
+   real, segunda cuenta). Smoke local previo (sin apps reales), con un JSON
+   de metadatos temporal en `LITMAN_HARNESS_METADATA`: enviar por stdin
+   `initialize`, `notifications/initialized`, `tools/list` y un `tools/call`
+   de `inspect`.

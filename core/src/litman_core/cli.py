@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import platform
+import shutil
 import sys
 from pathlib import Path
 
@@ -32,8 +34,30 @@ def main(argv: list[str] | None = None) -> None:
 
 
 def _info() -> None:
-    payload = {"contract": CONTRACT, "version": __version__, "providers": sorted(PROVIDERS)}
+    payload = {"contract": CONTRACT, "version": __version__, "providers": sorted(PROVIDERS),
+               "environment": _environment()}
     _emit_json(payload)
+
+
+def _environment() -> dict[str, object]:
+    """Local-only checks (never executes a provider CLI or a browser)."""
+    from litman_core.generation.opportunity_report.generator import _find_browser
+
+    providers: dict[str, dict[str, bool]] = {}
+    for name, spec in PROVIDERS.items():
+        binary = os.environ.get(spec.binary_env) or spec.default_binary
+        cli_found = shutil.which(binary) is not None
+        if name == "codex":
+            codex_home = os.environ.get("CODEX_HOME") or str(Path.home() / ".codex")
+            session = (Path(codex_home) / "auth.json").is_file()
+        else:
+            config_dir = (os.environ.get("LITMAN_CORE_CLAUDE_CONFIG_DIR")
+                          or os.environ.get("CLAUDE_CONFIG_DIR")
+                          or str(Path.home() / ".claude"))
+            session = (Path(config_dir) / ".credentials.json").is_file() or bool(os.environ.get("ANTHROPIC_API_KEY"))
+        providers[name] = {"cli": cli_found, "session": session}
+    pdf_browser = _find_browser("google-chrome") is not None
+    return {"providers": providers, "pdf_browser": pdf_browser}
 
 
 def _run(args: argparse.Namespace) -> None:

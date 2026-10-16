@@ -40,3 +40,20 @@ def test_skills_reference_real_operations():
                       "apply_summary", "discard_analysis", "recover", "preview_incorporation"):
         assert operation in registry() and f"`{operation}`" in connect_skill
     assert "read_published_artifact" not in summary_skill + connect_skill
+
+
+def test_prepare_team_skill_references_real_operations_and_installation_commands():
+    from litman_harness.interfaces.tools import registry
+    prepare_skill = (AGENT / "skills" / "preparar-equipo" / "SKILL.md").read_text(encoding="utf-8")
+    assert _frontmatter(AGENT / "skills" / "preparar-equipo" / "SKILL.md")["name"] == "preparar-equipo"
+    for operation in ("diagnose", "setup"):
+        assert operation in registry() and f"`{operation}`" in prepare_skill
+    assert "litman login" in prepare_skill
+    assert "litman install --oauth-client" in prepare_skill
+    assert "--delete-original" in prepare_skill
+    assert "conectar-licitacion" in prepare_skill
+
+
+def test_workspace_template_mentions_the_litman_binary_placeholder():
+    template = (AGENT / "workspace" / "AGENTS.md").read_text(encoding="utf-8")
+    assert "{{LITMAN_BIN}}" in template

@@ -138,6 +138,66 @@ def test_mcp_stdio_handshake_in_real_subprocess(harness_env):
     assert responses[3]["error"]["code"] == -32700
 
 
+def test_install_is_cli_only_and_not_exposed_as_an_mcp_operation(tmp_path, capsys, monkeypatch):
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
+    monkeypatch.setenv("CODEX_HOME", str(tmp_path / "home" / ".codex"))
+    monkeypatch.setattr(Path, "home", lambda: tmp_path / "home")
+    repo = Path(litman_harness.__file__).parents[3]
+
+    try:
+        cli.main(["install", "--app", "codex", "--source", str(repo)])
+        code = 0
+    except SystemExit as exc:
+        code = exc.code
+    captured = capsys.readouterr()
+    payload = json.loads(captured.out if code == 0 else captured.err)
+    assert code == 0 and payload["ok"] is True
+
+    try:
+        cli.main(["install", "--app", "codex"])
+        assert False, "debía fallar sin --source"
+    except SystemExit as exc:
+        assert exc.code == 2
+    capsys.readouterr()
+
+    assert "install" not in [t["name"] for t in mcp.handle(
+        json.dumps({"jsonrpc": "2.0", "id": 1, "method": "tools/list"}))["result"]["tools"]]
+
+
+def test_uninstall_without_manifest_is_ok(tmp_path, capsys, monkeypatch):
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
+    monkeypatch.setattr(Path, "home", lambda: tmp_path / "home")
+    try:
+        cli.main(["uninstall"])
+        code = 0
+    except SystemExit as exc:
+        code = exc.code
+    captured = capsys.readouterr()
+    payload = json.loads(captured.out if code == 0 else captured.err)
+    assert code == 0 and payload == {"ok": True, "result": {"removed": [], "kept": []}}
+
+
+def test_oauth_client_flag_only_works_without_app(tmp_path, capsys, monkeypatch):
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
+    monkeypatch.setattr(Path, "home", lambda: tmp_path / "home")
+    repo = Path(litman_harness.__file__).parents[3]
+    client = tmp_path / "client_secret.json"
+    client.write_text(json.dumps({"installed": {"client_id": "a", "client_secret": "b",
+                                                  "auth_uri": "https://x", "token_uri": "https://y"}}))
+
+    try:
+        cli.main(["install", "--oauth-client", str(client)])
+        code = 0
+    except SystemExit as exc:
+        code = exc.code
+    captured = capsys.readouterr()
+    payload = json.loads(captured.out if code == 0 else captured.err)
+    assert code == 0 and payload["result"]["oauth_client"] == {"ok": True, "imported": True}
+
+
 def test_login_is_cli_only_and_uses_the_configured_provider(harness_env, capsys, monkeypatch):
     from litman_harness.interfaces import assembly
 

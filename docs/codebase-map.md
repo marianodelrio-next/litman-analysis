@@ -15,7 +15,7 @@ actual antes de editarlo.
 | Distribución Harness | `harness/pyproject.toml`, `harness/uv.lock`, `harness/README.md` | Paquete `litman-harness`, que declara Core como dependencia de distribución. |
 | Interfaces y ejecución de Core desde Harness | `harness/src/litman_harness/interfaces/`, `harness/src/litman_harness/adapters/core.py` | CLI `litman`, MCP `litman-mcp` y ejecución de `litman-core run --config` como proceso. |
 | Expediente y análisis del Harness | `harness/src/litman_harness/{dossier,analysis,plans,adapters}/` | Estado del expediente, planes locales, Drive con OAuth personal y publicación de resultados. |
-| Producto, despliegue y pruebas del Harness | `harness/agent/`, `harness/deployment/`, `harness/tests/`, `harness/docs/` | Recursos del agente de producto, instalación de las wheels, pruebas y documentación interna del harness. |
+| Producto, despliegue y pruebas del Harness | `harness/agent/` (skills, subagente y `agent/workspace/` con la plantilla de `LitMan/AGENTS.md`), `harness/src/litman_harness/installation.py`, `harness/deployment/` (`install.sh`/`install.ps1`/`uninstall.sh`/`uninstall.ps1` y la instalación avanzada con wheels), `harness/tests/`, `harness/docs/` | Recursos del agente de producto, instalación guiada para personas sin IT (`litman install`/`uninstall`, scripts), pruebas y documentación interna del harness. |
 
 El contrato entre las distribuciones se describe en [contracts.md](contracts.md).
 Para las arquitecturas internas, consulta la documentación de

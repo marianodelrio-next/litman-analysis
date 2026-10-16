@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
+from .. import installation
 from ..adapters import core
 from ..adapters.drive import DriveGateway, GoogleDriveGateway
 from ..adapters.drive_state import DriveSharedState
@@ -100,7 +101,9 @@ def diagnose(env: Mapping[str, str] | None = None) -> dict[str, Any]:
                   "model": settings.get("model") if settings else None},
         "core": {"contract": info.get("contract") if info else None,
                  "version": info.get("version") if info else None,
-                 "compatible": info is not None and info.get("contract") == core.CONTRACT},
+                 "compatible": info is not None and info.get("contract") == core.CONTRACT,
+                 "environment": info.get("environment") if info else None},
+        "installation": installation.status(env=env),
         "errors": [],
     }
     if settings_error is not None:

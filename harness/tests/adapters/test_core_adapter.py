@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 import subprocess
+import sys
+import sysconfig
 import tomllib
 
 import pytest
@@ -121,7 +124,7 @@ def test_core_executable_is_resolved_beside_the_harness_interpreter(tmp_path: Pa
     from litman_harness.adapters import core
     from litman_harness.adapters.core import core_executable
     executable = tmp_path / "bin" / "litman-core"
-    monkeypatch.setattr(core.sys, "executable", str(tmp_path / "bin" / "python"))
+    monkeypatch.setattr(core.sysconfig, "get_path", lambda name: str(tmp_path / "bin"))
     assert core_executable() is None
     executable.parent.mkdir()
     executable.write_text("#!/bin/sh\n")
@@ -143,7 +146,7 @@ def test_core_executable_is_resolved_beside_the_harness_interpreter(tmp_path: Pa
 
 def test_core_info_returns_none_when_binary_is_missing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     from litman_harness.adapters import core
-    monkeypatch.setattr(core.sys, "executable", str(tmp_path / "bin" / "python"))
+    monkeypatch.setattr(core.sysconfig, "get_path", lambda name: str(tmp_path / "bin"))
     monkeypatch.setenv("PATH", str(tmp_path / "other-bin"))
     assert core_info() is None
 
@@ -151,7 +154,7 @@ def test_core_info_returns_none_when_binary_is_missing(tmp_path: Path, monkeypat
 def test_missing_core_is_reported_without_falling_back_to_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     from litman_harness.adapters import core
 
-    monkeypatch.setattr(core.sys, "executable", str(tmp_path / "bin" / "python"))
+    monkeypatch.setattr(core.sysconfig, "get_path", lambda name: str(tmp_path / "bin"))
     monkeypatch.setenv("PATH", str(tmp_path / "other-bin"))
     assert core.core_executable() is None
     with pytest.raises(HarnessError) as raised:
@@ -164,7 +167,7 @@ def test_windows_uses_exe_without_posix_execute_bits_and_sets_utf8(tmp_path: Pat
     executable = tmp_path / "bin" / "litman-core.exe"
     executable.parent.mkdir()
     executable.write_text("placeholder", encoding="utf-8")
-    monkeypatch.setattr(core.sys, "executable", str(tmp_path / "bin" / "python.exe"))
+    monkeypatch.setattr(core.sysconfig, "get_path", lambda name: str(tmp_path / "bin"))
     monkeypatch.setattr(core.platform, "system", lambda: "Windows")
     calls = []
 
@@ -177,4 +180,25 @@ def test_windows_uses_exe_without_posix_execute_bits_and_sets_utf8(tmp_path: Pat
     assert core.core_info(run)["version"] == "versión-á"
     assert calls[0][0][0].endswith("litman-core.exe")
     assert calls[0][1]["encoding"] == "utf-8"
-    assert calls[0][1]["env"]["PYTHONUTF8"] == "1"
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="symlinked venv layout is POSIX-specific")
+def test_core_command_finds_core_in_a_real_symlinked_venv(tmp_path: Path):
+    """Reproduces the ``uv tool install`` layout: ``bin/python`` symlinks outside the venv."""
+    env_dir = tmp_path / "env"
+    subprocess.run([sys.executable, "-m", "venv", "--without-pip", "--symlinks", str(env_dir)],
+                   check=True, capture_output=True, text=True)
+    python = env_dir / "bin" / "python"
+    assert python.is_symlink()
+    assert Path(python).resolve().parent != env_dir / "bin"
+
+    core_executable = env_dir / "bin" / "litman-core"
+    core_executable.write_text("#!/bin/sh\necho hi\n")
+    core_executable.chmod(0o755)
+
+    harness_src = Path(__file__).parents[2] / "src"
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(harness_src)
+    code = "from litman_harness.adapters.core import core_executable; print(core_executable())"
+    result = subprocess.run([str(python), "-c", code], capture_output=True, text=True, env=env, check=True)
+    assert result.stdout.strip() == str(core_executable)

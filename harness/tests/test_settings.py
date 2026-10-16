@@ -24,7 +24,7 @@ def test_setup_persists_provider_and_model_under_isolated_config_home(harness_en
     executable = tmp_path / "bin" / "litman-core"
     executable.parent.mkdir(parents=True, exist_ok=True)
     executable.write_text("#!/bin/sh\n"); executable.chmod(0o755)
-    monkeypatch.setattr(core.sys, "executable", str(tmp_path / "bin" / "python"))
+    monkeypatch.setattr(core.sysconfig, "get_path", lambda name: str(tmp_path / "bin"))
 
     result = setup(harness_env, "codex", "gpt-5.6-luna", run=_info_run())
     assert result == {"provider": "codex", "contract": 1, "core_version": "0.1.0", "model": "gpt-5.6-luna"}
@@ -40,7 +40,7 @@ def test_setup_without_model_persists_only_provider(harness_env, monkeypatch, tm
     executable = tmp_path / "bin" / "litman-core"
     executable.parent.mkdir(parents=True, exist_ok=True)
     executable.write_text("#!/bin/sh\n"); executable.chmod(0o755)
-    monkeypatch.setattr(core.sys, "executable", str(tmp_path / "bin" / "python"))
+    monkeypatch.setattr(core.sysconfig, "get_path", lambda name: str(tmp_path / "bin"))
 
     setup(harness_env, "codex", run=_info_run())
     assert load_settings(harness_env) == {"provider": "codex"}
@@ -51,7 +51,7 @@ def test_setup_rejects_mismatched_contract(harness_env, monkeypatch, tmp_path):
     executable = tmp_path / "bin" / "litman-core"
     executable.parent.mkdir(parents=True, exist_ok=True)
     executable.write_text("#!/bin/sh\n"); executable.chmod(0o755)
-    monkeypatch.setattr(core.sys, "executable", str(tmp_path / "bin" / "python"))
+    monkeypatch.setattr(core.sysconfig, "get_path", lambda name: str(tmp_path / "bin"))
 
     with pytest.raises(HarnessError) as raised:
         setup(harness_env, "codex", run=_info_run(contract=2))
@@ -63,7 +63,7 @@ def test_setup_rejects_provider_not_offered_by_core(harness_env, monkeypatch, tm
     executable = tmp_path / "bin" / "litman-core"
     executable.parent.mkdir(parents=True, exist_ok=True)
     executable.write_text("#!/bin/sh\n"); executable.chmod(0o755)
-    monkeypatch.setattr(core.sys, "executable", str(tmp_path / "bin" / "python"))
+    monkeypatch.setattr(core.sysconfig, "get_path", lambda name: str(tmp_path / "bin"))
 
     with pytest.raises(HarnessError) as raised:
         setup(harness_env, "claude-code", run=_info_run(providers=("codex",)))
@@ -72,7 +72,7 @@ def test_setup_rejects_provider_not_offered_by_core(harness_env, monkeypatch, tm
 
 def test_setup_without_core_installed_reports_core_not_installed(harness_env, monkeypatch, tmp_path):
     from litman_harness.adapters import core
-    monkeypatch.setattr(core.sys, "executable", str(tmp_path / "bin" / "python"))
+    monkeypatch.setattr(core.sysconfig, "get_path", lambda name: str(tmp_path / "bin"))
     monkeypatch.setenv("PATH", str(tmp_path / "other-bin"))
 
     with pytest.raises(HarnessError) as raised:

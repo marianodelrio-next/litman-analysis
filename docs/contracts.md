@@ -93,8 +93,18 @@ entregables (el harness nunca lo ve: publica siempre con
 ## Salida de `info`
 
 ```json
-{"contract": 1, "version": "0.1.0", "providers": ["claude-code", "codex"]}
+{"contract": 1, "version": "0.1.0", "providers": ["claude-code", "codex"],
+ "environment": {
+   "providers": {"codex": {"cli": true, "session": true},
+                 "claude-code": {"cli": false, "session": false}},
+   "pdf_browser": true
+ }}
 ```
+
+`environment` es un campo opcional (no sube `contract`): sólo comprobaciones
+locales (binario en `PATH`, archivo de sesión, navegador PDF localizable);
+nunca ejecuta la CLI del proveedor ni abre un navegador. `false` significa
+"no detectado", no necesariamente "ausente".
 
 Esquema: [`docs/contracts/core-info.schema.json`](contracts/core-info.schema.json).
 
