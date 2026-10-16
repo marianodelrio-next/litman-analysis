@@ -1,9 +1,10 @@
 # Comprobaciones manuales de Windows nativo
 
-Esta lista se usará **cuando estén terminadas las tareas de compatibilidad y
-haya un equipo Windows 10/11 disponible**. No es un requisito para implementar
-ahora en Ubuntu. No usar cuentas, credenciales, carpetas de Drive ni recursos
-de producción: las pruebas que los necesiten requieren autorización explícita
+Las tareas de compatibilidad de Core y harness ya están implementadas y
+probadas en Ubuntu. Esta lista se usará **cuando haya un equipo Windows 10/11
+disponible**; la validación nativa sigue pendiente. No usar cuentas,
+credenciales, carpetas de Drive ni recursos de producción: las pruebas que los
+necesiten requieren autorización explícita
 y datos de prueba. No guardar tokens, rutas privadas completas ni contenido de
 licitaciones en capturas o incidencias.
 
@@ -24,6 +25,9 @@ Diseños relacionados:
 - Usar una carpeta corta del perfil, un expediente sintético con texto español
   y un directorio de salida desechable. Registrar solo versión, resultado,
   error y ruta *relativa* del artefacto que falle.
+- Ejecutar las suites de Core y harness en PowerShell nativo (`uv run pytest
+  -q` desde cada paquete), además de las comprobaciones de extremo a extremo
+  siguientes. Registrar las pruebas omitidas y su motivo.
 
 ## Core y límite Core–harness
 
@@ -31,7 +35,9 @@ Diseños relacionados:
    `litman diagnose` y `litman setup` con el proveedor de prueba. Confirmar
    que el harness encuentra `litman-core.exe` del mismo entorno Python y que
    `info` devuelve `contract: 1`. Si falla, anotar la ruta real del lanzador
-   sin publicar datos de usuario.
+   sin publicar datos de usuario. Verificar que el estado del harness queda
+   bajo `%LOCALAPPDATA%\litman-harness` y que `LITMAN_HARNESS_*`, XDG y
+   `CODEX_HOME` explícitos siguen apuntando a sus rutas configuradas.
 2. **Unicode por pipes.** Ejecutar un trabajo sintético cuyo nombre y texto
    contengan `ñ`, tildes y un carácter fuera de cp1252. Leer el JSON de Core
    mediante el harness y comprobar que nombres, errores y artefactos no tienen
@@ -61,7 +67,7 @@ Diseños relacionados:
 ## CLI autenticadas: comprobaciones aplazadas
 
 Estas pruebas se harán después de contar con cuentas de prueba autorizadas.
-No son bloqueantes para la implementación inicial en Ubuntu.
+Su resultado determinará si el flujo nativo está listo para uso real.
 
 6. **Claude Code nativo.** Localizar el `claude.exe` efectivo y registrar su
    versión; comprobar si existe también un `.cmd` y cuál resolvería el
@@ -84,8 +90,11 @@ No son bloqueantes para la implementación inicial en Ubuntu.
 8. **Navegador PDF.** Con Chrome y/o Edge instalados, generar la ficha desde
    un resultado sintético. Confirmar cuál ejecutable se eligió, que el PDF se
    abre, contiene los caracteres españoles y respeta el máximo de páginas.
-   Repetir con una ruta que tenga espacios. Encontrar `msedge.exe` no prueba
-   por sí solo que su impresión headless funcione en esa versión.
+   Repetir con una ruta que tenga espacios y provocar un fallo controlado del
+   navegador para comprobar que el diagnóstico se puede leer, incluso si
+   emite caracteres fuera de la página de códigos local. Encontrar
+   `msedge.exe` no prueba por sí solo que su impresión headless funcione en esa
+   versión.
 9. **OAuth de escritorio.** Solo con un cliente OAuth y una carpeta Drive de
    prueba autorizados, ejecutar `litman login`, completar el navegador y
    confirmar el callback local y un refresco posterior. Si falla el callback,
