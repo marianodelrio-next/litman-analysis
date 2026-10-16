@@ -29,7 +29,7 @@ El runner no conoce Docker. Selecciona `LocalDocumentSource` o `GoogleDriveDocum
 - El workspace privado se elimina en `finally`; el run y sus diagnósticos no.
 - El proceso usa el UID/GID del host y no root.
 
-En Docker, Codex comparte el contenedor con las credenciales Google. Su entorno conserva solo las variables operativas necesarias y la autenticación elegida; los prompts no mencionan contenido de secretos. `auth.json` debe tener modo `0600`. Nunca guardes claves en jobs, imágenes, manifests o resultados.
+En Docker, Codex comparte el contenedor con las credenciales Google. Su entorno conserva solo las variables operativas necesarias y la autenticación elegida; los prompts no mencionan contenido de secretos. En POSIX, `auth.json` debe tener modo `0600`; en Windows Core sólo comprueba que el archivo sea legible y que `CODEX_HOME` sea escribible, porque los bits POSIX no representan la ACL. La prevalidación no cubre una sesión guardada exclusivamente en el almacén de credenciales del sistema. Nunca guardes claves en jobs, imágenes, manifests o resultados.
 
 No se instala Bubblewrap ni existe un sandbox anidado. Codex se ejecuta con
 `--dangerously-bypass-approvals-and-sandbox` y puede acceder al filesystem, la

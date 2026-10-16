@@ -1,6 +1,7 @@
 """Explicit, non-interactive authentication boundary for Codex."""
 from __future__ import annotations
 import os
+import platform
 import stat
 from dataclasses import dataclass
 from pathlib import Path
@@ -51,7 +52,7 @@ def _validate_chatgpt_state(codex_home: Path) -> None:
     _validate_file(auth_file, "CODEX_HOME/auth.json")
     if not codex_home.is_dir() or not os.access(codex_home, os.W_OK | os.X_OK):
         raise CodexAuthenticationError("CODEX_HOME debe ser un directorio escribible para renovar la sesión de ChatGPT")
-    if stat.S_IMODE(auth_file.stat().st_mode) & 0o077:
+    if platform.system() != "Windows" and stat.S_IMODE(auth_file.stat().st_mode) & 0o077:
         raise CodexAuthenticationError("CODEX_HOME/auth.json debe tener permisos 0600")
 
 def _path(env: dict[str, str], name: str) -> Path | None:

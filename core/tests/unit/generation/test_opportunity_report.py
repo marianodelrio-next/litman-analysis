@@ -6,6 +6,7 @@ import pytest
 from pypdf import PdfReader
 from litman_core.generation.opportunity_report import generate_opportunity_report
 from litman_core.generation.opportunity_report import build_report_model, render_html
+import litman_core.generation.opportunity_report.generator as generator
 
 def _template(): return {"id":"executive-v1", "version":"1.2.0", "document":{"max_pages":2}, "limits":{"sources":8}}
 def _result(): return {"extraction":{"ficha":{"objeto_contrato":"Servicio", "presupuesto":{"base_sin_iva":10,"moneda":"EUR"}, "fecha_limite_presentacion":None, "equipo":{"perfiles":["consultor"]}, "stack_tecnologico":{"tecnologias":["CTIS"]}, "certificaciones_exigidas":[{"nombre":"ISO 9001"}], "solvencia_tecnica":"experiencia", "solvencia_economica":"volumen", "lotes":{"existen":None}}, "clasificacion":{}, "calidad_informacion":{"estado":"parcial"}, "control_documental":{"documentos":[]}}, "decision":{"accion":"continuar", "evaluaciones":[]}, "validation":{"valid":True}}
@@ -43,3 +44,16 @@ def test_pdf_is_business_focused_and_within_two_pages(tmp_path: Path):
     assert manifest["validation"]["page_count"] <= 2 and "Información disponible para la valoración" in text
     assert "No se ha localizado la fecha límite" in text
     for unwanted in ("quote_not_found", "ev_", "Validación técnica de la extracción", "Abrir original", "Verificación:"): assert unwanted not in text
+
+
+def test_windows_browser_discovery_prefers_path(monkeypatch):
+    monkeypatch.setattr(generator.platform, "system", lambda: "Windows")
+    monkeypatch.setattr(generator.shutil, "which", lambda name: r"C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe" if name == "msedge" else None)
+    assert generator._find_browser("google-chrome").endswith("msedge.exe")
+
+
+def test_explicit_browser_is_preserved(monkeypatch, tmp_path: Path):
+    browser = tmp_path / "browser"
+    browser.write_text("", encoding="utf-8")
+    monkeypatch.setattr(generator.shutil, "which", lambda name: None)
+    assert generator._find_browser(str(browser)) == str(browser)

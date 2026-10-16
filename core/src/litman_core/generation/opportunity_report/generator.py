@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import os
+import platform
 import shutil
 import subprocess
 import tempfile
@@ -25,7 +27,7 @@ def generate_opportunity_report(run_dir: Path, *, template_id: str = "executive-
     html_path.write_text(render_html(report, manifest), encoding="utf-8")
     pdf_path = output / "ficha_oportunidad.pdf"
     validation = {"valid": False, "html": str(html_path), "pdf": str(pdf_path), "errors": [], "warnings": []}
-    chrome = shutil.which(chrome_binary) or (chrome_binary if Path(chrome_binary).exists() else None)
+    chrome = _find_browser(chrome_binary)
     if not chrome:
         validation["errors"].append(f"No se encuentra el renderizador PDF: {chrome_binary}")
     else:
@@ -63,3 +65,24 @@ def _load_evidence_index(run_dir: Path) -> dict:
 
 def _read(path: Path) -> dict: return json.loads(path.read_text(encoding="utf-8"))
 def _write(path: Path, value: object) -> None: path.write_text(json.dumps(value, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _find_browser(browser: str) -> str | None:
+    explicit = shutil.which(browser) or (browser if Path(browser).is_file() else None)
+    if explicit or browser != "google-chrome" or platform.system() != "Windows":
+        return explicit
+    for name in ("google-chrome", "chrome", "msedge", "msedge.exe", "chrome.exe"):
+        found = shutil.which(name)
+        if found:
+            return found
+    roots = [os.environ.get("PROGRAMFILES"), os.environ.get("PROGRAMFILES(X86)"), os.environ.get("LOCALAPPDATA")]
+    suffixes = (
+        ("Google", "Chrome", "Application", "chrome.exe"),
+        ("Microsoft", "Edge", "Application", "msedge.exe"),
+    )
+    for root in filter(None, roots):
+        for suffix in suffixes:
+            candidate = Path(root).joinpath(*suffix)
+            if candidate.is_file():
+                return str(candidate)
+    return None

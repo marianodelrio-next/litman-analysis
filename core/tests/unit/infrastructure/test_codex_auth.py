@@ -1,6 +1,7 @@
 from pathlib import Path
 import pytest
 from litman_core.infrastructure.llm.codex_auth import CodexAuthentication, CodexAuthenticationError
+import litman_core.infrastructure.llm.codex_auth as codex_auth
 
 def secret(tmp_path: Path, value: str = "secret") -> Path:
     path = tmp_path / "secret"
@@ -41,6 +42,13 @@ def test_chatgpt_rejects_unsafe_auth_permissions(tmp_path):
     (home / "auth.json").chmod(0o644)
     with pytest.raises(CodexAuthenticationError, match="0600"):
         CodexAuthentication.from_environment({}, codex_home=home)
+
+
+def test_windows_does_not_interpret_posix_auth_bits_as_acl(tmp_path, monkeypatch):
+    monkeypatch.setattr(codex_auth.platform, "system", lambda: "Windows")
+    home = chatgpt_home(tmp_path)
+    (home / "auth.json").chmod(0o644)
+    assert CodexAuthentication.from_environment({}, codex_home=home).mode == "chatgpt"
 
 def test_api_key_only(tmp_path):
     auth = CodexAuthentication.from_environment({

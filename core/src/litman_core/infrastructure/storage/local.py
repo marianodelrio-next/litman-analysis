@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import os
+import platform
 import shutil
+import stat
 import uuid
 from pathlib import Path
 
@@ -38,7 +40,7 @@ class LocalArtifactPublisher:
                     os.rename(backup, run_dir)
                     raise
                 try:
-                    shutil.rmtree(backup)
+                    _rmtree(backup)
                 except Exception:
                     # A successful rename is not enough: retain the complete
                     # diagnostic run if removing its backup cannot be proven.
@@ -46,6 +48,19 @@ class LocalArtifactPublisher:
                     os.rename(backup, run_dir)
                     raise
             except Exception:
-                shutil.rmtree(temporary, ignore_errors=True)
+                if temporary.exists():
+                    _rmtree(temporary)
                 raise
         return tuple(PublishedArtifact(item.relative_path, (run_dir / item.relative_path).as_uri(), item.checksum, item.role) for item in inventory)
+
+
+def _rmtree(path: Path) -> None:
+    if platform.system() == "Windows":
+        shutil.rmtree(path, onerror=_remove_readonly)
+    else:
+        shutil.rmtree(path)
+
+
+def _remove_readonly(function, path: str, _exc_info) -> None:
+    os.chmod(path, stat.S_IWRITE)
+    function(path)

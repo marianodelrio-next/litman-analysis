@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import os
+import platform
+import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -22,8 +24,8 @@ class Settings:
     claude_binary: str = field(default_factory=lambda: os.getenv("LITMAN_CORE_CLAUDE_BINARY", "claude"))
     claude_config_dir: Path | None = field(default_factory=lambda: _env_path("LITMAN_CORE_CLAUDE_CONFIG_DIR"))
     max_file_mb: int = 25
-    workspace_root: Path = field(default_factory=lambda: _env_path("LITMAN_CORE_WORKSPACE_DIR") or Path("/tmp/litman-core"))
-    home_dir: Path = field(default_factory=lambda: _env_path("HOME") or Path("/tmp/litman-core/home"))
+    workspace_root: Path = field(default_factory=lambda: _env_path("LITMAN_CORE_WORKSPACE_DIR") or _default_workspace())
+    home_dir: Path = field(default_factory=lambda: _env_path("HOME") or _default_home())
     codex_home_dir: Path = field(default_factory=lambda: _env_path("CODEX_HOME") or Path.home() / ".codex")
     google_credentials_file: Path | None = field(default_factory=lambda: _env_path("GOOGLE_APPLICATION_CREDENTIALS"))
 
@@ -35,3 +37,15 @@ class Settings:
 def _env_path(name: str) -> Path | None:
     value = os.getenv(name)
     return Path(value).expanduser() if value else None
+
+
+def _default_workspace() -> Path:
+    if platform.system() == "Windows":
+        return Path(tempfile.gettempdir()) / "litman-core"
+    return Path("/tmp/litman-core")
+
+
+def _default_home() -> Path:
+    if platform.system() == "Windows":
+        return Path.home()
+    return Path("/tmp/litman-core/home")

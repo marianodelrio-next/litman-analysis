@@ -2,7 +2,10 @@
 from __future__ import annotations
 
 import json
+import os
+import platform
 import shutil
+import stat
 import tempfile
 from contextlib import contextmanager
 from dataclasses import dataclass, replace
@@ -109,7 +112,7 @@ class JobRunner:
             if isinstance(exc, CoreError): raise
             raise CoreError("internal", str(exc), run_dir) from exc
         finally:
-            if workspace is not None: shutil.rmtree(workspace, ignore_errors=True)
+            if workspace is not None: _rmtree(workspace)
 
     def _drive_service(self, job: JobRequest) -> Any | None:
         if job.input_kind is not StorageKind.GOOGLE_DRIVE and not job.google_drive_folder_id: return None
@@ -139,3 +142,15 @@ class JobRunner:
         missing = [name for name in required if not (output / name).is_file()]
         if missing: raise ValueError(f"El run no contiene: {', '.join(missing)}")
         if json.loads((output / "validation.json").read_text(encoding="utf-8")).get("valid") is not True: raise ValueError("No se publica un run no validado")
+
+
+def _rmtree(path: Path) -> None:
+    if platform.system() == "Windows":
+        shutil.rmtree(path, onerror=_remove_readonly)
+    else:
+        shutil.rmtree(path)
+
+
+def _remove_readonly(function, path: str, _exc_info) -> None:
+    os.chmod(path, stat.S_IWRITE)
+    function(path)

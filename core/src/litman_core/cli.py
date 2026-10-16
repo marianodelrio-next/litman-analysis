@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import platform
 import sys
 from pathlib import Path
 
@@ -32,7 +33,7 @@ def main(argv: list[str] | None = None) -> None:
 
 def _info() -> None:
     payload = {"contract": CONTRACT, "version": __version__, "providers": sorted(PROVIDERS)}
-    print(json.dumps(payload, ensure_ascii=False, indent=2))
+    _emit_json(payload)
 
 
 def _run(args: argparse.Namespace) -> None:
@@ -60,7 +61,7 @@ def _run(args: argparse.Namespace) -> None:
         }
         if result.remote:
             payload["remote"] = result.remote
-        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        _emit_json(payload)
     except Exception as exc:
         code = exc.code if isinstance(exc, CoreError) else "internal"
         message = exc.message if isinstance(exc, CoreError) else str(exc)
@@ -68,8 +69,14 @@ def _run(args: argparse.Namespace) -> None:
         local_path = getattr(exc, "local_path", None)
         if local_path:
             payload["local_path"] = str(local_path)
-        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        _emit_json(payload)
         raise SystemExit(1) from exc
+
+
+def _emit_json(payload: dict[str, object]) -> None:
+    if platform.system() == "Windows" and hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
+    print(json.dumps(payload, ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":

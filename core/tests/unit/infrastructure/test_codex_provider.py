@@ -6,6 +6,9 @@ import pytest
 
 from litman_core.application.ports.llm import output_paths_for_run
 from litman_core.infrastructure.llm.codex_cli import CodexProvider, CodexTimeoutError, CodexToolExecutionError
+from litman_core.infrastructure.llm.codex_cli import _child_environment
+from litman_core.infrastructure.llm.codex_auth import CodexAuthentication
+import litman_core.infrastructure.llm.codex_cli as codex_cli
 
 
 FAKE_CODEX = r'''#!/usr/bin/env python3
@@ -151,3 +154,12 @@ def test_missing_binary_is_llm_unavailable(tmp_path: Path) -> None:
             case_dir=tmp_path, output_paths=paths,
         )
     assert exc_info.value.code == "llm_unavailable"
+
+
+def test_windows_child_environment_is_allowlisted_case_insensitively(monkeypatch) -> None:
+    monkeypatch.setattr(codex_cli.platform, "system", lambda: "Windows")
+    monkeypatch.setenv("windir", r"C:\\Windows")
+    monkeypatch.setenv("UNRELATED_SECRET", "hidden")
+    environment = _child_environment(CodexAuthentication(mode="chatgpt"), home=None, codex_home=None)
+    assert environment["windir"] == r"C:\\Windows"
+    assert "UNRELATED_SECRET" not in environment

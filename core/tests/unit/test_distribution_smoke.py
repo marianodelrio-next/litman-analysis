@@ -1,9 +1,14 @@
 import os
+import platform
 from pathlib import Path
 import subprocess
 
 
 ROOT = Path(__file__).parents[2]
+
+
+def _venv_path(environment: Path, name: str) -> Path:
+    return environment / ("Scripts" if platform.system() == "Windows" else "bin") / name
 
 
 def _run(command, *, cwd=None):
@@ -39,11 +44,12 @@ def test_installed_wheel_runs_outside_checkout(tmp_path):
 
     environment = tmp_path / "venv"
     _run(["uv", "venv", "--python", "3.11", str(environment)])
-    _run(["uv", "pip", "install", "--python", str(environment / "bin/python"), str(wheels[0])])
+    _run(["uv", "pip", "install", "--python", str(_venv_path(environment, "python.exe" if platform.system() == "Windows" else "python")), str(wheels[0])])
 
     outside_checkout = tmp_path / "outside-checkout"
     outside_checkout.mkdir()
-    version = _run([str(environment / "bin/litman-core"), "--version"], cwd=outside_checkout)
+    executable = "litman-core.exe" if platform.system() == "Windows" else "litman-core"
+    version = _run([str(_venv_path(environment, executable)), "--version"], cwd=outside_checkout)
     assert version.stdout.strip()
 
     check_resource = (
@@ -55,4 +61,4 @@ def test_installed_wheel_runs_outside_checkout(tmp_path):
         "assert 'site-packages' in str(resource); "
         "assert resource.read_text(encoding='utf-8').startswith('{')"
     )
-    _run([str(environment / "bin/python"), "-c", check_resource], cwd=outside_checkout)
+    _run([str(_venv_path(environment, "python.exe" if platform.system() == "Windows" else "python")), "-c", check_resource], cwd=outside_checkout)

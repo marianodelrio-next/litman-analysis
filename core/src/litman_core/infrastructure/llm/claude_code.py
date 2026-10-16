@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import json, os, shutil, subprocess, time
+import json, os, platform, shutil, subprocess, time
 from pathlib import Path
 from litman_core.application.ports.llm import LLMResult
 from litman_core.errors import CoreError
@@ -34,6 +34,8 @@ class ClaudeCodeProvider:
             output_paths.response.write_text("", encoding="utf-8")
             output_paths.summary.write_text(json.dumps({"provider":"claude-code","model":self.model or "claude_default","status":"binary_missing","duration_seconds":0,"output":str(output_paths.response),"usage":{},"error":"binary_missing"}, indent=2), encoding="utf-8")
             raise CoreError("llm_unavailable", f"No se encuentra Claude Code CLI ({self.binary!r}); revisa {output_paths.summary.name}")
+        if platform.system() == "Windows" and Path(executable).suffix.lower() in {".cmd", ".bat"}:
+            raise CoreError("llm_unavailable", "Claude Code debe usar el binario nativo .exe en Windows; configura LITMAN_CORE_CLAUDE_BINARY con esa ruta.")
         try:
             prepared_schema = self._prepare_schema(schema_path)
         except (OSError, json.JSONDecodeError, ValueError) as exc:
@@ -53,11 +55,16 @@ class ClaudeCodeProvider:
         command = [executable, "-p", "--output-format", "json", "--json-schema", prepared_schema, "--safe-mode", "--restricted", "--permission-mode", "dontAsk", "--permission-prompts", "none", "--tools", "Read"]
         if self.model: command += ["--model", self.model]
         allowed = {"PATH", "LANG", "LC_ALL", "LC_CTYPE", "SSL_CERT_FILE", "REQUESTS_CA_BUNDLE", "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "HOME"}
-        env = {k: v for k, v in os.environ.items() if k in allowed}
+        if platform.system() == "Windows":
+            allowed.update({"SystemRoot", "WINDIR", "USERPROFILE", "APPDATA", "LOCALAPPDATA", "TEMP", "TMP", "PATHEXT", "COMSPEC"})
+            allowed = {name.upper() for name in allowed}
+            env = {name: value for name, value in os.environ.items() if name.upper() in allowed}
+        else:
+            env = {name: value for name, value in os.environ.items() if name in allowed}
         if self.config_dir: env["CLAUDE_CONFIG_DIR"] = str(self.config_dir)
         started = time.monotonic()
         try:
-            result = subprocess.run(command, input=f"{instructions}\n\n---\n\n{prompt}", text=True, cwd=case_dir, capture_output=True, timeout=self.timeout_seconds, env=env)
+            result = subprocess.run(command, input=f"{instructions}\n\n---\n\n{prompt}", text=True, encoding="utf-8", errors="replace", cwd=case_dir, capture_output=True, timeout=self.timeout_seconds, env=env)
         except subprocess.TimeoutExpired as exc:
             stderr = (exc.stderr or "") if isinstance(exc.stderr, str) else ""
             output_paths.stderr.write_text(stderr, encoding="utf-8")

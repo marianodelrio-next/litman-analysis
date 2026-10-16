@@ -14,12 +14,15 @@ Requisitos: Python 3.11+, `uv`, Codex CLI y autenticación de Codex configurada
 `CODEX_HOME/auth.json`, por defecto `~/.codex/auth.json`, con permisos
 `0600`).
 
-En Ubuntu también puede usarse la sesión local de Claude Code sin guardar
+En Ubuntu y Windows 10/11 también puede usarse la sesión local de Claude Code sin guardar
 tokens en LitMan: use `[llm] provider = "claude-code"` en `config.toml` (el
 proveedor y el modelo sólo se eligen ahí; no hay variables de entorno para
 elegirlos). Codex es el valor predeterminado. Claude se ejecuta en modo no
-interactivo y sólo con lectura del workspace privado. Windows, Docker con
-Claude y cancelación explícita quedan fuera de alcance.
+interactivo y sólo con lectura del workspace privado. En Windows Claude debe
+resolverse a su binario nativo `.exe`, no a un lanzador `.cmd`/`.bat`. Docker
+con Claude y cancelación explícita quedan fuera de alcance. La comprobación de
+CLI y de impresión PDF en una instalación Windows real se describe en
+[`../docs/windows_manual.md`](../docs/windows_manual.md).
 
 ```bash
 cd core

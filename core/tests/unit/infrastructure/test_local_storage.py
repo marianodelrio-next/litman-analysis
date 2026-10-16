@@ -3,6 +3,7 @@ from pathlib import Path
 from litman_core.domain.jobs import JobType
 from litman_core.infrastructure.storage.common import publication_inventory
 from litman_core.infrastructure.storage.local import LocalArtifactPublisher, LocalDocumentSource
+import litman_core.infrastructure.storage.local as local
 
 
 def test_local_source_materializes_an_isolated_copy(tmp_path: Path) -> None:
@@ -35,7 +36,6 @@ def test_catalog_cleanup_failure_restores_complete_run(tmp_path: Path, monkeypat
     run = tmp_path / "run"; output = run / "output"; output.mkdir(parents=True)
     (output / "ficha_oportunidad.pdf").write_bytes(b"pdf"); (run / "lineage.json").write_text("{}")
     inventory = publication_inventory(run, JobType.ASSESSMENT, False)
-    import litman_core.infrastructure.storage.local as local
     real_rmtree = local.shutil.rmtree
     def fail_backup(path, *args, **kwargs):
         if ".complete-" in str(path): raise OSError("cleanup failed")
@@ -44,6 +44,23 @@ def test_catalog_cleanup_failure_restores_complete_run(tmp_path: Path, monkeypat
     import pytest
     with pytest.raises(OSError): LocalArtifactPublisher().publish(run, inventory, include_run_files=False)
     assert (run / "lineage.json").is_file()
+
+
+def test_windows_cleanup_retries_readonly_file(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(local.platform, "system", lambda: "Windows")
+    seen = {}
+
+    def fake_rmtree(path, *, onerror):
+        seen["path"] = path
+        onerror(__import__("os").unlink, str(path / "readonly"), None)
+
+    monkeypatch.setattr(local.shutil, "rmtree", fake_rmtree)
+    changed = []
+    monkeypatch.setattr(local.os, "chmod", lambda path, mode: changed.append((path, mode)))
+    monkeypatch.setattr(local.os, "unlink", lambda path: seen.setdefault("retried", path))
+    local._rmtree(tmp_path / "workspace")
+    assert seen["path"] == tmp_path / "workspace"
+    assert changed and seen["retried"].endswith("readonly")
 
 
 def test_assessment_catalog_role_is_opportunity_report(tmp_path: Path) -> None:

@@ -6,6 +6,7 @@ import pytest
 
 from litman_core.application.ports.llm import output_paths_for_run
 from litman_core.infrastructure.llm.claude_code import ClaudeCodeProvider
+import litman_core.infrastructure.llm.claude_code as claude_code
 
 
 def _run(tmp_path, monkeypatch, payload, *, returncode=0, stderr=""):
@@ -32,6 +33,25 @@ def test_valid_response_argv_stdin_and_sanitized_environment(tmp_path, monkeypat
     assert seen["input"] == "system\n\n---\n\nprompt"
     assert "SECRET_TOKEN" not in seen["env"]
     assert all(p.exists() for p in (paths.events, paths.stderr, paths.response, paths.summary))
+
+
+def test_windows_environment_is_allowlisted_case_insensitively(tmp_path, monkeypatch):
+    monkeypatch.setattr(claude_code.platform, "system", lambda: "Windows")
+    monkeypatch.setenv("systemroot", r"C:\\Windows")
+    monkeypatch.setenv("SECRET_TOKEN", "hidden")
+    _, seen, _ = _run(tmp_path, monkeypatch, {"structured_output": {"ok": True}})
+    assert seen["env"]["systemroot"] == r"C:\\Windows"
+    assert "SECRET_TOKEN" not in seen["env"]
+    assert seen["encoding"] == "utf-8" and seen["errors"] == "replace"
+
+
+def test_windows_rejects_cmd_launcher_before_schema_or_process(tmp_path, monkeypatch):
+    monkeypatch.setattr(claude_code.platform, "system", lambda: "Windows")
+    monkeypatch.setattr("shutil.which", lambda _: r"C:\\tools\\claude.cmd")
+    schema = tmp_path / "schema.json"; schema.write_text("{}", encoding="utf-8")
+    paths = output_paths_for_run(tmp_path / "run", "cmd")
+    with pytest.raises(RuntimeError, match=".exe"):
+        ClaudeCodeProvider().generate(instructions="", prompt="", schema_path=schema, case_dir=tmp_path, output_paths=paths)
 
 
 def test_schema_argument_removes_draft_metadata_but_preserves_constraints(tmp_path, monkeypatch):

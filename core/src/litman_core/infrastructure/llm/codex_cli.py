@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import platform
 import shutil
 import subprocess
 import sys
@@ -112,6 +113,8 @@ class CodexProvider:
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             bufsize=1,
             env=_child_environment(authentication, home=self.home, codex_home=self.codex_home),
         )
@@ -333,7 +336,12 @@ def _write_json(path: Path, value: object) -> None:
 def _child_environment(authentication: CodexAuthentication, *, home: Path | None, codex_home: Path | None) -> dict[str, str]:
     """A narrowly scoped environment, inherited by any agent tools as well."""
     allowed = {"PATH", "LANG", "LC_ALL", "LC_CTYPE", "SSL_CERT_FILE", "SSL_CERT_DIR", "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "http_proxy", "https_proxy", "no_proxy"}
-    env = {name: value for name, value in os.environ.items() if name in allowed}
+    if platform.system() == "Windows":
+        allowed.update({"SystemRoot", "WINDIR", "USERPROFILE", "APPDATA", "LOCALAPPDATA", "TEMP", "TMP", "PATHEXT", "COMSPEC"})
+        allowed = {name.upper() for name in allowed}
+        env = {name: value for name, value in os.environ.items() if name.upper() in allowed}
+    else:
+        env = {name: value for name, value in os.environ.items() if name in allowed}
     env["HOME"] = str(home or os.environ.get("HOME", "/tmp/litman-core/home"))
     env["CODEX_HOME"] = str(codex_home or os.environ.get("CODEX_HOME", str(Path.home() / ".codex")))
     env.update(authentication.environment())
