@@ -3,6 +3,7 @@ from __future__ import annotations
 import json, os, shutil, subprocess, time
 from pathlib import Path
 from litman_core.application.ports.llm import LLMResult
+from litman_core.errors import CoreError
 from .codex_cli import _prepare_output_paths
 
 class ClaudeCodeProvider:
@@ -32,7 +33,7 @@ class ClaudeCodeProvider:
         if executable is None:
             output_paths.response.write_text("", encoding="utf-8")
             output_paths.summary.write_text(json.dumps({"provider":"claude-code","model":self.model or "claude_default","status":"binary_missing","duration_seconds":0,"output":str(output_paths.response),"usage":{},"error":"binary_missing"}, indent=2), encoding="utf-8")
-            raise RuntimeError(f"No se encuentra Claude Code CLI ({self.binary!r}); revisa {output_paths.summary.name}")
+            raise CoreError("llm_unavailable", f"No se encuentra Claude Code CLI ({self.binary!r}); revisa {output_paths.summary.name}")
         try:
             prepared_schema = self._prepare_schema(schema_path)
         except (OSError, json.JSONDecodeError, ValueError) as exc:
@@ -69,7 +70,10 @@ class ClaudeCodeProvider:
             reason = "authentication" if any(x in result.stderr.lower() for x in ("auth", "login", "unauthorized")) else ("schema" if "schema" in result.stderr.lower() else "process_failed")
             output_paths.response.write_text("", encoding="utf-8")
             output_paths.summary.write_text(json.dumps({"provider":"claude-code","model":self.model or "claude_default","status":reason,"exit_code":result.returncode,"duration_seconds":round(time.monotonic()-started,3),"output":str(output_paths.response),"usage":{},"error":reason}, indent=2), encoding="utf-8")
-            raise RuntimeError(f"Claude Code terminó con error ({reason}); revisa {output_paths.stderr.name}")
+            message = f"Claude Code terminó con error ({reason}); revisa {output_paths.stderr.name}"
+            if reason == "authentication":
+                raise CoreError("llm_unavailable", message)
+            raise RuntimeError(message)
         try: payload = json.loads(result.stdout)
         except json.JSONDecodeError as exc:
             output_paths.response.write_text(result.stdout, encoding="utf-8")

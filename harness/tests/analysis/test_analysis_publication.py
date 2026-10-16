@@ -37,7 +37,7 @@ class Setup:
             return base(command, **kwargs)
 
         return AnalysisService(self.drive, self.store, work_root=self.tmp_path / "work", run=run,
-                               publication=self.publication)
+                               publication=self.publication, settings=lambda: {"provider": "codex"})
 
     def manifest(self) -> Manifest:
         resource = next(item for item in self.drive.resources.values() if item.name == "manifest.json")
@@ -52,10 +52,10 @@ class Setup:
 
 def test_preview_includes_publication_and_validates_it_before_core(tmp_path: Path):
     with pytest.raises(HarnessError) as raised:
-        Setup(tmp_path / "new", incorporate=False).analysis().preview("root", ["source"], "assessment", "codex")
+        Setup(tmp_path / "new", incorporate=False).analysis().preview("root", ["source"], "assessment")
     assert raised.value.code == "dossier_not_adopted"
     setup = Setup(tmp_path)
-    plan = setup.analysis("detailed-analysis").preview("root", ["source"], "detailed-analysis", "codex")
+    plan = setup.analysis("detailed-analysis").preview("root", ["source"], "detailed-analysis")
     kinds = [a.kind for a in plan.actions]
     assert kinds == ["download_original", "run_core", "publish_results", "convert_live_offer", "set_phase",
                      "update_context", "update_manifest"]
@@ -72,14 +72,14 @@ def test_missing_offer_folder_fails_in_preview_not_after_core(tmp_path: Path):
     manifest.folders["offer"] = None
     setup.drive.write_text(resource.id, manifest.serialize())
     with pytest.raises(HarnessError) as raised:
-        setup.analysis("detailed-analysis").preview("root", ["source"], "detailed-analysis", "codex")
+        setup.analysis("detailed-analysis").preview("root", ["source"], "detailed-analysis")
     assert raised.value.code == "folder_not_registered" and setup.core_calls == []
 
 
 def test_one_acceptance_runs_core_publishes_and_advances_the_phase(tmp_path: Path):
     setup = Setup(tmp_path)
     analysis = setup.analysis()
-    plan = analysis.preview("root", ["source"], "assessment", "codex")
+    plan = analysis.preview("root", ["source"], "assessment")
     result = analysis.execute(plan.id)
     assert result["publication"]["status"] == "succeeded"
     manifest = setup.manifest()
@@ -94,13 +94,13 @@ def test_one_acceptance_runs_core_publishes_and_advances_the_phase(tmp_path: Pat
 def test_detailed_analysis_converts_the_live_offer_and_phase_never_goes_back(tmp_path: Path):
     setup = Setup(tmp_path)
     analysis = setup.analysis("detailed-analysis")
-    analysis.execute(analysis.preview("root", ["source"], "detailed-analysis", "codex").id)
+    analysis.execute(analysis.preview("root", ["source"], "detailed-analysis").id)
     manifest = setup.manifest()
     assert manifest.workflow_phase == "analisis_detallado"
     assert setup.drive.resources[manifest.live_offer["document_id"]].mime_type == GOOGLE_DOC_MIME
     setup.set_phase("oferta_en_preparacion")
     assessment = setup.analysis()
-    plan = assessment.preview("root", ["source"], "assessment", "codex")
+    plan = assessment.preview("root", ["source"], "assessment")
     assert "set_phase" not in [a.kind for a in plan.actions]
     assessment.execute(plan.id)
     assert setup.manifest().workflow_phase == "oferta_en_preparacion"
@@ -109,7 +109,7 @@ def test_detailed_analysis_converts_the_live_offer_and_phase_never_goes_back(tmp
 def test_phase_set_after_preview_is_not_moved_back_at_publication(tmp_path: Path):
     setup = Setup(tmp_path)
     analysis = setup.analysis()
-    plan = analysis.preview("root", ["source"], "assessment", "codex")
+    plan = analysis.preview("root", ["source"], "assessment")
     assert "set_phase" in [a.kind for a in plan.actions]
     setup.set_phase("analisis_detallado")
     analysis.execute(plan.id)
@@ -119,7 +119,7 @@ def test_phase_set_after_preview_is_not_moved_back_at_publication(tmp_path: Path
 def test_publication_failure_is_recoverable_with_the_same_plan_id(tmp_path: Path):
     setup = Setup(tmp_path)
     analysis = setup.analysis()
-    plan = analysis.preview("root", ["source"], "assessment", "codex")
+    plan = analysis.preview("root", ["source"], "assessment")
     setup.state.race_before_update = {"manifest.json"}
     failed = analysis.execute(plan.id)
     assert failed["publication"]["status"] == "failed"
@@ -139,7 +139,7 @@ def test_publication_failure_is_recoverable_with_the_same_plan_id(tmp_path: Path
 def test_publication_can_also_be_resumed_with_apply_publication(tmp_path: Path):
     setup = Setup(tmp_path)
     analysis = setup.analysis()
-    plan = analysis.preview("root", ["source"], "assessment", "codex")
+    plan = analysis.preview("root", ["source"], "assessment")
     setup.state.race_before_update = {"manifest.json"}
     analysis.execute(plan.id)
     publication_plan = setup.store.record(setup.drive.user, plan.operation_id).result["publication_plan_id"]
@@ -150,7 +150,7 @@ def test_publication_can_also_be_resumed_with_apply_publication(tmp_path: Path):
 def test_gate_closed_publication_keeps_the_analysis_local(tmp_path: Path):
     setup = Setup(tmp_path, gated=True)
     analysis = setup.analysis()
-    plan = analysis.preview("root", ["source"], "assessment", "codex")
+    plan = analysis.preview("root", ["source"], "assessment")
     result = analysis.execute(plan.id)
     assert result["publication"]["status"] == "pending_concurrency_gate"
     assert Path(result["workspace"]).is_dir() and setup.manifest().analyses == []

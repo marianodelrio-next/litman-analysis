@@ -29,8 +29,9 @@ class Setup:
             assert self.dossier.apply_incorporation(plan.id)["status"] == "succeeded"
 
     def analyse(self, job_type: str) -> dict:
-        analysis = AnalysisService(self.drive, self.store, work_root=self.work, run=core_run(job_type))
-        return analysis.execute(analysis.preview("root", ["source"], job_type, "codex").id)
+        analysis = AnalysisService(self.drive, self.store, work_root=self.work, run=core_run(job_type),
+                                   settings=lambda: {"provider": "codex"})
+        return analysis.execute(analysis.preview("root", ["source"], job_type).id)
 
     def manifest(self) -> Manifest:
         resource = next(item for item in self.drive.resources.values() if item.name == "manifest.json")
@@ -85,7 +86,7 @@ def test_first_detailed_analysis_converts_one_live_offer_and_reanalysis_keeps_it
     offer = setup.drive.resources[manifest.live_offer["document_id"]]
     assert offer.mime_type == GOOGLE_DOC_MIME and offer.parents == (manifest.folders["offer"],)
     assert manifest.live_offer["origin_kind"] == "core_conversion"
-    technical = next(a for a in first["artifacts"] if a["role"] == "technical-document")
+    technical = next(a for a in first["artifacts"] if a["role"] == "technical_document")
     assert technical["name"] == "memoria_tecnica.docx"
     assert manifest.live_offer["origin_artifact_id"] == technical["file_id"]
     second_analysis = setup.analyse("detailed-analysis")

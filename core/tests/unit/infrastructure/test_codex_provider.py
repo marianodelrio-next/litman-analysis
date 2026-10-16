@@ -141,3 +141,13 @@ def test_provider_accepts_search_without_matches_in_strict_mode(tmp_path: Path) 
     assert result.execution["empty_search_count"] == 1
     summary = json.loads(paths.summary.read_text(encoding="utf-8"))
     assert summary["events"]["empty_searches"] == 1
+
+
+def test_missing_binary_is_llm_unavailable(tmp_path: Path) -> None:
+    paths = output_paths_for_run(tmp_path / "run")
+    with pytest.raises(RuntimeError) as exc_info:
+        CodexProvider(binary=str(tmp_path / "does-not-exist")).generate(
+            instructions="instructions", prompt="prompt", schema_path=_schema(tmp_path),
+            case_dir=tmp_path, output_paths=paths,
+        )
+    assert exc_info.value.code == "llm_unavailable"

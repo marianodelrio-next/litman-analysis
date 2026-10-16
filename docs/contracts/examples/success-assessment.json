@@ -1,0 +1,15 @@
+{
+  "contract": 1,
+  "status": "succeeded",
+  "job_id": "licitacion-ayuntamiento-2026",
+  "publication_id": "licitacion-ayuntamiento-2026-20261016T090000.000000Z",
+  "local_path": "/runs/licitacion-ayuntamiento-2026-20261016T090000.000000Z",
+  "artifacts": [
+    {
+      "role": "opportunity_report",
+      "name": "ficha_oportunidad.pdf",
+      "uri": "file:///runs/licitacion-ayuntamiento-2026-20261016T090000.000000Z/ficha_oportunidad.pdf",
+      "checksum": "ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb"
+    }
+  ]
+}

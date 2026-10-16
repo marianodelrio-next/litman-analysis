@@ -4,24 +4,25 @@ import json
 import pytest
 
 from litman_core.application.job_loader import load_job
+from litman_core.generation_config import DEFAULT_GENERATION
 
 
 def _base(extra: str = "") -> str:
     return "[job]\nid='job'\ntype='detailed-analysis'\n[input]\nkind='local'\nlocation='input'\n[output]\ndirectory='runs'\n" + extra
 
 
-def test_generation_preferences_are_loaded_from_unified_toml(tmp_path: Path):
+def test_detailed_analysis_always_loads_default_generation(tmp_path: Path):
     config = tmp_path / "config.toml"
-    config.write_text(_base("[analysis.detailed.generation.technical_document]\ncontent_profile='draft-v1'\n"), encoding="utf-8")
+    config.write_text(_base(), encoding="utf-8")
     result = load_job(config).options["generation"]
-    assert result["technical_document"]["content_profile"] == "draft-v1"
-    assert "artifacts" not in result
+    assert result == DEFAULT_GENERATION
 
 
-@pytest.mark.parametrize("body", ["[analysis.detailed.generation]\nunknown=true\n", "[analysis.detailed.generation.technical_document]\noutput_language='es'\n"])
-def test_unified_toml_rejects_unknown_generation_keys_and_types(tmp_path: Path, body: str):
-    path = tmp_path / "bad.toml"; path.write_text(_base(body), encoding="utf-8")
-    with pytest.raises(ValueError): load_job(path)
+def test_analysis_table_is_rejected_as_unknown_root_key(tmp_path: Path):
+    path = tmp_path / "bad.toml"
+    path.write_text(_base("[analysis.detailed.generation.technical_document]\ncontent_profile='draft-v1'\n"), encoding="utf-8")
+    with pytest.raises(ValueError, match="analysis"):
+        load_job(path)
 
 
 @pytest.mark.parametrize("value", ["", " ", " \t "])

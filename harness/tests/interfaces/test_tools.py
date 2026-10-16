@@ -9,7 +9,7 @@ from litman_harness.interfaces.tools import invoke, registry, tool_descriptors
 
 OPERATIONS = {"identity", "diagnose", "inspect", "status", "preview_incorporation", "apply_incorporation",
               "preview_analysis", "execute_analysis", "discard_analysis", "preview_publication", "apply_publication",
-              "read_document", "preview_summary", "apply_summary", "recover"}
+              "read_document", "preview_summary", "apply_summary", "recover", "setup"}
 
 
 def test_registry_exposes_operations_with_schema_and_kind():
@@ -19,9 +19,14 @@ def test_registry_exposes_operations_with_schema_and_kind():
         assert descriptor["description"].startswith(("Consulta", "Mutación"))
     incorporation = registry()["preview_incorporation"].input_schema["properties"]
     assert incorporation["overwrite_context"]["type"] == "boolean"
+    preview_analysis = registry()["preview_analysis"].input_schema
+    assert "provider" not in preview_analysis["properties"]
+    setup_schema = registry()["setup"].input_schema
+    assert setup_schema["required"] == ["provider"]
+    assert "codex" in setup_schema["properties"]["provider"]["enum"]
     assert {tool.name for tool in registry().values() if tool.mutates} == {"apply_incorporation", "execute_analysis",
                                                                               "discard_analysis", "apply_publication",
-                                                                              "apply_summary"}
+                                                                              "apply_summary", "setup"}
 
 
 def test_invalid_arguments_are_invalid_request_before_building_services():
@@ -37,6 +42,16 @@ def test_invalid_arguments_are_invalid_request_before_building_services():
     envelope = invoke("preview_analysis", {"folder_id": "r", "original_ids": ["a"], "job_type": "assessment",
                                            "provider": "other"}, factory)
     assert envelope["error"]["code"] == "invalid_request"
+
+
+def test_preview_analysis_no_longer_accepts_a_provider_argument():
+    def factory():
+        raise AssertionError("services must not be built for invalid arguments")
+
+    envelope = invoke("preview_analysis", {"folder_id": "r", "original_ids": ["a"], "job_type": "assessment",
+                                           "provider": "codex"}, factory)
+    assert envelope["ok"] is False and envelope["error"]["code"] == "invalid_request"
+    assert envelope["error"]["details"]["unknown"] == ["provider"]
 
 
 def test_harness_errors_keep_their_code_and_unknown_operations_fail():

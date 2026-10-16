@@ -62,3 +62,7 @@ def token_path(env: Mapping[str, str]) -> Path:
 
 def client_path(env: Mapping[str, str]) -> Path:
     return _configured(env, OAUTH_CLIENT_ENV, config_dir(env) / "client_secret.json")
+
+
+def settings_path(env: Mapping[str, str]) -> Path:
+    return config_dir(env) / "settings.toml"

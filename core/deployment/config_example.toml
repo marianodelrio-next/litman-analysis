@@ -1,26 +1,18 @@
 [job]
-id = "licitacion-ayuntamiento-2026"
 type = "detailed-analysis"
+# id = "licitacion-ayuntamiento-2026"  # opcional: por defecto, el nombre de la carpeta de entrada (o el id de carpeta de Drive).
 
 [input]
-kind = "local"
 location = "./input"
+# kind = "local"  # opcional: "local" (predeterminado) o "google-drive".
 
 [output]
 directory = "./runs"
-# google_drive_folder_id = "DESTINATION_FOLDER_ID"
+# google_drive_folder_id = "DESTINATION_FOLDER_ID"  # opcional: sin él no hay réplica en Drive.
 
-# Proveedor y modelo opcionales: codex (predeterminado, gpt-5.6-luna) o claude-code.
 # [llm]
-# provider = "claude-code"
-# model = "sonnet"
+# provider = "codex"  # opcional: "codex" (predeterminado, gpt-5.6-luna) o "claude-code" (claude-sonnet-5).
+# model = "claude-sonnet-5"  # opcional: por defecto, el modelo predeterminado del proveedor.
 
-[publication]
-include_run_files = false
-
-[analysis.detailed.generation.technical_document]
-template_id = "next-standard-v1"
-content_profile = "skeleton-v1"
-
-[analysis.detailed.generation.economic_simulator]
-template_id = "standard-v1"
+# [publication]
+# include_run_files = false  # opcional: publica también archivos fuera del catálogo de entregables.

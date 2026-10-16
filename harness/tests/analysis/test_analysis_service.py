@@ -34,24 +34,38 @@ class Drive:
         destination.write_bytes(b"ok")
 
 
-def service(drive, tmp_path: Path, run=None) -> AnalysisService:
+def _settings(provider: str = "codex", model: str | None = None):
+    def get():
+        return {"provider": provider, **({"model": model} if model is not None else {})}
+    return get
+
+
+def service(drive, tmp_path: Path, run=None, *, settings=None) -> AnalysisService:
     kwargs = {"run": run} if run else {}
-    return AnalysisService(drive, PlanStore(tmp_path / "plans"), work_root=tmp_path / "work", **kwargs)
+    return AnalysisService(drive, PlanStore(tmp_path / "plans"), work_root=tmp_path / "work",
+                           settings=settings or _settings(), **kwargs)
 
 
 def test_analysis_preview_rejects_native_google_documents():
     drive = Drive()
     drive.item = replace(drive.item, mime_type="application/vnd.google-apps.document")
     with pytest.raises(HarnessError, match="no se exportan"):
-        AnalysisService(drive).preview("root", ["file"], "assessment", "codex")
+        AnalysisService(drive, settings=_settings()).preview("root", ["file"], "assessment")
+
+
+def test_analysis_preview_requires_setup():
+    with pytest.raises(HarnessError) as raised:
+        AnalysisService(Drive()).preview("root", ["file"], "assessment")
+    assert raised.value.code == "setup_required"
+    assert raised.value.details["recommended_action"]["tool"] == "setup"
 
 
 def test_analysis_preview_has_closed_catalog_versions_and_provider():
-    plan = AnalysisService(Drive()).preview("root", ["file"], "detailed-analysis", "claude-code")
+    plan = AnalysisService(Drive(), settings=_settings("claude-code")).preview("root", ["file"], "detailed-analysis")
     assert plan.snapshot == {"file": OK_MD5}
     assert plan.account_id == "person"
     run_core = plan.actions[-1].metadata
-    assert "simulador_economico.xlsx" in run_core["expected_catalog"]
+    assert "economic_simulator" in run_core["expected_roles"]
     assert run_core["provider"] == "claude-code" and run_core["includes_technical_document"] is True
 
 
@@ -59,7 +73,7 @@ def test_analysis_preview_rejects_original_outside_selected_root():
     drive = Drive()
     drive.item = replace(drive.item, parents=("other",))
     with pytest.raises(HarnessError, match="pertenecer"):
-        AnalysisService(drive).preview("root", ["file"], "assessment", "codex")
+        AnalysisService(drive, settings=_settings()).preview("root", ["file"], "assessment")
 
 
 def test_analysis_preview_accepts_original_in_expediente_subfolder():
@@ -68,19 +82,19 @@ def test_analysis_preview_accepts_original_in_expediente_subfolder():
     drive.item = replace(drive.item, parents=("folder",))
     original_get = drive.get
     drive.get = lambda file_id: folder if file_id == "folder" else original_get(file_id)
-    assert AnalysisService(drive).preview("root", ["file"], "assessment", "codex").snapshot["file"] == OK_MD5
+    assert AnalysisService(drive, settings=_settings()).preview("root", ["file"], "assessment").snapshot["file"] == OK_MD5
 
 
 def test_analysis_preview_rejects_missing_download_capability():
     drive = Drive()
     drive.item = replace(drive.item, capabilities={"canDownload": False})
     with pytest.raises(HarnessError, match="descargar"):
-        AnalysisService(drive).preview("root", ["file"], "assessment", "codex")
+        AnalysisService(drive, settings=_settings()).preview("root", ["file"], "assessment")
 
 
 def test_preview_rejects_unapproved_provider_without_storing_a_plan(tmp_path: Path):
     with pytest.raises(HarnessError) as raised:
-        service(Drive(), tmp_path).preview("root", ["file"], "assessment", "codex\"\n[output]")
+        service(Drive(), tmp_path, settings=_settings("codex\"\n[output]")).preview("root", ["file"], "assessment")
     assert raised.value.code == "invalid_provider"
     assert not (tmp_path / "plans").exists()
 
@@ -88,7 +102,7 @@ def test_preview_rejects_unapproved_provider_without_storing_a_plan(tmp_path: Pa
 def test_execute_retains_success_workspace_with_flat_public_artifacts(tmp_path: Path):
     drive = Drive()
     analysis = service(drive, tmp_path, core_run())
-    plan = analysis.preview("root", ["file"], "assessment", "codex")
+    plan = analysis.preview("root", ["file"], "assessment")
     result = analysis.execute(plan.id)
     assert result["status"] == "local_validated"
     workspace = Path(result["workspace"])
@@ -102,22 +116,27 @@ def test_execute_retains_success_workspace_with_flat_public_artifacts(tmp_path: 
 
 def test_execute_detailed_catalog_includes_the_single_technical_docx(tmp_path: Path):
     analysis = service(Drive(), tmp_path, core_run("detailed-analysis", technical="memoria_tecnica.docx"))
-    plan = analysis.preview("root", ["file"], "detailed-analysis", "codex")
+    plan = analysis.preview("root", ["file"], "detailed-analysis")
     result = analysis.execute(plan.id)
     names = [item["name"] for item in result["public_artifacts"]]
-    assert names == ["resumen_tecnico.docx", "guia_preparacion_oferta.docx", "simulador_economico.xlsx",
-                     "memoria_tecnica.docx"]
+    assert names == ["resumen_tecnico.docx", "guia_preparacion_oferta.docx", "memoria_tecnica.docx",
+                     "simulador_economico.xlsx"]
     assert all(Path(item["path"]).is_file() and len(item["sha256"]) == 64 for item in result["public_artifacts"])
-    assert result["public_artifacts"][-1]["role"] == "technical-document"
+    assert result["public_artifacts"][2]["role"] == "technical_document"
     run_dir = Path(result["local_path"])
     assert sorted(path.name for path in run_dir.iterdir()) == sorted(names)  # no internal Core file exists
 
 
 def test_execute_retains_failed_private_workspace(tmp_path: Path):
+    import json as _json
     def run(command, **kwargs):
-        return subprocess.CompletedProcess(command, 1, "", "failed")
+        if command[-1] == "info":
+            return subprocess.CompletedProcess(command, 0, _json.dumps(
+                {"contract": 1, "version": "0.1.0", "providers": ["claude-code", "codex"]}), "")
+        payload = {"contract": 1, "status": "failed", "error": {"code": "analysis_failed", "message": "fallo"}}
+        return subprocess.CompletedProcess(command, 1, _json.dumps(payload), "failed")
     analysis = service(Drive(), tmp_path, run)
-    plan = analysis.preview("root", ["file"], "assessment", "codex")
+    plan = analysis.preview("root", ["file"], "assessment")
     with pytest.raises(HarnessError) as raised:
         analysis.execute(plan.id)
     assert raised.value.code == "core_failed"
@@ -128,7 +147,7 @@ def test_execute_retains_failed_private_workspace(tmp_path: Path):
 def test_execute_rejects_original_changed_during_download(tmp_path: Path):
     drive = Drive()
     analysis = service(drive, tmp_path, core_run())
-    plan = analysis.preview("root", ["file"], "assessment", "codex")
+    plan = analysis.preview("root", ["file"], "assessment")
 
     def download(file_id, destination):
         destination.write_bytes(b"ok")
@@ -143,7 +162,7 @@ def test_execute_rejects_original_changed_during_download(tmp_path: Path):
 def test_execute_requires_stored_plan_of_active_account(tmp_path: Path):
     drive = Drive()
     analysis = service(drive, tmp_path, core_run())
-    plan = analysis.preview("root", ["file"], "assessment", "codex")
+    plan = analysis.preview("root", ["file"], "assessment")
     drive.about = lambda: {"user": {"permissionId": "other"}}
     with pytest.raises(HarnessError) as raised:
         analysis.execute(plan.id)
@@ -154,7 +173,7 @@ def test_execute_requires_stored_plan_of_active_account(tmp_path: Path):
 def test_execute_rejects_core_run_outside_private_output(tmp_path: Path):
     outside = tmp_path / "elsewhere"
     analysis = service(Drive(), tmp_path, core_run(local_path=outside))
-    plan = analysis.preview("root", ["file"], "assessment", "codex")
+    plan = analysis.preview("root", ["file"], "assessment")
     with pytest.raises(HarnessError) as raised:
         analysis.execute(plan.id)
     assert raised.value.code == "invalid_core_result" and "fuera del workspace" in str(raised.value)
@@ -169,8 +188,8 @@ def test_execute_registers_validated_result_and_replays(tmp_path: Path):
         return run(command, **kwargs)
 
     store = PlanStore(tmp_path / "plans")
-    analysis = AnalysisService(Drive(), store, work_root=tmp_path / "work", run=counted)
-    plan = analysis.preview("root", ["file"], "assessment", "codex")
+    analysis = AnalysisService(Drive(), store, work_root=tmp_path / "work", run=counted, settings=_settings())
+    plan = analysis.preview("root", ["file"], "assessment")
     result = analysis.execute(plan.id)
     record = store.record("person", plan.operation_id)
     assert record.kind == "analysis" and record.result == {k: v for k, v in result.items() if k != "operation_status"}
@@ -183,7 +202,7 @@ def test_execute_registers_validated_result_and_replays(tmp_path: Path):
 
 def test_discard_removes_only_the_local_workspace(tmp_path: Path):
     analysis = service(Drive(), tmp_path, core_run())
-    plan = analysis.preview("root", ["file"], "assessment", "codex")
+    plan = analysis.preview("root", ["file"], "assessment")
     workspace = Path(analysis.execute(plan.id)["workspace"])
     result = analysis.discard(plan.operation_id)
     assert result["status"] == "discarded" and not workspace.exists() and (tmp_path / "work").is_dir()
@@ -195,29 +214,31 @@ def test_discard_removes_only_the_local_workspace(tmp_path: Path):
 def test_execute_rejects_original_changed_after_preview(tmp_path: Path):
     drive = Drive()
     analysis = service(drive, tmp_path, core_run())
-    plan = analysis.preview("root", ["file"], "assessment", "codex")
+    plan = analysis.preview("root", ["file"], "assessment")
     drive.item = replace(drive.item, md5_checksum="0" * 32)
     with pytest.raises(HarnessError, match="antes de ejecutar") as raised:
         analysis.execute(plan.id)
     assert raised.value.code == "stale_plan" and not (tmp_path / "work").exists()
 
 
-def _extra(run_dir, payload):
+def _unknown_role(run_dir, payload):
     (run_dir / "extra.pdf").write_bytes(b"x")
-    payload["artifacts"].append({"name": "extra.pdf", "checksum": hashlib.sha256(b"x").hexdigest()})
+    payload["artifacts"].append({"role": "not_a_real_role", "name": "extra.pdf",
+                                 "checksum": hashlib.sha256(b"x").hexdigest()})
 
 
-def _missing(run_dir, payload):
-    payload["artifacts"] = [item for item in payload["artifacts"] if item["name"] != "simulador_economico.xlsx"]
+def _missing_role(run_dir, payload):
+    payload["artifacts"] = [item for item in payload["artifacts"] if item["role"] != "economic_simulator"]
 
 
 def _checksum(run_dir, payload):
     (run_dir / "resumen_tecnico.docx").write_bytes(b"otro contenido")
 
 
-def _two_technical(run_dir, payload):
+def _duplicate_role(run_dir, payload):
     (run_dir / "otro.docx").write_bytes(b"y")
-    payload["artifacts"].append({"name": "otro.docx", "checksum": hashlib.sha256(b"y").hexdigest()})
+    payload["artifacts"].append({"role": "technical_document", "name": "otro.docx",
+                                 "checksum": hashlib.sha256(b"y").hexdigest()})
 
 
 def _no_artifacts(run_dir, payload):
@@ -229,13 +250,13 @@ def _undeclared_file(run_dir, payload):
 
 
 @pytest.mark.parametrize(("tamper", "message"), (
-    (_extra, "no coinciden"), (_missing, "no coinciden"), (_checksum, "SHA-256"),
-    (_two_technical, "exactamente un DOCX"), (_no_artifacts, "lista de artefactos"),
-    (_undeclared_file, "Falta un artefacto"),
+    (_unknown_role, "rol de artefacto desconocido"), (_missing_role, "Faltan roles obligatorios"),
+    (_checksum, "SHA-256"), (_duplicate_role, "mismo rol más de una vez"),
+    (_no_artifacts, "publicación validada"), (_undeclared_file, "Falta un artefacto"),
 ))
 def test_execute_rejects_results_outside_the_public_contract(tmp_path: Path, tamper, message):
     analysis = service(Drive(), tmp_path, core_run("detailed-analysis", tamper=tamper))
-    plan = analysis.preview("root", ["file"], "detailed-analysis", "codex")
+    plan = analysis.preview("root", ["file"], "detailed-analysis")
     with pytest.raises(HarnessError, match=message) as raised:
         analysis.execute(plan.id)
     assert raised.value.code == "invalid_core_result"
@@ -244,7 +265,7 @@ def test_execute_rejects_results_outside_the_public_contract(tmp_path: Path, tam
 def test_root_version_change_does_not_invalidate_the_plan(tmp_path: Path):
     drive = Drive()
     analysis = service(drive, tmp_path, core_run())
-    plan = analysis.preview("root", ["file"], "assessment", "codex")
+    plan = analysis.preview("root", ["file"], "assessment")
     assert plan.snapshot == {"file": OK_MD5}
     drive.root = replace(drive.root, version="9")
     drive.item = replace(drive.item, version="7")  # same content, new Drive version
@@ -254,7 +275,7 @@ def test_root_version_change_does_not_invalidate_the_plan(tmp_path: Path):
 def test_downloaded_bytes_must_match_the_planned_md5(tmp_path: Path):
     drive = Drive()
     analysis = service(drive, tmp_path, core_run())
-    plan = analysis.preview("root", ["file"], "assessment", "codex")
+    plan = analysis.preview("root", ["file"], "assessment")
     drive.download = lambda file_id, destination: destination.write_bytes(b"different")
     with pytest.raises(HarnessError, match="durante la descarga") as raised:
         analysis.execute(plan.id)
@@ -265,5 +286,5 @@ def test_original_without_md5_is_rejected_in_preview():
     drive = Drive()
     drive.item = replace(drive.item, md5_checksum=None)
     with pytest.raises(HarnessError) as raised:
-        AnalysisService(drive).preview("root", ["file"], "assessment", "codex")
+        AnalysisService(drive, settings=_settings()).preview("root", ["file"], "assessment")
     assert raised.value.code == "missing_checksum"

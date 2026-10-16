@@ -5,8 +5,13 @@ import stat
 from dataclasses import dataclass
 from pathlib import Path
 
-class CodexAuthenticationError(ValueError):
+from litman_core.errors import CoreError
+
+class CodexAuthenticationError(CoreError, ValueError):
     """Unsafe configuration; messages deliberately never include secret values."""
+
+    def __init__(self, message: str) -> None:
+        CoreError.__init__(self, "llm_unavailable", message)
 
 @dataclass(frozen=True)
 class CodexAuthentication:

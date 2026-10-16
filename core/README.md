@@ -12,11 +12,11 @@ Admite jobs `assessment` y `detailed-analysis`, con entrada y salida local o Goo
 Requisitos: Python 3.11+, `uv`, Codex CLI y autenticación de Codex configurada.
 
 En Ubuntu también puede usarse la sesión local de Claude Code sin guardar
-tokens en LitMan. Defina `LITMAN_CORE_LLM_PROVIDER=claude-code` en el `.env`
-adyacente al TOML, o use `[llm] provider = "claude-code"` por job. El job
-tiene precedencia sobre `.env`; Codex es el valor predeterminado. Claude se
-ejecuta en modo no interactivo y sólo con lectura del workspace privado.
-Windows, Docker con Claude y cancelación explícita quedan fuera de alcance.
+tokens en LitMan: use `[llm] provider = "claude-code"` en `config.toml` (el
+proveedor y el modelo sólo se eligen ahí; no hay variables de entorno para
+elegirlos). Codex es el valor predeterminado. Claude se ejecuta en modo no
+interactivo y sólo con lectura del workspace privado. Windows, Docker con
+Claude y cancelación explícita quedan fuera de alcance.
 
 ```bash
 cd core

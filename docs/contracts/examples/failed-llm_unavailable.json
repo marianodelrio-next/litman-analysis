@@ -1,0 +1,9 @@
+{
+  "contract": 1,
+  "status": "failed",
+  "local_path": "/runs/licitacion-ayuntamiento-2026-20261016T090000.000000Z",
+  "error": {
+    "code": "llm_unavailable",
+    "message": "No se encuentra Codex CLI ('codex'). Instálalo o configura LITMAN_CORE_CODEX_BINARY."
+  }
+}

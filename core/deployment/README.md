@@ -22,9 +22,12 @@ añade una réplica Drive. `.env` solo contiene autenticación y rutas a
 árbol local y no promueven una carpeta final en Drive.
 
 Use `type = "assessment"` para generar `ficha_oportunidad.pdf`; para
-`detailed-analysis` se generan siempre los cuatro entregables. La configuración
-de sus generadores está bajo `[analysis.detailed.generation]`, con secciones
-para `technical_document` y `economic_simulator`.
+`detailed-analysis` se generan siempre los cuatro entregables con la plantilla
+aprobada (`technical_document` y `economic_simulator`); no existe una clave
+pública `[analysis]` para configurarla: se rechaza como desconocida. `[llm]
+provider` (`codex`, por defecto, o `claude-code`) y `model` opcional eligen el
+proveedor y modelo del análisis; ver el contrato completo en
+[`../../docs/contracts.md`](../../docs/contracts.md).
 
 Las guías de [desarrollo local](local-dev/README.md),
 [instalación wheel](local-install/README.md) y [Docker](docker/README.md)

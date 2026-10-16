@@ -42,3 +42,4 @@ class PublishedArtifact:
     name: str
     uri: str
     checksum: str
+    role: str

@@ -1,0 +1,8 @@
+{
+  "contract": 1,
+  "status": "failed",
+  "error": {
+    "code": "invalid_config",
+    "message": "job.type debe ser texto no vacío"
+  }
+}

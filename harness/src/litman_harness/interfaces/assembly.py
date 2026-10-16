@@ -19,6 +19,7 @@ from ..dossier.shared_state import SharedStateCapability, UnavailableSharedState
 from ..errors import HarnessError, safe_exception_message
 from ..local_paths import CONFIGURABLE, METADATA_ENV, client_path, plan_store_root, token_path, work_root
 from ..plans import PlanStore
+from ..settings import load_settings
 
 
 @dataclass(frozen=True)
@@ -68,7 +69,8 @@ def build_services(env: Mapping[str, str] | None = None, *, provider: DesktopOAu
         shared_state = DriveSharedState(session_factory(provider.authorized_credentials()), drive)
     expediente = ExpedienteService(drive, store, shared_state)
     publication = PublicationService(expediente, work)
-    analysis = AnalysisService(drive, store, work_root=work, publication=publication)
+    analysis = AnalysisService(drive, store, work_root=work, publication=publication,
+                               settings=lambda: load_settings(env))
     return Services(kind, drive, shared_state, expediente, analysis, publication, SummaryService(expediente))
 
 
@@ -76,6 +78,14 @@ def diagnose(env: Mapping[str, str] | None = None) -> dict[str, Any]:
     """Configuration report without tokens, secrets or local paths."""
     env = os.environ if env is None else env
     kind = adapter_kind(env)
+    try:
+        settings = load_settings(env)
+    except HarnessError as exc:
+        settings = None
+        settings_error = {"code": exc.code, "message": str(exc)}
+    else:
+        settings_error = None
+    info = core.core_info()
     report: dict[str, Any] = {
         "adapter": kind,
         "read_only": kind == "metadata",
@@ -85,8 +95,16 @@ def diagnose(env: Mapping[str, str] | None = None) -> dict[str, Any]:
         "core_executable_found": core.core_executable() is not None,
         "shared_state": {"available": False, "mechanism": "unavailable"},
         "paths_configured": {name: bool(env.get(name)) for name in CONFIGURABLE},
+        "setup": {"configured": settings is not None,
+                  "provider": settings.get("provider") if settings else None,
+                  "model": settings.get("model") if settings else None},
+        "core": {"contract": info.get("contract") if info else None,
+                 "version": info.get("version") if info else None,
+                 "compatible": info is not None and info.get("contract") == core.CONTRACT},
         "errors": [],
     }
+    if settings_error is not None:
+        report["errors"].append(settings_error)
     if kind == "oauth":
         try:
             report["oauth"] = oauth_provider(env).diagnose()

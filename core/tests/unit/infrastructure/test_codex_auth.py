@@ -32,8 +32,9 @@ def test_chatgpt_is_default(tmp_path):
 
 def test_chatgpt_requires_auth_file(tmp_path):
     home = tmp_path / "codex"; home.mkdir()
-    with pytest.raises(CodexAuthenticationError, match="auth.json"):
+    with pytest.raises(CodexAuthenticationError, match="auth.json") as exc_info:
         CodexAuthentication.from_environment({}, codex_home=home)
+    assert exc_info.value.code == "llm_unavailable"
 
 def test_chatgpt_rejects_unsafe_auth_permissions(tmp_path):
     home = chatgpt_home(tmp_path)

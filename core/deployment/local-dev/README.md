@@ -1,8 +1,9 @@
 # Desarrollo local desde checkout
 
 Esta guía es para contribuir desde el checkout. Requiere Python 3.11, `uv` y
-la autenticación de Codex o, en Ubuntu, de Claude Code
-(`LITMAN_CORE_LLM_PROVIDER=claude-code`).
+la autenticación de Codex o, en Ubuntu, de Claude Code (`[llm] provider =
+"claude-code"` en `config.toml`; no hay variable de entorno para elegir el
+proveedor).
 
 Desde la raíz del repositorio:
 

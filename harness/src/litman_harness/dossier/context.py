@@ -19,9 +19,12 @@ _ROLE_TEXT = {
 }
 _ANALYSIS_TYPES = {"assessment": "Análisis inicial", "detailed-analysis": "Análisis detallado"}
 # One fixed phrase per artifact role: the context never depends on Core's content.
+# "technical-document" (hyphen) is a back-compat alias for manifests published
+# before the role became "technical_document" (underscore, Core's contract).
 _ARTIFACT_TEXT = {"opportunity_report": "ficha de oportunidad", "technical_summary": "resumen técnico",
                   "bid_preparation_guide": "guía de preparación de la oferta",
                   "economic_simulator": "simulador económico",
+                  "technical_document": "documento técnico (borrador de oferta)",
                   "technical-document": "documento técnico (borrador de oferta)"}
 
 

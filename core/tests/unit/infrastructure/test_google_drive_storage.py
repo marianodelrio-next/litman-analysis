@@ -48,6 +48,9 @@ def test_frozen_inventory_is_uploaded_recursively_and_promoted(tmp_path):
     result = GoogleDriveArtifactPublisher(service, uploader=lambda path: str(path), temporary_suffix=lambda: "fixed").publish_inventory(_job(), "job-20261008T153045.123456Z", inventory, run_dir=run)
     assert {item.name for item in result} == {"output/ficha_oportunidad.pdf", "logs/run.log"}
     assert service.api.updated and service.api.updated[-1]["body"]["name"] == "job-20261008T153045.123456Z"
+    roles = {item.name: item.role for item in result}
+    assert roles["output/ficha_oportunidad.pdf"] == "opportunity_report"
+    assert roles["logs/run.log"] == "run_file"
 
 
 def test_upload_failure_cleans_temporary_folder(tmp_path):
@@ -69,7 +72,7 @@ def test_drive_rejects_symlink_inventory_before_remote_mutation(tmp_path):
     (run / "output/ficha_oportunidad.pdf").symlink_to(external)
     service = Service()
     from litman_core.infrastructure.storage.common import CatalogArtifact
-    item = CatalogArtifact(run / "output/ficha_oportunidad.pdf", "output/ficha_oportunidad.pdf", "0" * 64)
+    item = CatalogArtifact(run / "output/ficha_oportunidad.pdf", "output/ficha_oportunidad.pdf", "0" * 64, "opportunity_report")
     with pytest.raises(ValueError, match="enlaces simbólicos"):
         GoogleDriveArtifactPublisher(service).publish_inventory(_job(), "id", (item,), run_dir=run)
     assert service.api.created == []

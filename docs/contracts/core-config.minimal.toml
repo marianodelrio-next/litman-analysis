@@ -1,0 +1,11 @@
+[job]
+type = "detailed-analysis"
+
+[input]
+location = "./input"
+
+[output]
+directory = "./runs"
+
+[llm]
+provider = "codex"

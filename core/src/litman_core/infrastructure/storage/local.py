@@ -48,4 +48,4 @@ class LocalArtifactPublisher:
             except Exception:
                 shutil.rmtree(temporary, ignore_errors=True)
                 raise
-        return tuple(PublishedArtifact(item.relative_path, (run_dir / item.relative_path).as_uri(), item.checksum) for item in inventory)
+        return tuple(PublishedArtifact(item.relative_path, (run_dir / item.relative_path).as_uri(), item.checksum, item.role) for item in inventory)

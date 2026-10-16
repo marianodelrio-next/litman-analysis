@@ -6,11 +6,24 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
+ROLE_OPPORTUNITY_REPORT = "opportunity_report"
+ROLE_TECHNICAL_SUMMARY = "technical_summary"
+ROLE_BID_PREPARATION_GUIDE = "bid_preparation_guide"
+ROLE_TECHNICAL_DOCUMENT = "technical_document"
+ROLE_ECONOMIC_SIMULATOR = "economic_simulator"
+ROLE_RUN_FILE = "run_file"
+"""``run_file`` is exclusive to ``publication.include_run_files = true``: it
+tags every published file outside the closed delivery catalog. The harness
+never sees it because it always publishes with ``include_run_files = false``.
+"""
+
+
 @dataclass(frozen=True)
 class CatalogArtifact:
     source: Path
     relative_path: str
     checksum: str
+    role: str
 
 def sha256(path: Path) -> str:
     digest = hashlib.sha256()
@@ -30,15 +43,15 @@ def publication_catalog(run_dir: Path, job_type: str) -> tuple[CatalogArtifact, 
     """Return the closed public delivery contract for a job type."""
     output = run_dir / "output"
     if job_type == "assessment":
-        names = ("ficha_oportunidad.pdf",)
+        names = (("ficha_oportunidad.pdf", ROLE_OPPORTUNITY_REPORT),)
     elif job_type == "detailed-analysis":
         return detailed_analysis_delivery_catalog(run_dir)
     else:
         raise ValueError(f"Tipo de job no publicable: {job_type}")
-    artifacts = tuple(CatalogArtifact(output / name, name, sha256(output / name))
-                      for name in names if (output / name).is_file())
+    artifacts = tuple(CatalogArtifact(output / name, name, sha256(output / name), role)
+                      for name, role in names if (output / name).is_file())
     if len(artifacts) != len(names):
-        missing = next(name for name in names if not (output / name).is_file())
+        missing = next(name for name, _ in names if not (output / name).is_file())
         raise ValueError(f"No existe el artefacto de entrega requerido: {output / missing}")
     return artifacts
 
@@ -54,6 +67,10 @@ def detailed_analysis_delivery_catalog(run_dir: Path) -> tuple[CatalogArtifact, 
     """
     output = run_dir / "output"
     artifacts: list[CatalogArtifact] = []
+    roles = {
+        "resumen_tecnico.docx": ROLE_TECHNICAL_SUMMARY,
+        "guia_preparacion_oferta.docx": ROLE_BID_PREPARATION_GUIDE,
+    }
     names = list(_DETAILED_ANALYSIS_DELIVERABLES)
     manifest_path = output / "generation_manifest.json"
     if not manifest_path.is_file():
@@ -82,12 +99,14 @@ def detailed_analysis_delivery_catalog(run_dir: Path) -> tuple[CatalogArtifact, 
     if len(declared) != 1 or declared[0] in _DETAILED_ANALYSIS_DELIVERABLES:
         raise ValueError("generation_manifest.json debe declarar exactamente un DOCX técnico")
     names.extend(declared)
+    roles[declared[0]] = ROLE_TECHNICAL_DOCUMENT
     names.append("simulador_economico.xlsx")
+    roles["simulador_economico.xlsx"] = ROLE_ECONOMIC_SIMULATOR
     for name in dict.fromkeys(names):
         path = output / name
         if not path.is_file():
             raise ValueError(f"No existe el artefacto de entrega requerido: {path}")
-        artifacts.append(CatalogArtifact(path, name, sha256(path)))
+        artifacts.append(CatalogArtifact(path, name, sha256(path), roles[name]))
     return tuple(artifacts)
 
 
@@ -104,8 +123,10 @@ def catalog_digest(catalog: Iterable[CatalogArtifact]) -> str:
 
 def publication_inventory(run_dir: Path, job_type: str, include_run_files: bool) -> tuple[CatalogArtifact, ...]:
     """Freeze the canonical local files used by every publisher."""
+    catalog = publication_catalog(run_dir, job_type)
     if not include_run_files:
-        return publication_catalog(run_dir, job_type)
+        return catalog
+    catalog_roles = {f"output/{item.relative_path}": item.role for item in catalog}
     root = run_dir.resolve()
     items: list[CatalogArtifact] = []
     for path in sorted(root.rglob("*"), key=lambda item: item.as_posix()):
@@ -116,7 +137,7 @@ def publication_inventory(run_dir: Path, job_type: str, include_run_files: bool)
         relative = path.relative_to(root).as_posix()
         if not relative or relative.startswith("/") or ".." in Path(relative).parts:
             raise ValueError(f"Ruta de inventario inválida: {relative}")
-        items.append(CatalogArtifact(path, relative, sha256(path)))
+        items.append(CatalogArtifact(path, relative, sha256(path), catalog_roles.get(relative, ROLE_RUN_FILE)))
     if not items:
         raise ValueError("El run no contiene archivos publicables")
     return tuple(items)

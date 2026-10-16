@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Literal, TextIO
 
 from litman_core.application.ports.llm import LLMOutputPaths, LLMResult
+from litman_core.errors import CoreError
 from .codex_events import CodexEventSummary
 from .codex_auth import CodexAuthentication
 
@@ -61,9 +62,10 @@ class CodexProvider:
                  case_dir: Path, output_paths: LLMOutputPaths) -> LLMResult:
         executable = shutil.which(self.binary)
         if executable is None:
-            raise RuntimeError(
+            raise CoreError(
+                "llm_unavailable",
                 f"No se encuentra Codex CLI ({self.binary!r}). "
-                "Instálalo o configura LITMAN_CORE_CODEX_BINARY."
+                "Instálalo o configura LITMAN_CORE_CODEX_BINARY.",
             )
 
         _prepare_output_paths(output_paths)

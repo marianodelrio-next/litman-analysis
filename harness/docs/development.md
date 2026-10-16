@@ -76,12 +76,12 @@ enumerados, sin propiedades extra) → `invalid_request`.
 | Operación | Tipo | Efecto |
 | --- | --- | --- |
 | `identity` | consulta | cuenta activa |
-| `diagnose` | consulta | adaptador, identidad, scopes, disponibilidad de `litman-core` instalado, mecanismo de estado compartido y rutas configuradas (sí/no); nunca tokens ni rutas |
+| `diagnose` | consulta | adaptador, identidad, scopes, disponibilidad y contrato de `litman-core` instalado, proveedor fijado por `setup`, mecanismo de estado compartido y rutas configuradas (sí/no); nunca tokens ni rutas |
 | `inspect` | consulta | inventario de todo el árbol de la carpeta (`tree`, `candidates`, sugerencias) y `next_actions` |
 | `status` | consulta | inspección + manifiesto: `unadopted`, `partial`, `adopted`, `degraded`, `unsupported_manifest`; publicaciones locales pendientes; `recommended_action` |
 | `preview_incorporation` | consulta | plan con sólo lo que falta: fase, carpetas (`folder_ids` para registrar existentes), originales, oferta viva existente, contexto y manifiesto |
 | `apply_incorporation` | mutación | aplica el `plan_id` aceptado |
-| `preview_analysis` | consulta | plan de Core con originales, tipo y proveedor (`codex`, `claude-code`) que incluye su publicación |
+| `preview_analysis` | consulta | plan de Core con originales y tipo, con el proveedor fijado por `setup`; incluye su publicación. Sin `setup`, `setup_required` |
 | `execute_analysis` | mutación | ejecuta Core para el `plan_id` aceptado y publica sus resultados sin otra aceptación |
 | `discard_analysis` | mutación local | borra sólo el workspace de un análisis no publicado |
 | `preview_publication` | consulta | recuperación: plan de publicación de un análisis local (`analysis_operation_id`) |
@@ -90,6 +90,7 @@ enumerados, sin propiedades extra) → `invalid_request`.
 | `preview_summary` | consulta | plan con el resumen de la licitación (claves fijas, una fuente por línea) |
 | `apply_summary` | mutación | guarda el resumen aceptado en manifiesto y `contexto.md` |
 | `recover` | consulta | estado local de una operación |
+| `setup` | mutación local | fija proveedor (`codex`, `claude-code`) y modelo opcional de LitMan Core para esta instalación, tras comprobar `litman-core info`; no toca Drive |
 
 CLI: `litman <operación-con-guiones> [--json '{...}']`; imprime el sobre por
 stdout, o por stderr con salida 2 si falla. MCP (`litman-mcp`): JSON-RPC 2.0 por
@@ -191,31 +192,44 @@ mientras Drive lo procesaba, lo que producía falsos `stale_plan`. Por eso:
 
 ### Contrato con Core
 
-El harness depende **sólo del contrato público de la CLI** de Core: el código de
-salida de `litman-core run` y su JSON de stdout (`status`, `publication_id`,
-`local_path` y `artifacts[{name, uri, checksum}]`, con SHA-256). Genera
-`[publication] include_run_files = false`, de modo que Core valida su propio
-run y deja en `local_path` sólo los artefactos públicos, en plano. El harness
-no lee ningún archivo interno de Core (`validation.json`,
-`generation_manifest.json`, salidas estructuradas).
+El harness depende **sólo del contrato público de la CLI** de Core, documentado
+en [`docs/contracts.md`](../../docs/contracts.md) (claves de `config.toml`,
+forma exacta del JSON de `run`/`info`, roles de artefacto, códigos de error y
+política de versionado); no se repite aquí. El harness genera siempre la
+plantilla mínima (sin `job.id`, `input.kind` ni `[publication]`: Core resuelve
+`input.kind = "local"` y `publication.include_run_files = false` por defecto),
+de modo que Core valida su propio run y deja en `local_path` sólo los
+artefactos públicos, en plano. El harness no lee ningún archivo interno de Core
+(`validation.json`, `generation_manifest.json`, salidas estructuradas); valida
+el resultado por `role` (`analysis/results.py::REQUIRED_ROLES`), nunca por
+nombre de archivo.
 
 `execute_analysis` descarga sólo los originales planificados a un workspace
-privado, escribe un `config.toml` local explícito (sin
-`output.google_drive_folder_id`) y ejecuta `litman-core run --config`. Exige que
-`local_path` esté dentro del `output` del workspace y que `artifacts` sea
-exactamente el catálogo: `ficha_oportunidad.pdf`, o `resumen_tecnico.docx`,
-`guia_preparacion_oferta.docx`, `simulador_economico.xlsx` y exactamente un DOCX
-más (documento técnico); cada archivo debe existir en `local_path` con el
-SHA-256 declarado. Si sobra o falta algo → `invalid_core_result`. El resultado
-(rutas, SHA-256, proveedor, versiones y snapshot de entrada con MD5 y SHA-256)
-se registra en el almacén local bajo el `operation_id` del análisis; sólo ese
-catálogo cerrado puede llegar a Drive. Un fallo de Core conserva el workspace e
-informa su ruta; un éxito lo conserva hasta publicar o descartar.
+privado cuya carpeta de entrada se llama `<operation_id>` (un UUID4 válido para
+el patrón de `job.id`), no `input`: como no se envía `job.id` explícito, Core lo
+deriva del nombre de esa carpeta, y debe ser único por ejecución para que
+`publication_id` también lo sea. Exige que `local_path` esté dentro del
+`output` del workspace y que cada rol requerido por tipo de job aparezca
+exactamente una vez, con su archivo presente y su SHA-256 verificado; un rol
+desconocido, duplicado, ausente o con checksum distinto → `invalid_core_result`.
+El resultado (rutas, SHA-256 y rol de cada artefacto, proveedor, versiones y
+snapshot de entrada con MD5 y SHA-256) se registra en el almacén local bajo el
+`operation_id` del análisis; sólo ese catálogo cerrado puede llegar a Drive. Un
+fallo de Core conserva el workspace e informa su ruta; un éxito lo conserva
+hasta publicar o descartar.
 
-Core usa por defecto el modelo `gpt-5.6-luna` con Codex (el anterior,
-`gpt-5.5`, lo rechaza una cuenta ChatGPT). `LITMAN_CORE_LLM_MODEL` es una
-variable de **Core** que el proceso `litman-core` hereda del entorno del harness
-y permite elegir otro modelo.
+El proveedor (`codex` o `claude-code`) y el modelo opcional se fijan una vez por
+instalación con `litman setup --json '{"provider": "...", "model"?: "..."}'`
+(comprueba `litman-core info`, exige que el contrato coincida y que el
+proveedor esté entre los que ofrece la instalación de Core, y guarda el ajuste
+bajo `$XDG_CONFIG_HOME/litman-harness/settings.toml`, 0600 en directorio 0700).
+`preview_analysis` sin `setup` devuelve `setup_required` con una
+`recommended_action` hacia `setup`; cada plan de análisis guarda el proveedor
+(y modelo) vigente en ese momento, así que cambiar el `setup` después no altera
+la ejecución de un plan ya aceptado. Core usa por defecto el modelo
+`gpt-5.6-luna` con Codex (el anterior, `gpt-5.5`, lo rechaza una cuenta
+ChatGPT) y `claude-sonnet-5` con Claude Code; `setup` permite fijar otro modelo
+explícitamente.
 
 `preview_publication` exige expediente adoptado y su carpeta de fase registrada,
 y vuelve a comprobar los hashes locales. Planifica una carpeta

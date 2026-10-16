@@ -46,6 +46,44 @@ def test_catalog_cleanup_failure_restores_complete_run(tmp_path: Path, monkeypat
     assert (run / "lineage.json").is_file()
 
 
+def test_assessment_catalog_role_is_opportunity_report(tmp_path: Path) -> None:
+    run = tmp_path / "run"; output = run / "output"; output.mkdir(parents=True)
+    (output / "ficha_oportunidad.pdf").write_bytes(b"pdf")
+    inventory = publication_inventory(run, JobType.ASSESSMENT, False)
+    assert {item.role for item in inventory} == {"opportunity_report"}
+
+
+def test_detailed_analysis_catalog_roles(tmp_path: Path) -> None:
+    import json
+
+    run = tmp_path / "run"; output = run / "output"; output.mkdir(parents=True)
+    for name in ("resumen_tecnico.docx", "guia_preparacion_oferta.docx", "memoria_tecnica.docx", "simulador_economico.xlsx"):
+        (output / name).write_bytes(b"x")
+    manifest = {"artifacts": [
+        {"id": "technical-summary", "documents": ["resumen_tecnico.docx"]},
+        {"id": "bid-preparation-guide", "documents": ["guia_preparacion_oferta.docx"]},
+        {"id": "technical-document", "documents": ["memoria_tecnica.docx"]},
+    ]}
+    (output / "generation_manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    inventory = publication_inventory(run, JobType.DETAILED_ANALYSIS, False)
+    roles = {item.relative_path: item.role for item in inventory}
+    assert roles == {
+        "resumen_tecnico.docx": "technical_summary",
+        "guia_preparacion_oferta.docx": "bid_preparation_guide",
+        "memoria_tecnica.docx": "technical_document",
+        "simulador_economico.xlsx": "economic_simulator",
+    }
+
+
+def test_full_run_inventory_tags_non_catalog_files_as_run_file(tmp_path: Path) -> None:
+    run = tmp_path / "run"; (run / "output").mkdir(parents=True); (run / "logs").mkdir()
+    (run / "output/ficha_oportunidad.pdf").write_bytes(b"pdf"); (run / "logs/run.log").write_text("log")
+    inventory = publication_inventory(run, JobType.ASSESSMENT, True)
+    roles = {item.relative_path: item.role for item in inventory}
+    assert roles["output/ficha_oportunidad.pdf"] == "opportunity_report"
+    assert roles["logs/run.log"] == "run_file"
+
+
 def test_detailed_catalog_requires_manifest_declared_technical_document(tmp_path: Path) -> None:
     run = tmp_path / "run"; (run / "output").mkdir(parents=True)
     from litman_core.infrastructure.storage.common import detailed_analysis_delivery_catalog

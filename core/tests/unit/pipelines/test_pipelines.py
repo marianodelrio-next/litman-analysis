@@ -6,6 +6,7 @@ import inspect
 import json
 import pkgutil
 import shutil
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -282,9 +283,8 @@ def test_failed_stage_persists_validation_diagnostics_before_raising(tmp_path: P
     with pytest.raises(ValueError, match="validación"):
         run_stage(definition, prepared, FakeProvider())
     assert json.loads((prepared.run_dir / "output" / "validation.json").read_text(encoding="utf-8"))["schema_errors"] == ["canary"]
-def test_claude_environment_model_is_used_for_stage_metadata(monkeypatch):
-    monkeypatch.setenv("LITMAN_CORE_LLM_PROVIDER", "claude-code")
-    monkeypatch.setenv("LITMAN_CORE_CLAUDE_MODEL", "sonnet")
-    settings = Settings()
+def test_resolved_toml_model_is_used_for_stage_metadata():
+    # Simulates JobRunner's replace() after resolve_llm(job) picked the TOML selection.
+    settings = replace(Settings(), llm_provider="claude-code", llm_model="sonnet")
     from litman_core.pipelines.detailed_analysis.stage import _request_metadata
     assert _request_metadata(settings, None, None, {}) == {"model": "sonnet"}

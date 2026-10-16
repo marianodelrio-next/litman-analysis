@@ -1,0 +1,42 @@
+{
+  "contract": 1,
+  "status": "succeeded",
+  "job_id": "licitacion-ayuntamiento-2026",
+  "publication_id": "licitacion-ayuntamiento-2026-20261016T090000.000000Z",
+  "local_path": "/runs/licitacion-ayuntamiento-2026-20261016T090000.000000Z",
+  "artifacts": [
+    {
+      "role": "technical_summary",
+      "name": "resumen_tecnico.docx",
+      "uri": "file:///runs/licitacion-ayuntamiento-2026-20261016T090000.000000Z/resumen_tecnico.docx",
+      "checksum": "3e23e8160039594a33894f6564e1b1348bbd7a0088d42c4acb73eeaed59c009d"
+    },
+    {
+      "role": "bid_preparation_guide",
+      "name": "guia_preparacion_oferta.docx",
+      "uri": "file:///runs/licitacion-ayuntamiento-2026-20261016T090000.000000Z/guia_preparacion_oferta.docx",
+      "checksum": "2e7d2c03a9507ae265ecf5b5356885a53393a2029d241394997265a1a25aefc6"
+    },
+    {
+      "role": "technical_document",
+      "name": "memoria_tecnica.docx",
+      "uri": "file:///runs/licitacion-ayuntamiento-2026-20261016T090000.000000Z/memoria_tecnica.docx",
+      "checksum": "18ac3e7343f016890c510e93f935261169d9e3f565436429830faf0934f4f8e4"
+    },
+    {
+      "role": "economic_simulator",
+      "name": "simulador_economico.xlsx",
+      "uri": "file:///runs/licitacion-ayuntamiento-2026-20261016T090000.000000Z/simulador_economico.xlsx",
+      "checksum": "3f79bb7b435b05321651daefd374cdc681dc06faa65e374e38337b88ca046dea"
+    }
+  ],
+  "remote": {
+    "folder_id": "1AbCdEfGhIjKlMnOpQrStUvWxYz",
+    "artifacts": [
+      "drive://file-1",
+      "drive://file-2",
+      "drive://file-3",
+      "drive://file-4"
+    ]
+  }
+}

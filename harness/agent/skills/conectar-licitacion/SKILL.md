@@ -7,8 +7,9 @@ description: Conecta una licitación por el ID de su carpeta de Drive y guía a 
    padre ni explores otras licitaciones. Llama a `identity` y a `status`.
 2. Resume en una o dos frases lo que hay y sigue `recommended_action`, que
    calcula el harness: propónla en una frase de negocio (`reason`), prepara su
-   vista previa con `tool`/`arguments` (completa lo que falte, p. ej. el
-   proveedor de análisis) y muestra el plan.
+   vista previa con `tool`/`arguments` y muestra el plan. Si una operación
+   devuelve `setup_required`, ejecuta `setup` con el proveedor que indique la
+   persona antes de continuar.
 3. Aplica (`apply_incorporation`, `execute_analysis`, `apply_publication`,
    `apply_summary`, `discard_analysis`) sólo el `plan_id` u `operation_id` que la
    persona acepte. Cada respuesta trae la siguiente `recommended_action`:

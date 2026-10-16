@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://litman-core/contracts/core-result.schema.json",
+  "title": "litman-core run result",
+  "description": "Single JSON object printed to stdout by `litman-core run`, on success or failure. contract: 1.",
+  "oneOf": [
+    { "$ref": "#/$defs/success" },
+    { "$ref": "#/$defs/failure" }
+  ],
+  "$defs": {
+    "success": {
+      "type": "object",
+      "required": ["contract", "status", "job_id", "publication_id", "local_path", "artifacts"],
+      "properties": {
+        "contract": { "const": 1 },
+        "status": { "const": "succeeded" },
+        "job_id": { "type": "string" },
+        "publication_id": { "type": "string" },
+        "local_path": { "type": "string" },
+        "artifacts": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/artifact" }
+        },
+        "remote": { "$ref": "#/$defs/remote" }
+      },
+      "additionalProperties": true
+    },
+    "failure": {
+      "type": "object",
+      "required": ["contract", "status", "error"],
+      "properties": {
+        "contract": { "const": 1 },
+        "status": { "const": "failed" },
+        "local_path": { "type": "string" },
+        "error": {
+          "type": "object",
+          "required": ["code", "message"],
+          "properties": {
+            "code": {
+              "enum": [
+                "invalid_config",
+                "invalid_input",
+                "llm_unavailable",
+                "analysis_failed",
+                "publication_failed",
+                "internal"
+              ]
+            },
+            "message": { "type": "string" }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    },
+    "artifact": {
+      "type": "object",
+      "required": ["role", "name", "uri", "checksum"],
+      "properties": {
+        "role": {
+          "enum": [
+            "opportunity_report",
+            "technical_summary",
+            "bid_preparation_guide",
+            "technical_document",
+            "economic_simulator",
+            "run_file"
+          ]
+        },
+        "name": { "type": "string" },
+        "uri": { "type": "string" },
+        "checksum": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      },
+      "additionalProperties": true
+    },
+    "remote": {
+      "type": "object",
+      "required": ["folder_id", "artifacts"],
+      "properties": {
+        "folder_id": { "type": "string" },
+        "artifacts": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": true
+    }
+  }
+}

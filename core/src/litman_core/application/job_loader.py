@@ -9,7 +9,8 @@ from typing import Any
 from litman_core.domain.jobs import JobRequest, JobType, StorageKind
 from litman_core.generation_config import merge_generation
 
-_ROOT = {"job", "input", "output", "llm", "publication", "analysis"}
+_ROOT = {"job", "input", "output", "llm", "publication"}
+_JOB_ID_PATTERN = r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}"
 
 
 def load_job(path: Path) -> JobRequest:
@@ -23,14 +24,12 @@ def load_job(path: Path) -> JobRequest:
     _keys(data, _ROOT, "root")
     job, input_data, output = (_table(data, name) for name in ("job", "input", "output"))
     _keys(job, {"id", "type"}, "job"); _keys(input_data, {"kind", "location"}, "input"); _keys(output, {"directory", "google_drive_folder_id"}, "output")
-    job_id = _text(job, "id", "job.id")
-    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}", job_id):
-        raise ValueError("job.id contiene caracteres no permitidos")
     job_type = _enum(_text(job, "type", "job.type"), JobType, "job.type")
-    input_kind = _enum(_text(input_data, "kind", "input.kind"), StorageKind, "input.kind")
+    input_kind = _enum(input_data.get("kind", StorageKind.LOCAL.value), StorageKind, "input.kind")
     location = _text(input_data, "location", "input.location")
     if input_kind is StorageKind.LOCAL:
         location = str((path.parent / location).resolve()) if not Path(location).is_absolute() else str(Path(location).resolve())
+    job_id = _job_id(job, input_kind, location)
     directory = Path(_text(output, "directory", "output.directory"))
     output_directory = (path.parent / directory).resolve() if not directory.is_absolute() else directory.resolve()
     drive_id = output.get("google_drive_folder_id")
@@ -49,20 +48,24 @@ def load_job(path: Path) -> JobRequest:
     _keys(publication, {"include_run_files"}, "publication")
     include = publication.get("include_run_files", False)
     if type(include) is not bool: raise ValueError("publication.include_run_files debe ser booleano")
-    generation = _generation(data, job_type)
+    generation = merge_generation() if job_type is JobType.DETAILED_ANALYSIS else None
     return JobRequest(job_id, job_type, input_kind, location, output_directory, drive_id, include, provider, llm_model, {"generation": generation} if generation else {})
 
 
-def _generation(data: dict[str, Any], job_type: JobType) -> dict[str, Any] | None:
-    analysis = data.get("analysis", {})
-    if not isinstance(analysis, dict): raise ValueError("analysis debe ser una tabla")
-    _keys(analysis, {"detailed"}, "analysis")
-    detailed = analysis.get("detailed", {})
-    if not isinstance(detailed, dict): raise ValueError("analysis.detailed debe ser una tabla")
-    _keys(detailed, {"generation"}, "analysis.detailed")
-    generation = detailed.get("generation", {})
-    if not isinstance(generation, dict): raise ValueError("analysis.detailed.generation debe ser una tabla")
-    return merge_generation(generation) if job_type is JobType.DETAILED_ANALYSIS else None
+def _job_id(job: dict[str, Any], input_kind: StorageKind, location: str) -> str:
+    raw = job.get("id")
+    if raw is not None:
+        if not isinstance(raw, str) or not raw:
+            raise ValueError("job.id debe ser texto no vacío")
+        if not re.fullmatch(_JOB_ID_PATTERN, raw):
+            raise ValueError("job.id contiene caracteres no permitidos")
+        return raw
+    derived = Path(location).name if input_kind is StorageKind.LOCAL else location
+    sanitized = re.sub(r"[^A-Za-z0-9._-]", "-", derived)
+    sanitized = re.sub(r"^[^A-Za-z0-9]+", "", sanitized)[:128]
+    if not sanitized:
+        raise ValueError("No se puede derivar job.id a partir de input.location; indícalo explícitamente")
+    return sanitized
 
 
 def _table(data: dict[str, Any], name: str) -> dict[str, Any]:

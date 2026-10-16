@@ -4,13 +4,15 @@ from __future__ import annotations
 import json
 import shutil
 import tempfile
+from contextlib import contextmanager
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Iterator
 
 from litman_core.config import Settings
 from litman_core.domain.documents import Document
 from litman_core.domain.jobs import JobRequest, JobType, PublishedArtifact, StorageKind
+from litman_core.errors import CoreError
 from litman_core.infrastructure.documents.bundle import DocumentBundle
 from litman_core.infrastructure.documents.inventory import inventory
 from litman_core.infrastructure.documents.normalize import normalize_documents
@@ -24,9 +26,22 @@ from litman_core.pipelines import AssessmentPipeline, DetailedAnalysisPipeline
 from litman_core.runtime import initialize_runtime
 
 
-class ExecutionError(RuntimeError):
-    def __init__(self, message: str, local_path: Path):
-        super().__init__(message); self.local_path = local_path
+@contextmanager
+def _stage(code: str, local_path: Path | None) -> Iterator[None]:
+    """Classify any exception raised inside the block as ``code``.
+
+    A :class:`CoreError` already raised deeper keeps its own code; it only
+    gains ``local_path`` here if it did not carry one yet (e.g. it was raised
+    before the run directory existed).
+    """
+    try:
+        yield
+    except CoreError as exc:
+        if exc.local_path is None:
+            exc.local_path = local_path
+        raise
+    except Exception as exc:
+        raise CoreError(code, str(exc), local_path) from exc
 
 
 @dataclass(frozen=True)
@@ -55,39 +70,46 @@ class JobRunner:
     def run(self, job: JobRequest) -> JobRunnerResult:
         self._validate(job)
         publication_id = publication_folder_name(job.job_id)
-        root = job.output_directory.resolve(); root.mkdir(parents=True, exist_ok=True)
-        run_dir = root / publication_id
-        try: run_dir.mkdir()
-        except FileExistsError: raise FileExistsError(f"La carpeta de publicación ya existe: {run_dir}")
-        for name in ("input", "output", "logs"): (run_dir / name).mkdir()
-        settings = self.settings
-        initialize_runtime(home=settings.home_dir, codex_home=settings.codex_home_dir, workspace=settings.workspace_dir, runs=root, output=root, input_dir=Path(job.input_location) if job.input_kind is StorageKind.LOCAL else None)
-        workspace = Path(tempfile.mkdtemp(prefix=f"{job.job_id}-", dir=settings.workspace_dir))
+        run_dir: Path | None = None
+        workspace: Path | None = None
         try:
-            service = self._drive_service(job)
-            source = self.local_source if job.input_kind is StorageKind.LOCAL else self.drive_source_factory(service, settings.max_file_mb)
-            materialized = source.materialize(job, workspace); bundle = self._bundle(materialized.directory, materialized.source_metadata, workspace)
-            if not any(item.status == "ready" for item in bundle.normalized): raise ValueError("El expediente no produjo documentos normalizados listos para análisis")
-            resolved_provider, resolved_model = resolve_llm(settings, job)
-            settings = replace(settings, llm_provider=resolved_provider, llm_model=resolved_model)
-            provider = self.provider_factory(settings, job)
-            pipeline = self.assessment_factory(settings, provider) if job.job_type is JobType.ASSESSMENT else self.detailed_factory(settings, provider)
-            kwargs = {"bundle": bundle, "run_dir": run_dir}
-            if job.job_type is JobType.DETAILED_ANALYSIS: kwargs["generation"] = job.options["generation"]
-            actual_dir, _ = pipeline.execute(materialized.directory, **kwargs)
-            if actual_dir.resolve() != run_dir: raise RuntimeError("El pipeline no usó el directorio de ejecución asignado")
-            self._validate_run(job, run_dir)
-            catalog = publication_inventory(run_dir, str(job.job_type), job.include_run_files)
+            with _stage("invalid_input", None):
+                root = job.output_directory.resolve(); root.mkdir(parents=True, exist_ok=True)
+                run_dir = root / publication_id
+                try: run_dir.mkdir()
+                except FileExistsError: raise FileExistsError(f"La carpeta de publicación ya existe: {run_dir}")
+                for name in ("input", "output", "logs"): (run_dir / name).mkdir()
+            settings = self.settings
+            with _stage("invalid_input", run_dir):
+                initialize_runtime(home=settings.home_dir, codex_home=settings.codex_home_dir, workspace=settings.workspace_dir, runs=root, output=root, input_dir=Path(job.input_location) if job.input_kind is StorageKind.LOCAL else None)
+                workspace = Path(tempfile.mkdtemp(prefix=f"{job.job_id}-", dir=settings.workspace_dir))
+                service = self._drive_service(job)
+                source = self.local_source if job.input_kind is StorageKind.LOCAL else self.drive_source_factory(service, settings.max_file_mb)
+                materialized = source.materialize(job, workspace); bundle = self._bundle(materialized.directory, materialized.source_metadata, workspace)
+                if not any(item.status == "ready" for item in bundle.normalized): raise ValueError("El expediente no produjo documentos normalizados listos para análisis")
+            with _stage("analysis_failed", run_dir):
+                resolved_provider, resolved_model = resolve_llm(job)
+                settings = replace(settings, llm_provider=resolved_provider, llm_model=resolved_model)
+                provider = self.provider_factory(settings, job)
+                pipeline = self.assessment_factory(settings, provider) if job.job_type is JobType.ASSESSMENT else self.detailed_factory(settings, provider)
+                kwargs = {"bundle": bundle, "run_dir": run_dir}
+                if job.job_type is JobType.DETAILED_ANALYSIS: kwargs["generation"] = job.options["generation"]
+                actual_dir, _ = pipeline.execute(materialized.directory, **kwargs)
+                if actual_dir.resolve() != run_dir: raise RuntimeError("El pipeline no usó el directorio de ejecución asignado")
+                self._validate_run(job, run_dir)
+                catalog = publication_inventory(run_dir, str(job.job_type), job.include_run_files)
             remote = None
-            if job.google_drive_folder_id:
-                remote_artifacts = self.drive_publisher_factory(service).publish_inventory(job, publication_id, catalog, run_dir=run_dir)
-                remote = {"folder_id": job.google_drive_folder_id, "artifacts": [x.uri for x in remote_artifacts]}
-            artifacts = self.local_publisher.publish(run_dir, catalog, include_run_files=job.include_run_files)
+            with _stage("publication_failed", run_dir):
+                if job.google_drive_folder_id:
+                    remote_artifacts = self.drive_publisher_factory(service).publish_inventory(job, publication_id, catalog, run_dir=run_dir)
+                    remote = {"folder_id": job.google_drive_folder_id, "artifacts": [x.uri for x in remote_artifacts]}
+                artifacts = self.local_publisher.publish(run_dir, catalog, include_run_files=job.include_run_files)
             return JobRunnerResult(job.job_id, publication_id, "succeeded", run_dir, tuple(artifacts), remote)
         except Exception as exc:
-            if isinstance(exc, ExecutionError): raise
-            raise ExecutionError(str(exc), run_dir) from exc
-        finally: shutil.rmtree(workspace, ignore_errors=True)
+            if isinstance(exc, CoreError): raise
+            raise CoreError("internal", str(exc), run_dir) from exc
+        finally:
+            if workspace is not None: shutil.rmtree(workspace, ignore_errors=True)
 
     def _drive_service(self, job: JobRequest) -> Any | None:
         if job.input_kind is not StorageKind.GOOGLE_DRIVE and not job.google_drive_folder_id: return None

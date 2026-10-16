@@ -8,20 +8,20 @@ Describe el comportamiento actual de Core, no una API futura.
 |---|---|---|---|
 | `litman-core run` | usuario local | carga `./config.toml` (y su `.env` adyacente) y ejecuta `JobRunner` | canónico |
 | `litman-core run --config RUTA [--env-file RUTA]` | usuario local, integración (harness) | carga una configuración y un `.env` explícitos | canónico |
+| `litman-core info` | integración (harness) | imprime versión y contrato | canónico |
 
-Con éxito, `run` imprime por stdout un JSON con `job_id`, `publication_id`,
-`status` (`succeeded`), `local_path`, `artifacts[{name, uri, checksum}]`
-(SHA-256) y, si hay réplica Drive, `remote`. Con error, sale con código 1 y
-escribe en stderr `{"status": "failed", "error", "local_path"?}`.
+El contrato de la CLI (claves de configuración, forma exacta del JSON de
+`run`/`info`, roles de artefacto, códigos de error y política de
+versionado) vive en [`docs/contracts.md`](../../docs/contracts.md); no se
+repite aquí.
 
 ## Job y run
 
-Un job contiene `job.id`, `job.type` (`assessment` o `detailed-analysis`),
-`input.kind` (`local` o `google-drive`), `input.location`,
-`output.directory` y opcionalmente `output.google_drive_folder_id`, `[llm]`
-(`provider` `codex` o `claude-code` y `model`), además de las opciones de
-publicación y generación. `JobRunner` materializa,
-normaliza, analiza, valida y publica atómicamente.
+Un job contiene `job.type` (`assessment` o `detailed-analysis`),
+`input.location` y `output.directory` como claves obligatorias, además de
+`job.id`, `input.kind`, `output.google_drive_folder_id`, `[llm]` y
+`[publication]` opcionales (ver el contrato enlazado arriba). `JobRunner`
+materializa, normaliza, analiza, valida y publica atómicamente.
 
 Cada ejecución crea una publicación identificada por un `publication_id` y un
 run con `input/`, `output/` y `logs/`. Ambos pipelines producen

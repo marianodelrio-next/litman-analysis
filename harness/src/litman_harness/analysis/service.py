@@ -7,7 +7,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import tempfile
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Callable
 
 from .. import __version__
 
@@ -18,7 +18,7 @@ from ..errors import HarnessError, safe_exception_message
 from ..plans import PlanStore
 from ..plans.models import OperationRecord, OperationStatus, Plan, PlanAction
 from .inputs import download_originals, require_checksum, validate_original, verify_originals
-from .results import includes_technical_document, public_catalog, validate_public_result
+from .results import REQUIRED_ROLES, includes_technical_document, validate_public_result
 
 if TYPE_CHECKING:  # the publication service imports this module; inject it, never import it
     from ..dossier.publication import PublicationService
@@ -31,7 +31,8 @@ class AnalysisService:
 
     def __init__(self, drive: DriveGateway, plan_store: PlanStore | None = None, *,
                  work_root: Path | None = None, run: core.Runner = subprocess.run,
-                 publication: "PublicationService | None" = None):
+                 publication: "PublicationService | None" = None,
+                 settings: Callable[[], dict[str, Any] | None] | None = None):
         self.drive = drive
         self.plan_store = plan_store
         self.work_root = work_root
@@ -39,10 +40,17 @@ class AnalysisService:
         # With a publication service the plan includes publishing (one acceptance);
         # without it the analysis stays local (development and isolated tests).
         self.publication = publication
+        self.settings = settings or (lambda: None)
 
-    def preview(self, root_folder_id: str, original_ids: list[str], job_type: str, provider: str) -> Plan:
+    def preview(self, root_folder_id: str, original_ids: list[str], job_type: str) -> Plan:
         if job_type not in core.JOB_TYPES:
             raise HarnessError("invalid_analysis", "Tipo de análisis no admitido")
+        configured = self.settings()
+        if not configured:
+            raise HarnessError("setup_required", "No hay proveedor configurado; ejecute `setup` antes de analizar",
+                               details={"recommended_action": {"tool": "setup"}})
+        provider = configured["provider"]
+        model = configured.get("model")
         core.validate_provider(provider)
         if not original_ids or len(original_ids) != len(set(original_ids)):
             raise HarnessError("invalid_originals", "Seleccione originales únicos")
@@ -60,10 +68,13 @@ class AnalysisService:
             actions.append(PlanAction("download_original", item.id, item.name, None, md5,
                                       {"mime_type": item.mime_type, "size": item.size,
                                        "drive_version": item.version}))
-        actions.append(PlanAction("run_core", None, job_type, None, metadata={
+        run_core_metadata = {
             "provider": provider, "publication": "included" if self.publication else "local_only",
-            "expected_catalog": public_catalog(job_type),
-            "includes_technical_document": includes_technical_document(job_type)}))
+            "expected_roles": list(REQUIRED_ROLES[job_type]),
+            "includes_technical_document": includes_technical_document(job_type)}
+        if model is not None:
+            run_core_metadata["model"] = model
+        actions.append(PlanAction("run_core", None, job_type, None, metadata=run_core_metadata))
         if self.publication:
             actions += self.publication.publication_intent(root.id, job_type)
         plan = Plan("analysis", root.id, account, tuple(actions), snapshot)
@@ -121,31 +132,36 @@ class AnalysisService:
             raise HarnessError("invalid_plan", "El plan de análisis no contiene la ejecución de Core")
         job_type = run_action.name
         provider = str(run_action.metadata.get("provider"))
+        model = run_action.metadata.get("model")
         core.validate_provider(provider)
         root = self._root(plan.root_folder_id)
         verify_originals(self.drive, root, plan)
         workspace = self._new_workspace()
         try:
-            inputs = workspace / "input"
+            # The input folder name becomes Core's derived job.id (no explicit
+            # job.id is sent): it must be unique per run, not a fixed "input",
+            # or every publication_id would collide on "input-<timestamp>".
+            inputs = workspace / plan.operation_id
             output = workspace / "output"
             inputs.mkdir(mode=0o700)
             output.mkdir(mode=0o700)
             snapshot = download_originals(self.drive, root, plan, inputs)
             config = workspace / "config.toml"
-            config.write_text(core.core_config(job_id=plan.operation_id, job_type=job_type, input_dir=inputs,
-                                               output_dir=output, provider=provider), encoding="utf-8")
+            config.write_text(core.core_config(job_type=job_type, input_dir=inputs,
+                                               output_dir=output, provider=provider, model=model), encoding="utf-8")
             payload = core.run_core(config, self.run)
             run_dir = Path(payload["local_path"]).resolve()
             if not run_dir.is_relative_to(output.resolve()):
                 raise HarnessError("invalid_core_result", "Core devolvió un run fuera del workspace privado")
             public_artifacts = validate_public_result(payload, run_dir, job_type)
+            info = core.core_info(self.run)
             result = {
                 "status": LOCAL_VALIDATED, "operation_id": plan.operation_id, "plan_id": plan.id,
                 "root_folder_id": plan.root_folder_id, "job_type": job_type, "provider": provider,
                 "publication_id": payload["publication_id"], "input_snapshot": snapshot,
                 "workspace": str(workspace), "local_path": str(run_dir),
                 "public_artifacts": public_artifacts,
-                "core_version": core.core_version(self.run), "harness_version": __version__,
+                "core_version": info.get("version") if info else None, "harness_version": __version__,
                 "performed_by": self._performed_by(),
                 "completed_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
                 "recovery": "Resultado local validado; si no se publica, use preview_publication o discard_analysis.",

@@ -104,14 +104,16 @@ def test_invalid_json_and_process_failures_are_classified(tmp_path, monkeypatch)
     assert summary["output"].endswith("llm-response-test.json")
     assert summary["usage"] == {}
     assert summary["error"] == "invalid_json"
-    with pytest.raises(RuntimeError): _run(tmp_path, monkeypatch, {"error": "auth"}, returncode=1, stderr="Please login")
+    with pytest.raises(RuntimeError) as auth_exc: _run(tmp_path, monkeypatch, {"error": "auth"}, returncode=1, stderr="Please login")
+    assert auth_exc.value.code == "llm_unavailable"
 
 
 def test_binary_missing_creates_diagnostics(tmp_path, monkeypatch):
     monkeypatch.setattr("shutil.which", lambda _: None)
     schema = tmp_path / "schema.json"; schema.write_text("{}")
     paths = output_paths_for_run(tmp_path / "run", "missing")
-    with pytest.raises(RuntimeError): ClaudeCodeProvider().generate(instructions="", prompt="", schema_path=schema, case_dir=tmp_path, output_paths=paths)
+    with pytest.raises(RuntimeError) as exc_info: ClaudeCodeProvider().generate(instructions="", prompt="", schema_path=schema, case_dir=tmp_path, output_paths=paths)
+    assert exc_info.value.code == "llm_unavailable"
     assert all(p.exists() for p in (paths.events, paths.stderr, paths.response, paths.summary))
 
 

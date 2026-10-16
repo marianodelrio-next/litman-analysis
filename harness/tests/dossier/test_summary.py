@@ -32,8 +32,9 @@ class Setup:
             self.publish("detailed-analysis")
 
     def publish(self, job_type: str) -> dict:
-        analysis = AnalysisService(self.drive, self.store, work_root=self.tmp_path / "work", run=core_run(job_type))
-        executed = analysis.execute(analysis.preview("root", ["source"], job_type, "codex").id)
+        analysis = AnalysisService(self.drive, self.store, work_root=self.tmp_path / "work", run=core_run(job_type),
+                                   settings=lambda: {"provider": "codex"})
+        executed = analysis.execute(analysis.preview("root", ["source"], job_type).id)
         publication = PublicationService(self.dossier, self.tmp_path / "work")
         result = publication.apply(publication.preview(executed["operation_id"]).id)
         self.artifacts.update({item["name"]: item["file_id"] for item in result["artifacts"]})

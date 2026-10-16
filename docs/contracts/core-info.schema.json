@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://litman-core/contracts/core-info.schema.json",
+  "title": "litman-core info result",
+  "description": "Single JSON object printed to stdout by `litman-core info`. contract: 1.",
+  "type": "object",
+  "required": ["contract", "version", "providers"],
+  "properties": {
+    "contract": { "const": 1 },
+    "version": { "type": "string" },
+    "providers": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  },
+  "additionalProperties": true
+}

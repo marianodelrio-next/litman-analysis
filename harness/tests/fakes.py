@@ -137,29 +137,40 @@ def dossier_drive(*, user: str = "person-1") -> FakeDrive:
     return drive
 
 
+_ROLES_BY_NAME = {"ficha_oportunidad.pdf": "opportunity_report", "resumen_tecnico.docx": "technical_summary",
+                  "guia_preparacion_oferta.docx": "bid_preparation_guide",
+                  "simulador_economico.xlsx": "economic_simulator"}
+
+
 def core_run(job_type: str = "assessment", *, technical: str = "memoria_tecnica.docx", local_path=None,
              tamper=None):
     """Fake ``litman-core`` honouring the public CLI contract with ``include_run_files = false``.
 
     The run directory holds only the public artifacts, flat, and stdout declares
-    them with their SHA-256.  No internal Core file is created, so the harness
-    cannot depend on one.  ``tamper(run_dir, payload)`` lets a test break the contract.
+    them with their SHA-256 and role.  No internal Core file is created, so the
+    harness cannot depend on one.  ``tamper(run_dir, payload)`` lets a test break
+    the contract.
     """
     def run(command, **kwargs):
-        if command[-1] == "--version":
-            return subprocess.CompletedProcess(command, 0, "litman-core 0.1.0\n", "")
+        if command[-1] == "info":
+            return subprocess.CompletedProcess(command, 0, json.dumps(
+                {"contract": 1, "version": "0.1.0", "providers": ["claude-code", "codex"]}), "")
         config = tomllib.loads(Path(command[-1]).read_text())
-        assert config["publication"]["include_run_files"] is False
+        assert "publication" not in config
+        assert "id" not in config["job"]
+        assert "kind" not in config["input"]
+        job_id = Path(config["input"]["location"]).name
         run_dir = Path(config["output"]["directory"]) / "core-run"
         run_dir.mkdir(parents=True)
         names = (["ficha_oportunidad.pdf"] if job_type == "assessment" else
                  ["resumen_tecnico.docx", "guia_preparacion_oferta.docx", "simulador_economico.xlsx", technical])
         artifacts = []
         for name in names:
-            (run_dir / name).write_bytes(f"{name} {config['job']['id']}".encode())
-            artifacts.append({"name": name, "uri": (run_dir / name).as_uri(),
+            (run_dir / name).write_bytes(f"{name} {job_id}".encode())
+            role = _ROLES_BY_NAME.get(name, "technical_document")
+            artifacts.append({"role": role, "name": name, "uri": (run_dir / name).as_uri(),
                               "checksum": hashlib.sha256((run_dir / name).read_bytes()).hexdigest()})
-        payload = {"job_id": config["job"]["id"], "publication_id": "pub-1", "status": "succeeded",
+        payload = {"contract": 1, "job_id": job_id, "publication_id": "pub-1", "status": "succeeded",
                    "local_path": str(local_path or run_dir), "artifacts": artifacts}
         if tamper:
             tamper(run_dir, payload)

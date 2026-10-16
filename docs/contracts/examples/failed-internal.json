@@ -1,0 +1,9 @@
+{
+  "contract": 1,
+  "status": "failed",
+  "local_path": "/runs/licitacion-ayuntamiento-2026-20261016T090000.000000Z",
+  "error": {
+    "code": "internal",
+    "message": "Error inesperado no clasificado"
+  }
+}

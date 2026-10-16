@@ -187,7 +187,7 @@ class GoogleDriveArtifactPublisher:
                     parent = next_parent
                 result = self.service.files().create(body={"name": relative.name, "parents": [folders[parent]], "appProperties": {"sha256": item.checksum}}, media_body=self.uploader(item.source), fields="id,webViewLink", **_DRIVE_OPTIONS).execute()
                 if not result.get("id"): raise RuntimeError("La subida a Drive no devolvió un ID")
-                published.append(PublishedArtifact(item.relative_path, result.get("webViewLink") or f"drive://{result['id']}", item.checksum))
+                published.append(PublishedArtifact(item.relative_path, result.get("webViewLink") or f"drive://{result['id']}", item.checksum, item.role))
             self.service.files().update(fileId=temporary, body={"name": publication_id}, fields="id", **_DRIVE_OPTIONS).execute()
             return tuple(published)
         except Exception:
