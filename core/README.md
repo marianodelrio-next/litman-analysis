@@ -9,7 +9,10 @@ Admite jobs `assessment` y `detailed-analysis`, con entrada y salida local o Goo
 
 ## Desarrollo local
 
-Requisitos: Python 3.11+, `uv`, Codex CLI y autenticación de Codex configurada.
+Requisitos: Python 3.11+, `uv`, Codex CLI y autenticación de Codex configurada
+(ejecuta `codex login` una vez en tu cuenta; Core lee la sesión guardada en
+`CODEX_HOME/auth.json`, por defecto `~/.codex/auth.json`, con permisos
+`0600`).
 
 En Ubuntu también puede usarse la sesión local de Claude Code sin guardar
 tokens en LitMan: use `[llm] provider = "claude-code"` en `config.toml` (el
@@ -41,7 +44,12 @@ Cada publicación crea una carpeta versionada `<job_id>-<YYYYMMDDTHHMMSS.ffffffZ
 
 ## Docker opcional
 
-Desde la raíz del repositorio:
+Antes de construir, copia `deployment/config_example.toml` a
+`deployment/config.toml` (igual que en desarrollo local) y, si vas a usar
+Codex o Drive, prepara `deployment/local-secrets/` con las credenciales
+correspondientes; ver [`deployment/docker`](deployment/docker/README.md) para
+el detalle de esas rutas. Desde la raíz del repositorio (del monorepo, no de
+`core/`):
 
 ```bash
 docker compose -f core/deployment/docker/compose.yaml config --quiet

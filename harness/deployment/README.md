@@ -17,3 +17,16 @@ estado fuera del clon; el harness localiza `litman-core` junto a su intérprete.
 `litman setup` comprueba `litman-core info` y guarda el proveedor (y modelo
 opcional) elegido para esta instalación antes de analizar cualquier
 licitación; ver el contrato en [`docs/contracts.md`](../../docs/contracts.md).
+
+El harness nunca lee ni escribe el `config.toml` de LitMan Core: genera su
+propia configuración mínima en memoria para cada análisis (tipo de job,
+carpeta de entrada temporal, carpeta de salida temporal y el proveedor fijado
+por `setup`) y la pasa a `litman-core run --config`. No es necesario preparar
+`config.toml`/`local-secrets/` de Core para usar el harness; esos archivos
+sólo aplican al uso independiente de Core descrito en
+[`core/deployment/README.md`](../../core/deployment/README.md).
+
+Los resultados publicados no quedan en el disco local: `apply_publication`
+los sube a la carpeta Drive conectada, dentro de una carpeta con fecha
+(`AAAA-MM-DD <publication_id>`) bajo `Analisis inicial` o `Analisis
+detallado`, según el tipo de análisis.

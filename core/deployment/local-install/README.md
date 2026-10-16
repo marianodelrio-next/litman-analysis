@@ -2,7 +2,8 @@
 
 Esta guía consume una distribución construida de `litman-core`, sin ejecutar
 el código desde un checkout. Requiere Python 3.11, `uv` y autenticación de
-Codex configurada por el usuario.
+Codex configurada por el usuario (`codex login` una vez; Core lee la sesión en
+`CODEX_HOME/auth.json`, por defecto `~/.codex/auth.json`).
 
 Construye u obtén una wheel como paso de empaquetado/release:
 
