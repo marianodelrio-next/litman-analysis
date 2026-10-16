@@ -3,8 +3,10 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 import os
+import platform
 from pathlib import Path
 import shutil
+import stat
 import subprocess
 import tempfile
 from typing import TYPE_CHECKING, Any, Callable
@@ -209,7 +211,8 @@ class AnalysisService:
         # and each workspace below it is created 0700.
         self.work_root.mkdir(mode=0o700, parents=True, exist_ok=True)
         workspace = Path(tempfile.mkdtemp(prefix="litman-analysis-", dir=self.work_root))
-        os.chmod(workspace, 0o700)
+        if platform.system() != "Windows":
+            os.chmod(workspace, 0o700)
         return workspace
 
     def _root(self, folder_id: str) -> Resource:
@@ -235,4 +238,13 @@ def remove_workspace(work_root: Path | None, workspace: Path) -> None:
     if resolved == work_root.resolve() or not resolved.is_relative_to(work_root.resolve()):
         raise HarnessError("unsafe_workspace", "El workspace registrado no está dentro del directorio de trabajo")
     if resolved.exists():
-        shutil.rmtree(resolved)
+        if platform.system() == "Windows":
+            shutil.rmtree(resolved, onerror=_remove_readonly)
+        else:
+            shutil.rmtree(resolved)
+
+
+def _remove_readonly(function: Callable[..., Any], path: str, _exc_info: Any) -> None:
+    """Retry only Windows read-only files; other deletion failures still surface."""
+    os.chmod(path, stat.S_IWRITE)
+    function(path)

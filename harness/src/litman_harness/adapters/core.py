@@ -6,6 +6,8 @@ Core's separate service-account publisher.
 from __future__ import annotations
 
 import json
+import os
+import platform
 from pathlib import Path
 import subprocess
 import sys
@@ -32,13 +34,17 @@ Runner = Callable[..., subprocess.CompletedProcess]
 
 def core_command() -> str:
     """Return the Core script installed alongside the harness interpreter."""
-    return str(Path(sys.executable).resolve().parent / CORE_EXECUTABLE)
+    name = f"{CORE_EXECUTABLE}.exe" if platform.system() == "Windows" else CORE_EXECUTABLE
+    return str(Path(sys.executable).resolve().parent / name)
 
 
 def core_executable() -> str | None:
     """The resolved executable if it exists and is executable (for ``diagnose``)."""
     command = core_command()
-    return command if Path(command).is_file() and Path(command).stat().st_mode & 0o111 else None
+    path = Path(command)
+    if not path.is_file():
+        return None
+    return command if platform.system() == "Windows" or path.stat().st_mode & 0o111 else None
 
 
 def _required_core_command() -> str:
@@ -79,7 +85,8 @@ def core_config(*, job_type: str, input_dir: Path, output_dir: Path, provider: s
 def run_core(config_path: Path, run: Runner = subprocess.run) -> dict[str, Any]:
     """Run Core on a local config and return its validated success payload."""
     command = _required_core_command() if run is subprocess.run else core_command()
-    result = run([command, "run", "--config", str(config_path)], text=True, capture_output=True, check=False)
+    result = run([command, "run", "--config", str(config_path)], text=True, encoding="utf-8",
+                 errors="replace", capture_output=True, check=False, env=_child_env())
     try:
         payload = json.loads(result.stdout)
     except (json.JSONDecodeError, TypeError):
@@ -108,7 +115,8 @@ def core_info(run: Runner = subprocess.run) -> dict[str, Any] | None:
     """``litman-core info`` payload (``{"contract", "version", "providers"}``); ``None`` if it cannot be read."""
     try:
         command = _required_core_command() if run is subprocess.run else core_command()
-        result = run([command, "info"], text=True, capture_output=True, check=False)
+        result = run([command, "info"], text=True, encoding="utf-8", errors="replace", capture_output=True,
+                     check=False, env=_child_env())
     except Exception:  # noqa: BLE001 - informative only
         return None
     if result.returncode != 0:
@@ -118,3 +126,11 @@ def core_info(run: Runner = subprocess.run) -> dict[str, Any] | None:
     except (json.JSONDecodeError, TypeError):
         return None
     return payload if isinstance(payload, dict) else None
+
+
+def _child_env() -> dict[str, str]:
+    """Ensure a Python Core child speaks UTF-8 without discarding its environment."""
+    env = os.environ.copy()
+    env.setdefault("PYTHONUTF8", "1")
+    env.setdefault("PYTHONIOENCODING", "utf-8")
+    return env

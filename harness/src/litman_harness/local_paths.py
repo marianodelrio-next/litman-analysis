@@ -1,6 +1,8 @@
 """Private local locations of the harness: never inside the repository checkout."""
 from __future__ import annotations
 
+import os
+import platform
 from pathlib import Path
 from typing import Mapping
 
@@ -32,11 +34,15 @@ def ensure_outside_checkout(path: Path, code: str, message: str) -> Path:
 
 
 def state_dir(env: Mapping[str, str]) -> Path:
+    if platform.system() == "Windows" and not env.get("XDG_STATE_HOME"):
+        return Path(env.get("LOCALAPPDATA") or Path.home() / "AppData" / "Local") / "litman-harness"
     base = env.get("XDG_STATE_HOME") or str(Path.home() / ".local" / "state")
     return Path(base).expanduser() / "litman-harness"
 
 
 def config_dir(env: Mapping[str, str]) -> Path:
+    if platform.system() == "Windows" and not env.get("XDG_CONFIG_HOME"):
+        return Path(env.get("LOCALAPPDATA") or Path.home() / "AppData" / "Local") / "litman-harness"
     base = env.get("XDG_CONFIG_HOME") or str(Path.home() / ".config")
     return Path(base).expanduser() / "litman-harness"
 

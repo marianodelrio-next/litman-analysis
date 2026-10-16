@@ -157,3 +157,24 @@ def test_missing_core_is_reported_without_falling_back_to_path(tmp_path: Path, m
     with pytest.raises(HarnessError) as raised:
         core.run_core(tmp_path / "config.toml")
     assert raised.value.code == "core_not_installed"
+
+
+def test_windows_uses_exe_without_posix_execute_bits_and_sets_utf8(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    from litman_harness.adapters import core
+    executable = tmp_path / "bin" / "litman-core.exe"
+    executable.parent.mkdir()
+    executable.write_text("placeholder", encoding="utf-8")
+    monkeypatch.setattr(core.sys, "executable", str(tmp_path / "bin" / "python.exe"))
+    monkeypatch.setattr(core.platform, "system", lambda: "Windows")
+    calls = []
+
+    def run(command, **kwargs):
+        calls.append((command, kwargs))
+        return subprocess.CompletedProcess(command, 0, json.dumps(
+            {"contract": 1, "version": "versión-á", "providers": ["codex"]}), "")
+
+    assert core.core_executable() == str(executable)
+    assert core.core_info(run)["version"] == "versión-á"
+    assert calls[0][0][0].endswith("litman-core.exe")
+    assert calls[0][1]["encoding"] == "utf-8"
+    assert calls[0][1]["env"]["PYTHONUTF8"] == "1"

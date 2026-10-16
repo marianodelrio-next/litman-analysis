@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import os
+import platform
 import subprocess
 import tomllib
 from typing import Any, Mapping
@@ -55,13 +56,15 @@ def setup(env: Mapping[str, str], provider: str, model: str | None = None, *,
                            details={"providers": providers})
     directory = config_dir(env)
     directory.mkdir(mode=0o700, parents=True, exist_ok=True)
-    os.chmod(directory, 0o700)
+    if platform.system() != "Windows":
+        os.chmod(directory, 0o700)
     text = f"provider = {json.dumps(provider)}\n"
     if model is not None:
         text += f"model = {json.dumps(model)}\n"
     path = settings_path(env)
     path.write_text(text, encoding="utf-8")
-    os.chmod(path, 0o600)
+    if platform.system() != "Windows":
+        os.chmod(path, 0o600)
     result = {"provider": provider, "contract": info.get("contract"), "core_version": info.get("version")}
     if model is not None:
         result["model"] = model

@@ -52,11 +52,15 @@ ruta puede estar dentro del clon, que se detecta subiendo desde el paquete hasta
 | --- | --- | --- |
 | `LITMAN_HARNESS_METADATA` | JSON de metadatos no secretos, sólo lectura, para desarrollo | sin definir → OAuth |
 | `LITMAN_HARNESS_OAUTH_CLIENT` | cliente OAuth de escritorio (sólo para `login`) | `$XDG_CONFIG_HOME/litman-harness/client_secret.json` |
-| `LITMAN_HARNESS_OAUTH_TOKEN` | token personal (0600) | `$XDG_CONFIG_HOME/litman-harness/token.json` |
-| `LITMAN_HARNESS_PLAN_STORE` | planes y operaciones locales (0700/0600) | `$XDG_STATE_HOME/litman-harness/plans` |
-| `LITMAN_HARNESS_WORK_DIR` | workspaces de análisis (0700) | `$XDG_STATE_HOME/litman-harness/work` |
+| `LITMAN_HARNESS_OAUTH_TOKEN` | token personal (0600 en POSIX) | `$XDG_CONFIG_HOME/litman-harness/token.json` |
+| `LITMAN_HARNESS_PLAN_STORE` | planes y operaciones locales (0700/0600 en POSIX) | `$XDG_STATE_HOME/litman-harness/plans` |
+| `LITMAN_HARNESS_WORK_DIR` | workspaces de análisis (0700 en POSIX) | `$XDG_STATE_HOME/litman-harness/work` |
 
-Sin `XDG_*` se usan `~/.config` y `~/.local/state`.
+Sin `XDG_*` se usan `~/.config` y `~/.local/state` en POSIX. En Windows se usa
+`%LOCALAPPDATA%/litman-harness` para estado y configuración; los overrides
+`LITMAN_HARNESS_*` y cualquier `XDG_*` explícito tienen precedencia. Los
+archivos Windows heredan la ACL del perfil: `chmod` no se presenta como una
+garantía de privacidad allí.
 
 `litman login` (sólo CLI, interactivo) abre el flujo de escritorio
 (`InstalledAppFlow.run_local_server(port=0)`) con el único scope `drive` y
@@ -213,10 +217,15 @@ deriva del nombre de esa carpeta, y debe ser único por ejecución para que
 exactamente una vez, con su archivo presente y su SHA-256 verificado; un rol
 desconocido, duplicado, ausente o con checksum distinto → `invalid_core_result`.
 El resultado (rutas, SHA-256 y rol de cada artefacto, proveedor, versiones y
-snapshot de entrada con MD5 y SHA-256) se registra en el almacén local bajo el
+snapshot de entrada con MD5, SHA-256 y `local_name`) se registra en el almacén local bajo el
 `operation_id` del análisis; sólo ese catálogo cerrado puede llegar a Drive. Un
 fallo de Core conserva el workspace e informa su ruta; un éxito lo conserva
-hasta publicar o descartar.
+hasta publicar o descartar. En Windows cada copia de original recibe un
+`local_name` seguro y trazable, sin modificar el nombre de Drive. El ID y MD5
+siguen siendo la identidad; se conservan pistas legibles como `PCAP`, `anuncio`
+o `adjudicación` para Core. Si la raíz de trabajo deja una ruta demasiado
+profunda, la descarga falla antes de empezar con `work_path_too_long`; configure
+`LITMAN_HARNESS_WORK_DIR` con una ruta más corta. No depende de `LongPathsEnabled`.
 
 El proveedor (`codex` o `claude-code`) y el modelo opcional se fijan una vez por
 instalación con `litman setup --json '{"provider": "...", "model"?: "..."}'`

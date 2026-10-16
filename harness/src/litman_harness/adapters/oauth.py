@@ -8,6 +8,7 @@ to the connected dossier tree (``drive.file`` cannot open existing folders by ID
 from __future__ import annotations
 
 import os
+import platform
 from pathlib import Path
 from typing import Any, Callable
 
@@ -41,7 +42,8 @@ def write_private(path: Path, content: str) -> None:
     descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
     with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
         stream.write(content)
-    os.chmod(temporary, 0o600)
+    if platform.system() != "Windows":
+        os.chmod(temporary, 0o600)
     temporary.replace(path)
 
 

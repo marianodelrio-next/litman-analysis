@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import hashlib
+import platform
 from pathlib import Path
+import re
 from typing import Any
 
 from ..dossier.membership import belongs_to_root
@@ -16,6 +18,14 @@ ALLOWED_MIME_TYPES = frozenset({
     "application/msword", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     "application/vnd.ms-excel", "text/plain",
 })
+WINDOWS_INVALID = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
+WINDOWS_RESERVED = frozenset({"CON", "PRN", "AUX", "NUL", *(f"COM{i}" for i in range(1, 10)),
+                              *(f"LPT{i}" for i in range(1, 10))})
+WINDOWS_COMPONENT_LIMIT = 120
+# Keep a margin below the traditional 260-character Windows path limit for
+# directories Core creates below the input/output locations.
+WINDOWS_PATH_LIMIT = 260
+CORE_PATH_MARGIN = 60
 
 
 def _digest(path: Path, algorithm: str) -> str:
@@ -72,18 +82,62 @@ def verify_originals(drive: Any, root: Resource, plan: Plan, *, during_download:
         validate_original(drive, root, current)
 
 
-def download_originals(drive: Any, root: Resource, plan: Plan, inputs_dir: Path) -> list[dict[str, Any]]:
-    """Download the planned originals and fail if any changed while downloading."""
-    snapshot = []
+def _windows_local_name(file_id: str, name: str) -> str:
+    """A traceable Windows component which keeps useful document-name clues."""
+    # Drive names are labels, not paths: retain all words around either separator.
+    visible = name
+    visible = WINDOWS_INVALID.sub("_", visible).rstrip(". ")
+    if not visible:
+        visible = "original"
+    stem, dot, suffix = visible.rpartition(".")
+    if not dot or not stem:
+        stem, suffix = visible, ""
+    stem = stem.rstrip(". ") or "original"
+    if stem.upper() in WINDOWS_RESERVED:
+        stem = f"_{stem}"
+    suffix = WINDOWS_INVALID.sub("_", suffix).rstrip(". ")
+    extension = f".{suffix}" if suffix else ""
+    prefix = f"{file_id}-"
+    available = WINDOWS_COMPONENT_LIMIT - len(prefix) - len(extension)
+    return f"{prefix}{stem[:max(1, available)].rstrip('. ') or 'original'}{extension}"
+
+
+def local_original_name(file_id: str, name: str) -> str:
+    """Return the local filename without changing the original Drive name."""
+    if platform.system() == "Windows":
+        return _windows_local_name(file_id, name)
+    return f"{file_id}-{Path(name).name}"
+
+
+def _download_targets(plan: Plan, inputs_dir: Path) -> list[tuple[Any, Path, str]]:
+    targets: list[tuple[Any, Path, str]] = []
+    seen: set[str] = set()
     for action in plan.actions:
         if action.kind != "download_original" or not action.resource_id:
             continue
-        target = inputs_dir / f"{action.resource_id}-{Path(action.name).name}"
+        local_name = local_original_name(action.resource_id, action.name)
+        target = inputs_dir / local_name
+        key = local_name.casefold()
+        if key in seen:
+            raise HarnessError("local_name_collision", "Dos originales producirían la misma copia local")
+        seen.add(key)
+        if platform.system() == "Windows" and len(str(target)) + CORE_PATH_MARGIN > WINDOWS_PATH_LIMIT:
+            raise HarnessError("work_path_too_long", "La ruta de trabajo es demasiado larga; configure "
+                               "LITMAN_HARNESS_WORK_DIR con una ruta más corta")
+        targets.append((action, target, local_name))
+    return targets
+
+
+def download_originals(drive: Any, root: Resource, plan: Plan, inputs_dir: Path) -> list[dict[str, Any]]:
+    """Download the planned originals and fail if any changed while downloading."""
+    snapshot = []
+    # Derive and validate every destination before the first network write.
+    for action, target, local_name in _download_targets(plan, inputs_dir):
         drive.download(action.resource_id, target)
         md5 = md5_file(target)
         if md5 != action.expected_version:
             raise _stale(action.resource_id, True)
-        snapshot.append({"file_id": action.resource_id, "name": action.name,
+        snapshot.append({"file_id": action.resource_id, "name": action.name, "local_name": local_name,
                          "drive_version": action.metadata.get("drive_version"), "md5_checksum": md5,
                          "sha256": sha256_file(target), "size": target.stat().st_size})
     verify_originals(drive, root, plan, during_download=True)

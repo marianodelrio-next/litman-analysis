@@ -8,7 +8,8 @@ import subprocess
 import pytest
 from fakes import core_run
 
-from litman_harness.analysis.service import AnalysisService
+from litman_harness.analysis import service as service_module
+from litman_harness.analysis.service import AnalysisService, remove_workspace
 from litman_harness.dossier.models import FOLDER_MIME, Resource
 from litman_harness.errors import HarnessError
 from litman_harness.plans import PlanStore
@@ -112,6 +113,7 @@ def test_execute_retains_success_workspace_with_flat_public_artifacts(tmp_path: 
     assert [item["name"] for item in result["public_artifacts"]] == ["ficha_oportunidad.pdf"]
     assert result["provider"] == "codex"
     assert result["input_snapshot"][0]["file_id"] == "file"
+    assert result["input_snapshot"][0]["local_name"] == "file-source.pdf"
 
 
 def test_execute_detailed_catalog_includes_the_single_technical_docx(tmp_path: Path):
@@ -209,6 +211,24 @@ def test_discard_removes_only_the_local_workspace(tmp_path: Path):
     with pytest.raises(HarnessError) as raised:
         analysis.discard(plan.operation_id)
     assert raised.value.code == "invalid_operation_state"
+
+
+def test_windows_workspace_cleanup_uses_readonly_retry_and_rejects_external_path(tmp_path: Path,
+                                                                                   monkeypatch: pytest.MonkeyPatch):
+    root, workspace = tmp_path / "work", tmp_path / "work" / "run"
+    workspace.mkdir(parents=True)
+    monkeypatch.setattr(service_module.platform, "system", lambda: "Windows")
+    calls = []
+
+    def rmtree(path, **kwargs):
+        calls.append((path, kwargs))
+
+    monkeypatch.setattr(service_module.shutil, "rmtree", rmtree)
+    remove_workspace(root, workspace)
+    assert calls == [(workspace.resolve(), {"onerror": service_module._remove_readonly})]
+    with pytest.raises(HarnessError) as raised:
+        remove_workspace(root, tmp_path / "outside")
+    assert raised.value.code == "unsafe_workspace"
 
 
 def test_execute_rejects_original_changed_after_preview(tmp_path: Path):

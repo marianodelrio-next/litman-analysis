@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import platform
 from pathlib import Path
 import re
 
@@ -17,19 +18,21 @@ class PlanStore:
 
     def save(self, plan: Plan) -> str:
         self.root.mkdir(mode=0o700, parents=True, exist_ok=True)
-        try:
-            os.chmod(self.root, 0o700)
-        except OSError:
-            pass
+        if platform.system() != "Windows":
+            try:
+                os.chmod(self.root, 0o700)
+            except OSError:
+                pass
         path = self._path(plan.account_id, plan.id)
         path.parent.mkdir(mode=0o700, exist_ok=True)
         payload = json.dumps(plan.storage_json(), sort_keys=True, ensure_ascii=False)
         temporary = path.with_suffix(".tmp")
         temporary.write_text(payload, encoding="utf-8")
-        try:
-            os.chmod(temporary, 0o600)
-        except OSError:
-            pass
+        if platform.system() != "Windows":
+            try:
+                os.chmod(temporary, 0o600)
+            except OSError:
+                pass
         temporary.replace(path)
         return plan.id
 
@@ -53,10 +56,11 @@ class PlanStore:
         temporary = path.with_suffix(".tmp")
         payload = state.json() if isinstance(state, OperationRecord) else state
         temporary.write_text(json.dumps(payload, sort_keys=True, ensure_ascii=False), encoding="utf-8")
-        try:
-            os.chmod(temporary, 0o600)
-        except OSError:
-            pass
+        if platform.system() != "Windows":
+            try:
+                os.chmod(temporary, 0o600)
+            except OSError:
+                pass
         temporary.replace(path)
 
     def load_operation(self, account_id: str, operation_id: str) -> dict:
