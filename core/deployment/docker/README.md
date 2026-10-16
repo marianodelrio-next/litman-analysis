@@ -1,13 +1,13 @@
 # Docker opcional
 
-Docker ejecuta la misma CLI instalada en la imagen. Desde la raíz:
+Docker ejecuta la misma CLI instalada en la imagen. Desde la raíz del repositorio:
 
-Prepare antes `deployment/config.toml` copiando `deployment/config_example.toml`;
+Prepare antes `core/deployment/config.toml` copiando `core/deployment/config_example.toml`;
 el archivo operativo puede contener rutas o IDs locales y no se versiona.
 
 ```sh
-docker compose -f deployment/docker/compose.yaml build
-docker compose -f deployment/docker/compose.yaml run --rm litman-core run
+docker compose -f core/deployment/docker/compose.yaml build
+docker compose -f core/deployment/docker/compose.yaml run --rm litman-core run
 ```
 
 Compose carga `deployment/config.toml` como `/app/config.toml`, `deployment/input/`

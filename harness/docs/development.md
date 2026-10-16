@@ -44,7 +44,7 @@ UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv sync
 UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest -q
 ```
 
-Configuración local (variables de entorno; salvo `LITMAN_HARNESS_CORE`, ninguna
+Configuración local (variables de entorno; ninguna
 ruta puede estar dentro del clon, que se detecta subiendo desde el paquete hasta
 `.git`):
 
@@ -55,7 +55,6 @@ ruta puede estar dentro del clon, que se detecta subiendo desde el paquete hasta
 | `LITMAN_HARNESS_OAUTH_TOKEN` | token personal (0600) | `$XDG_CONFIG_HOME/litman-harness/token.json` |
 | `LITMAN_HARNESS_PLAN_STORE` | planes y operaciones locales (0700/0600) | `$XDG_STATE_HOME/litman-harness/plans` |
 | `LITMAN_HARNESS_WORK_DIR` | workspaces de análisis (0700) | `$XDG_STATE_HOME/litman-harness/work` |
-| `LITMAN_HARNESS_CORE` | ejecutable `litman-core` (p. ej. `../.venv/bin/litman-core` en desarrollo; puede estar en el clon) | `litman-core` del `PATH` |
 
 Sin `XDG_*` se usan `~/.config` y `~/.local/state`.
 
@@ -77,7 +76,7 @@ enumerados, sin propiedades extra) → `invalid_request`.
 | Operación | Tipo | Efecto |
 | --- | --- | --- |
 | `identity` | consulta | cuenta activa |
-| `diagnose` | consulta | adaptador, identidad, scopes, `litman-core` (`LITMAN_HARNESS_CORE` o PATH), mecanismo de estado compartido, rutas configuradas (sí/no); nunca tokens ni rutas |
+| `diagnose` | consulta | adaptador, identidad, scopes, disponibilidad de `litman-core` instalado, mecanismo de estado compartido y rutas configuradas (sí/no); nunca tokens ni rutas |
 | `inspect` | consulta | inventario de todo el árbol de la carpeta (`tree`, `candidates`, sugerencias) y `next_actions` |
 | `status` | consulta | inspección + manifiesto: `unadopted`, `partial`, `adopted`, `degraded`, `unsupported_manifest`; publicaciones locales pendientes; `recommended_action` |
 | `preview_incorporation` | consulta | plan con sólo lo que falta: fase, carpetas (`folder_ids` para registrar existentes), originales, oferta viva existente, contexto y manifiesto |
@@ -270,7 +269,7 @@ publicado de esta licitación; sólo puede omitirse con `"No consta"`), más
    `context_conflict`.
 
 `contexto.md` muestra `## Resumen` justo tras fase y expediente: una línea por
-clave en orden fijo, `- Etiqueta: valor ([fuente](enlace))`, y la línea de
+clave en orden fijo, `- Etiqueta: valor (fuente: enlace)`, y la línea de
 procedencia; sin resumen, «Resumen pendiente de proponer». El harness sólo
 verifica forma y procedencia, nunca la veracidad.
 

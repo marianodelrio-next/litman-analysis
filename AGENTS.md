@@ -1,6 +1,6 @@
-# Codex Development
+# Agent Development
 
-This repository contains two independent Python 3.11 distributions: LitMan Core (`litman-core`, `src/`), which analyzes procurement files locally or optionally in Docker, and the dossier harness (`litman-harness`, `harness/`), which runs Core as a process and publishes to Google Drive. It also contains a Codex-only development workflow, separate from the product runtime.
+This repository contains two independent Python 3.11 distributions: LitMan Core (`core/`, `litman-core`), which analyzes procurement files locally or optionally in Docker, and the dossier harness (`harness/`, `litman-harness`), which runs Core as a process and publishes to Google Drive. It also contains an Agent development workflow, separate from the product runtime.
 
 - Make the smallest scoped change and follow existing architecture and conventions.
 - Prefer conventional, deterministic code, scripts, rules, and templates; do not delegate work to an LLM that they can solve reliably.
@@ -9,9 +9,9 @@ This repository contains two independent Python 3.11 distributions: LitMan Core 
 - Do not use real credentials, Drive, destructive operations, or production resources without explicit authorization.
 - Do not alter the product LLM CLI invocation (Codex or Claude Code), Docker isolation, product prompts, schemas, templates, or pipelines unless explicitly requested.
 
-Run `UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest -q` from the repository root for Core and from `harness/` for the harness; when Docker is relevant, also run `docker compose -f deployment/docker/compose.yaml config --quiet` and `docker compose -f deployment/docker/compose.yaml build`.
+Run `UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest -q` from `core/` for Core and from `harness/` for the harness; when Docker is relevant, also run `docker compose -f core/deployment/docker/compose.yaml config --quiet` and `docker compose -f core/deployment/docker/compose.yaml build`.
 
-Start with `AGENTS.md`, then use the [codebase map](docs/codebase-map.md) to locate relevant code. Read [architecture](docs/architecture.md) and [decisions](docs/decisions.md) only when relevant; verify the actual code and expand exploration only as needed.
+Start with `AGENTS.md`, then use the [codebase map](docs/codebase-map.md) to locate relevant code. Read [architecture](docs/architecture.md) and the relevant package decisions only when needed; verify the actual code and expand exploration only as needed.
 
 ## Work modes
 

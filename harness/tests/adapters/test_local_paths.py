@@ -14,6 +14,13 @@ def test_default_private_locations_follow_xdg_state(tmp_path: Path):
     assert plan_store_root(env) == (tmp_path / "litman-harness" / "plans").resolve()
 
 
+def test_checkout_root_protects_both_distributions() -> None:
+    root = checkout_root()
+    assert root is not None
+    assert (root / "core" / "pyproject.toml").is_file()
+    assert (root / "harness" / "pyproject.toml").is_file()
+
+
 @pytest.mark.parametrize("resolver,variable", ((work_root, "LITMAN_HARNESS_WORK_DIR"),
                                                 (plan_store_root, "LITMAN_HARNESS_PLAN_STORE")))
 def test_configured_locations_inside_checkout_are_rejected(resolver, variable):

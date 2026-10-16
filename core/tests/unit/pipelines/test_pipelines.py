@@ -246,10 +246,10 @@ def test_registries_declare_all_runtime_components() -> None:
 
 
 def test_detailed_analysis_has_no_dependency_on_assessment_implementation() -> None:
-    source = (
-        Path(__file__).parents[1] / "src" / "litman_core" / "pipelines" / "detailed_analysis"
-    ).glob("*.py")
-    for path in source:
+    source = Path(__file__).parents[3] / "src" / "litman_core" / "pipelines" / "detailed_analysis"
+    paths = list(source.glob("*.py"))
+    assert paths, source
+    for path in paths:
         tree = ast.parse(path.read_text(encoding="utf-8"))
         imports = [
             node.module or "" for node in ast.walk(tree)

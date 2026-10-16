@@ -1,11 +1,11 @@
 .venv/
 .env
-deployment/.env
-deployment/config*.toml
-!deployment/config_example.toml
-deployment/input/
-deployment/runs/
-deployment/local-secrets/
+core/deployment/.env
+core/deployment/config*.toml
+!core/deployment/config_example.toml
+core/deployment/input/
+core/deployment/runs/
+core/deployment/local-secrets/
 local-data/
 local-secrets/
 credentials*.json
@@ -20,6 +20,7 @@ runs/
 build/
 dist/
 .agent-work/
+.claude/
 auth.json
 
 # Datos y documentos reales de licitaciones (pueden contener información sensible)

@@ -8,12 +8,16 @@ version = "0.1.0"
 description = "Local, user-authorized Drive harness for LitMan"
 requires-python = ">=3.11"
 dependencies = [
+  "litman-core==0.1.0",
   "google-api-python-client>=2.0",
   "google-auth>=2.0",
   "google-auth-oauthlib>=1.0",
   "pypdf>=5.0",
   "python-docx>=1.1",
 ]
+
+[tool.uv.sources]
+litman-core = { path = "../core" }
 
 [dependency-groups]
 dev = ["pytest>=8.0"]

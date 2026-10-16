@@ -1,58 +1,37 @@
-# Essential Architecture
+# Arquitectura transversal
 
-LitMan Core is a Python 3.11 application implemented exclusively under `src/litman_core`; no alternate Core package is shipped. The separate `litman-harness` distribution under `harness/` is a client of Core (see «Harness de expediente»), not an alternate implementation. The CLI validates a job and invokes `JobRunner` in the current Python process. `JobRunner` materializes local or Google Drive files, builds a `DocumentBundle`, normalizes documents, and runs either `assessment` or `detailed-analysis`.
+LitMan se compone de dos distribuciones Python 3.11 hermanas y de tooling de
+desarrollo en la raíz. Cada distribución tiene su propio proyecto, lock,
+entorno, documentación, pruebas y despliegue.
 
-Pipelines use the `LLMProvider` port (Codex by default or Claude Code, see «Proveedores LLM locales») for structured analysis. Schema, semantic, and evidence validation complete before publishing. `generation/` creates deliverables from the dossier and versioned resources; `infrastructure/storage/` publishes locally or to Drive.
+`litman-core` vive en `core/` y analiza licitaciones. Su interfaz pública es la
+CLI `litman-core`. `litman-harness` vive en `harness/`, administra el expediente
+con OAuth personal y expone las interfaces `litman` y `litman-mcp`. El harness
+declara Core como dependencia de distribución, pero no importa sus módulos: lo
+ejecuta mediante `litman-core run --config` y consume el resultado público de
+ese proceso. Los detalles de ese límite están en el
+[contrato compartido](contracts.md).
 
-Versioned prompts, rules, schemas, and templates are under `resources/`. The product invokes the configured LLM CLI in its execution environment, local or containerized; `.codex/` and `.agents/` are development-only configuration and are not part of the product runtime.
+```text
+Usuario o agente de producto
+        |
+        v
+litman / litman-mcp  (harness/)
+        |
+        | proceso: litman-core run --config
+        v
+litman-core          (core/)
+```
 
-## Core y Docker
+Core puede instalarse y ejecutarse por sí solo. El harness requiere una
+instalación compatible de Core, tanto en desarrollo como al instalar las dos
+wheels. Docker es una opción de despliegue exclusiva de Core; el harness no
+forma parte de esa imagen.
 
-`litman_core` es el namespace público de la aplicación: su `JobRunner` carga y ejecuta un `JobRequest` y contiene el flujo común de materialización, pipelines, validación, generación y publicación. Core no importa ni invoca Docker y no distingue entre runtimes `native` y `docker` en el dominio o los pipelines.
+La raíz contiene la visión del repositorio, este documento, el contrato
+compartido, el mapa de código y configuración de desarrollo (`.codex/` y
+`.agents/`). Ese tooling no es runtime de producto. La arquitectura y las
+decisiones internas de cada paquete se mantienen junto a su propietario:
 
-Docker pertenece únicamente a `deployment/docker/` como distribución opcional. La CLI local invoca directamente `JobRunner`; la imagen instala y ejecuta esa misma CLI.
-
-El repositorio distingue el desarrollo desde checkout (`deployment/local-dev/`)
-del consumo de una wheel instalada (`deployment/local-install/`). Docker es la
-frontera de aislamiento y construye la wheel en una etapa intermedia para
-instalarla en la imagen final; no usa `src/` como runtime.
-
-`litman-core` es la única CLI pública de Core (el harness expone sus propios `litman` y `litman-mcp`). El comando `run` carga el contrato único `config.toml` en el proceso actual; no existe una interfaz worker en el paquete.
-## Proveedores LLM locales
-
-Core usa un único puerto `LLMProvider` y una factoría validada que selecciona
-Codex (por defecto) o Claude Code en Ubuntu. La precedencia es `[llm]` del job,
-variables del `.env` y valores por defecto; las credenciales permanecen en el
-CLI del usuario. Claude recibe únicamente herramientas de lectura y sus cuatro
-diagnósticos neutrales se conservan dentro del run. Windows, Docker con Claude
-y cancelación explícita no forman parte de este contrato.
-
-## Harness de expediente
-
-`harness/` es la distribución separada `litman-harness`: no importa
-`litman_core` y lo invoca como proceso `litman-core run --config` con un
-`config.toml` local en un workspace privado, nunca con
-`output.google_drive_folder_id` (el publicador de cuenta de servicio de Core no
-participa). Su único contrato con Core es la CLI pública: código de salida y
-JSON de stdout con los artefactos y sus checksums. Cada empleado usa su OAuth
-personal de escritorio con el scope `drive`; el límite a la licitación
-conectada lo impone el harness.
-
-Capas: `plans/` (planes y operaciones locales por cuenta), `dossier/`
-(pertenencia, inventario del árbol, manifiesto, contexto, incorporación,
-publicación, resumen y la recomendación determinista del siguiente paso,
-`recommendation.py`),
-`analysis/` (originales, ejecución de Core y validación del catálogo público),
-`adapters/` (Drive, estado compartido, OAuth, metadatos, documentos, proceso
-Core) e `interfaces/` (un registro único de operaciones servido por la CLI
-`litman` y el MCP stdio `litman-mcp`). `agent/` contiene las skills y el
-subagente lector de producto.
-
-El estado compartido del expediente vive en `_LitMan/manifest.json`
-(`litman-dossier-v1`); `contexto.md` se deriva de él. Toda escritura en Drive
-pasa por `SharedStateCapability`: con OAuth es `DriveSharedState`
-(`adapters/drive_state.py`, actualización condicional con Drive API v2
-`If-Match`); el adaptador de metadatos de desarrollo usa
-`UnavailableSharedState` y devuelve `pending_concurrency_gate` sin escribir.
-Detalle operativo y validación pendiente:
-[harness-development.md](harness-development.md).
+- [Core: operaciones y documentación](../core/docs/operations.md)
+- [Harness: desarrollo](../harness/docs/development.md)

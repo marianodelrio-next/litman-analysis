@@ -1,5 +1,9 @@
 import os
+from pathlib import Path
 import subprocess
+
+
+ROOT = Path(__file__).parents[2]
 
 
 def _run(command, *, cwd=None):
@@ -10,7 +14,8 @@ def _run(command, *, cwd=None):
 
 def test_installed_wheel_runs_outside_checkout(tmp_path):
     wheelhouse = tmp_path / "wheelhouse"
-    result = subprocess.run(["uv", "build", "--wheel", "--out-dir", str(wheelhouse)], capture_output=True, text=True)
+    result = subprocess.run(["uv", "build", "--wheel", "--out-dir", str(wheelhouse)], cwd=ROOT,
+                            capture_output=True, text=True)
     if result.returncode:
         import pytest
         external_markers = (

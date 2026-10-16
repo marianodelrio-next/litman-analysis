@@ -11,7 +11,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 FOLDER = "application/vnd.google-apps.folder"
 HARNESS_VARIABLES = ("LITMAN_HARNESS_METADATA", "LITMAN_HARNESS_OAUTH_TOKEN", "LITMAN_HARNESS_OAUTH_CLIENT",
-                     "LITMAN_HARNESS_PLAN_STORE", "LITMAN_HARNESS_WORK_DIR", "LITMAN_HARNESS_CORE")
+                     "LITMAN_HARNESS_PLAN_STORE", "LITMAN_HARNESS_WORK_DIR")
 
 METADATA = {
     "about": {"user": {"permissionId": "person-1", "emailAddress": "persona@example.test",

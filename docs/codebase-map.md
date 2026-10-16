@@ -1,27 +1,21 @@
-# Codebase Map
+# Mapa del código
 
-Use this map to locate likely ownership, then verify the current code before editing.
+Usa este índice para localizar la propiedad de un cambio y comprueba el código
+actual antes de editarlo.
 
-| Area | Paths | Navigation purpose |
+| Área | Rutas | Propósito de navegación |
 | --- | --- | --- |
-| Package and configuration | `src/litman_core/config.py`, `src/litman_core/resource_paths.py`, `src/litman_core/runtime.py` | Package settings, resource resolution, runtime directories. |
-| Environment and generation configuration | `src/litman_core/environment.py`, `src/litman_core/generation_config.py` | `.env` loading and detailed-analysis generation options. |
-| Host entry points | `src/litman_core/cli.py`, `src/litman_core/execution/job_runner.py` | Public commands and direct job orchestration. |
-| Job contract | `src/litman_core/application/job_loader.py`, `src/litman_core/domain/jobs.py` | Typed `config.toml` loading, validation, and job types. |
-| Document input | `src/litman_core/infrastructure/documents/`, `src/litman_core/infrastructure/storage/local.py`, `src/litman_core/infrastructure/storage/google_drive.py` | Inventory, normalization, local sources, and Drive materialization. |
-| Drive integration | `src/litman_core/infrastructure/storage/google_drive.py`, `src/litman_core/infrastructure/storage/publication.py` | Google API setup, Drive reads, staged publication, publication naming. |
-| LLM providers | `src/litman_core/infrastructure/llm/factory.py`, `resolution.py`, `claude_code.py`, `codex_cli.py`, `codex_auth.py`, `codex_events.py` | Shared provider composition, provider/model resolution, Ubuntu Claude Code/Codex execution, authentication, events, and failures. |
-| Pipeline framework | `src/litman_core/pipelines/runner.py`, `src/litman_core/pipelines/registry.py`, `src/litman_core/pipelines/models.py` | Versioned resource loading and common pipeline execution. |
-| Assessment analysis | `src/litman_core/pipelines/assessment/`, `src/litman_core/resources/pipelines/assessment/v1/` | Assessment preparation, extraction, rules, and prompts. |
-| Detailed analysis | `src/litman_core/pipelines/detailed_analysis/`, `src/litman_core/resources/pipelines/detailed/v1/` | Dossier extraction and detailed-analysis prompts. |
-| Validation | `src/litman_core/domain/validation/`, `src/litman_core/resources/schemas/` | Schema, semantic, and evidence validation. |
-| Document generation | `src/litman_core/generation/service.py`, `src/litman_core/generation/registry.py`, `src/litman_core/generation/*/generator.py`, `src/litman_core/generation/*/renderer.py` | Deterministic artefact planning and DOCX/XLSX/PDF rendering, including technical summary and bid-preparation guide. |
-| Versioned templates | `src/litman_core/resources/templates/` | Runtime document and spreadsheet templates. |
-| Run metadata | `src/litman_core/infrastructure/runs.py` | Run directories, hashes, manifests, and lineage. |
-| Unit tests: domain/pipelines | `tests/unit/domain/`, `tests/unit/pipelines/`, `tests/unit/test_deployment.py` | Validation, pipeline behavior, and optional deployment configuration. |
-| Unit tests: infrastructure | `tests/unit/infrastructure/` | Storage, normalization, product Codex CLI and Claude Code providers, LLM resolution, and auth. |
-| Unit tests: generation | `tests/unit/generation/` | Artefact generation and rendering. |
-| Contracts and integration | `tests/contracts/`, `tests/integration/test_job_runner.py` | Public job and architecture contracts; end-to-end job orchestration. |
-| Personal Drive harness | `harness/src/litman_harness/{dossier,analysis,adapters,interfaces,plans}/`, `harness/agent/` (skills, `claude/` and `codex/` subagents), `harness/tests/` | Separate user-OAuth dossier client (CLI `litman`, MCP `litman-mcp`, one operation registry); manifest/context, incorporation, publication and tender summary write shared Drive state through Drive v2 `If-Match` (`adapters/drive_state.py`); development metadata stays read-only. See `docs/harness-development.md`. |
+| Documentación y tooling transversal | `README.md`, `AGENTS.md`, `docs/`, `.codex/`, `.agents/` | Visión de los dos paquetes, contrato público entre ellos y reglas de desarrollo. No forman parte del runtime de producto. |
+| Distribución Core | `core/pyproject.toml`, `core/uv.lock`, `core/README.md` | Paquete `litman-core`, dependencias y entrada de desarrollo. |
+| Ejecución y contrato de Core | `core/src/litman_core/cli.py`, `core/src/litman_core/execution/job_runner.py`, `core/src/litman_core/application/` | CLI `litman-core`, carga de jobs y orquestación local de análisis. |
+| Dominio, pipelines y generación de Core | `core/src/litman_core/domain/`, `pipelines/`, `generation/`, `resources/` | Modelo de jobs, análisis, validación y artefactos versionados. |
+| Infraestructura de Core | `core/src/litman_core/infrastructure/` | Documentos, almacenamiento, metadatos de ejecución y proveedores LLM. |
+| Despliegue y pruebas de Core | `core/deployment/`, `core/tests/`, `core/docs/` | Guías operativas y Docker opcional, pruebas y documentación interna de Core. |
+| Distribución Harness | `harness/pyproject.toml`, `harness/uv.lock`, `harness/README.md` | Paquete `litman-harness`, que declara Core como dependencia de distribución. |
+| Interfaces y ejecución de Core desde Harness | `harness/src/litman_harness/interfaces/`, `harness/src/litman_harness/adapters/core.py` | CLI `litman`, MCP `litman-mcp` y ejecución de `litman-core run --config` como proceso. |
+| Expediente y análisis del Harness | `harness/src/litman_harness/{dossier,analysis,plans,adapters}/` | Estado del expediente, planes locales, Drive con OAuth personal y publicación de resultados. |
+| Producto, despliegue y pruebas del Harness | `harness/agent/`, `harness/deployment/`, `harness/tests/`, `harness/docs/` | Recursos del agente de producto, instalación de las wheels, pruebas y documentación interna del harness. |
 
-Project-level operating guidance is in `AGENTS.md`; concise architecture and durable decisions are in `docs/architecture.md` and `docs/decisions.md`.
+El contrato entre las distribuciones se describe en [contracts.md](contracts.md).
+Para las arquitecturas internas, consulta la documentación de
+[Core](../core/docs/) o del [Harness](../harness/docs/development.md).
