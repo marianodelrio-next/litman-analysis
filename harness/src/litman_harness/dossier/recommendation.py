@@ -1,7 +1,8 @@
 """The single next step of the guided path, computed deterministically from known state.
 
-organise (structure + originals) → place registered originals in ``Originales`` → initial analysis (+ publication) → summary →
-detailed analysis? (+ publication, live offer) → refresh summary → the person decides.
+organise (structure + originals) → place registered originals in ``Originales`` →
+initial analysis (+ publication) → summary → detailed analysis? (+ publication, live offer) →
+refresh summary → the person decides.
 """
 from __future__ import annotations
 

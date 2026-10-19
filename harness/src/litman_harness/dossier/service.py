@@ -322,7 +322,8 @@ class ExpedienteService:
         actions += self._folder_actions(root, manifest, folder_ids)
         registered = ({value for item in manifest.originals for value in (item["file_id"], item.get("copied_from"))
                        if value} if manifest else set())
-        placements = self._registered_placements(root, manifest, folder_ids)
+        originals_folder = self._originals_folder(manifest, folder_ids)
+        placements = self._registered_placements(root, manifest, originals_folder)
         for identifier in original_ids:
             if identifier in registered:
                 continue
@@ -339,7 +340,7 @@ class ExpedienteService:
             actions.append(PlanAction("register_original", item.id, item.name, None, md5,
                                       {"mime_type": item.mime_type, "size": item.size,
                                        "drive_version": item.version}))
-            if not self._in_originals(manifest, folder_ids, item):
+            if not self._inside(originals_folder, item):
                 placements.append(self._placement(item, md5, registered=False))
         actions += placements
         if live_offer_id:
@@ -416,8 +417,7 @@ class ExpedienteService:
         folder_id = (manifest.folders.get("originals") if manifest else None) or folder_ids.get("originals")
         return self.drive.get(folder_id) if folder_id else None
 
-    def _in_originals(self, manifest: Manifest | None, folder_ids: dict[str, str], item: Resource) -> bool:
-        folder = self._originals_folder(manifest, folder_ids)
+    def _inside(self, folder: Resource | None, item: Resource) -> bool:
         return folder is not None and belongs_to_root(self.drive, folder, item)
 
     @staticmethod
@@ -428,7 +428,7 @@ class ExpedienteService:
             "registered": registered, "warning": placement_warning(strategy, item.name)})
 
     def _registered_placements(self, root: Resource, manifest: Manifest | None,
-                               folder_ids: dict[str, str]) -> list[PlanAction]:
+                               originals_folder: Resource | None) -> list[PlanAction]:
         """Place registered originals that are outside ``originals``; never one kept ``in_place``.
 
         An original whose content no longer matches the manifest is not placed
@@ -444,7 +444,7 @@ class ExpedienteService:
                 item = self.drive.get(original["file_id"])
             except HarnessError:
                 continue
-            if not belongs_to_root(self.drive, root, item) or self._in_originals(manifest, folder_ids, item):
+            if not belongs_to_root(self.drive, root, item) or self._inside(originals_folder, item):
                 continue
             expected = original.get("md5_checksum")
             strategy = None if item.md5_checksum == expected else "skipped"
