@@ -353,7 +353,48 @@ def test_uninstall_without_manifest_is_a_noop(tmp_path: Path, monkeypatch: pytes
     env = _env(tmp_path, monkeypatch)
     home = tmp_path / "home"
     result = installation.uninstall(home=home, env=env)
-    assert result == {"removed": [], "kept": []}
+    assert result == {"removed": [], "kept": [], "failed": []}
+
+
+def test_uninstall_reports_failed_folder_and_file_and_keeps_manifest(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+):
+    env = _env(tmp_path, monkeypatch)
+    home = tmp_path / "home"
+    _patch_scripts(monkeypatch, tmp_path / "scripts")
+    installation.install(app="codex", source=REPO, home=home, env=env)
+
+    from litman_harness.local_paths import token_path
+    token_file = token_path(env)
+    token_file.parent.mkdir(parents=True, exist_ok=True)
+    token_file.write_text("{}", encoding="utf-8")
+
+    real_remove = installation._remove
+    failing_skill = installation.SKILL_NAMES[0]
+
+    def fake_remove(path: Path, *, is_dir: bool) -> bool:
+        if is_dir and path.name == failing_skill:
+            return False
+        if not is_dir and path.name == "token.json":
+            return False
+        return real_remove(path, is_dir=is_dir)
+
+    monkeypatch.setattr(installation, "_remove", fake_remove)
+
+    result = installation.uninstall(home=home, env=env, purge_data=True)
+    assert f"skill:{failing_skill}" in result["failed"]
+    assert "token" in result["failed"]
+    for name in installation.SKILL_NAMES:
+        if name != failing_skill:
+            assert f"skill:{name}" in result["removed"]
+    assert installation.manifest_path(env).is_file()
+
+    monkeypatch.setattr(installation, "_remove", real_remove)
+    retry = installation.uninstall(home=home, env=env, purge_data=True)
+    assert retry["failed"] == []
+    assert f"skill:{failing_skill}" in retry["removed"]
+    assert "token" in retry["removed"]
+    assert not installation.manifest_path(env).is_file()
 
 
 def test_import_oauth_client_copies_with_private_permissions(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):

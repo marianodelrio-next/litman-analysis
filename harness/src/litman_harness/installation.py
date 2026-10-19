@@ -10,11 +10,14 @@ never executes Git, uv, a provider CLI or a browser.
 from __future__ import annotations
 
 import json
+import os
+import platform
 import shutil
+import stat
 import subprocess
 import tomllib
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Callable, Mapping
 
 from .adapters.core import Runner, script_path
 from .adapters.oauth import write_private
@@ -47,6 +50,33 @@ def _read_manifest(env: Mapping[str, str]) -> dict[str, Any]:
 
 def _write_manifest(env: Mapping[str, str], data: dict[str, Any]) -> None:
     write_private(manifest_path(env), json.dumps(data, ensure_ascii=False, sort_keys=True, indent=2))
+
+
+def _remove(path: Path, *, is_dir: bool) -> bool:
+    """Remove a file or tree, retrying Windows read-only targets; return False instead of raising."""
+    try:
+        if is_dir:
+            if platform.system() == "Windows":
+                shutil.rmtree(path, onerror=_remove_readonly)
+            else:
+                shutil.rmtree(path)
+        else:
+            try:
+                path.unlink()
+            except OSError:
+                if platform.system() != "Windows":
+                    raise
+                os.chmod(path, stat.S_IWRITE)
+                path.unlink()
+    except OSError:
+        return False
+    return True
+
+
+def _remove_readonly(function: Callable[..., Any], path: str, _exc_info: Any) -> None:
+    """Retry only Windows read-only files; other deletion failures still surface."""
+    os.chmod(path, stat.S_IWRITE)
+    function(path)
 
 
 def _atomic_write(path: Path, text: str) -> None:
@@ -289,10 +319,11 @@ def uninstall(*, home: Path, env: Mapping[str, str], remove_workspace: bool = Fa
     """Remove exactly what the manifest recorded, never more."""
     manifest = _read_manifest(env)
     if not manifest:
-        return {"removed": [], "kept": []}
+        return {"removed": [], "kept": [], "failed": []}
 
     removed: list[str] = []
     kept: list[str] = []
+    failed: list[str] = []
     app = manifest.get("app")
     paths = _app_paths(app, home, env) if app in APPS else None
 
@@ -300,14 +331,12 @@ def uninstall(*, home: Path, env: Mapping[str, str], remove_workspace: bool = Fa
         for name in manifest.get("skills") or []:
             dest = paths["skills"] / name
             if dest.exists():
-                shutil.rmtree(dest, ignore_errors=True)
-                removed.append(f"skill:{name}")
+                (removed if _remove(dest, is_dir=True) else failed).append(f"skill:{name}")
         subagent = manifest.get("subagent")
         if subagent:
             dest = _subagent_dest(paths, app)
             if dest.exists():
-                dest.unlink()
-                removed.append("subagent")
+                (removed if _remove(dest, is_dir=False) else failed).append("subagent")
 
     if manifest.get("mcp_registered") and paths:
         if app == "codex":
@@ -342,16 +371,14 @@ def uninstall(*, home: Path, env: Mapping[str, str], remove_workspace: bool = Fa
         if remove_workspace:
             claude_md = workspace_dir / "CLAUDE.md"
             if claude_md.exists():
-                claude_md.unlink()
-                removed.append("claude_md")
+                (removed if _remove(claude_md, is_dir=False) else failed).append("claude_md")
         else:
             kept.append("claude_md")
 
     if manifest.get("workspace_created"):
         if remove_workspace:
             if workspace_dir.exists():
-                shutil.rmtree(workspace_dir, ignore_errors=True)
-                removed.append("workspace")
+                (removed if _remove(workspace_dir, is_dir=True) else failed).append("workspace")
         else:
             kept.append("workspace")
 
@@ -359,26 +386,23 @@ def uninstall(*, home: Path, env: Mapping[str, str], remove_workspace: bool = Fa
         if manifest.get("oauth_client"):
             client = client_path(env)
             if client.is_file():
-                client.unlink()
-                removed.append("oauth_client")
+                (removed if _remove(client, is_dir=False) else failed).append("oauth_client")
         token = token_path(env)
         if token.is_file():
-            token.unlink()
-            removed.append("token")
+            (removed if _remove(token, is_dir=False) else failed).append("token")
         settings_file = settings_path(env)
         if settings_file.is_file():
-            settings_file.unlink()
-            removed.append("settings")
+            (removed if _remove(settings_file, is_dir=False) else failed).append("settings")
         for root in (plan_store_root(env), work_root(env)):
             if root.exists():
-                shutil.rmtree(root, ignore_errors=True)
-                removed.append(str(root.name))
+                (removed if _remove(root, is_dir=True) else failed).append(str(root.name))
     else:
         if manifest.get("oauth_client"):
             kept.append("oauth_client")
 
-    manifest_path(env).unlink(missing_ok=True)
-    return {"removed": removed, "kept": kept}
+    if not failed:
+        manifest_path(env).unlink(missing_ok=True)
+    return {"removed": removed, "kept": kept, "failed": failed}
 
 
 def status(*, env: Mapping[str, str], home: Path | None = None) -> dict[str, Any]:

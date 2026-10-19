@@ -63,6 +63,13 @@ def uninstall(argv: list[str]) -> dict[str, Any]:
     try:
         result = installation.uninstall(home=Path.home(), env=os.environ, remove_workspace=args.remove_workspace,
                                          purge_data=args.purge_data)
+        if result["failed"]:
+            return error_envelope(
+                "uninstall_incomplete",
+                "No se pudieron eliminar algunos elementos. Cierre los programas que puedan estar "
+                "usando esos archivos o carpetas y vuelva a ejecutar la desinstalación.",
+                result,
+            )
         return {"ok": True, "result": result}
     except HarnessError as exc:
         return error_envelope(exc.code, str(exc), exc.details)

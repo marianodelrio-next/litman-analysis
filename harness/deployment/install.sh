@@ -28,6 +28,20 @@ if ! command -v uv >/dev/null 2>&1; then
     exit 1
 fi
 
+if [ "$LITMAN_APP" = "codex" ]; then
+    if ! command -v codex >/dev/null 2>&1; then
+        echo "Falta la CLI de Codex. Instálela siguiendo:" >&2
+        echo "  https://github.com/openai/codex" >&2
+        exit 1
+    fi
+else
+    if ! command -v claude >/dev/null 2>&1; then
+        echo "Falta la CLI de Claude Code. Instálela siguiendo:" >&2
+        echo "  https://docs.claude.com/en/docs/claude-code/setup" >&2
+        exit 1
+    fi
+fi
+
 SRC="${LITMAN_SRC_DIR:-$HOME/.local/share/litman/src}"
 REPO="${LITMAN_REPO:-https://github.com/marianodelrio-next/litman-analysis.git}"
 
@@ -45,20 +59,6 @@ else
 fi
 
 uv tool install --force --python 3.11 "$SRC/harness" --with "$SRC/core"
-
-if [ "$LITMAN_APP" = "codex" ]; then
-    if ! command -v codex >/dev/null 2>&1; then
-        echo "Falta la CLI de Codex. Instálela siguiendo:" >&2
-        echo "  https://github.com/openai/codex" >&2
-        exit 1
-    fi
-else
-    if ! command -v claude >/dev/null 2>&1; then
-        echo "Falta la CLI de Claude Code. Instálela siguiendo:" >&2
-        echo "  https://docs.claude.com/en/docs/claude-code/setup" >&2
-        exit 1
-    fi
-fi
 
 LITMAN_BIN="$(uv tool dir --bin)/litman"
 "$LITMAN_BIN" install --app "$LITMAN_APP" --source "$SRC"

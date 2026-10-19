@@ -62,7 +62,11 @@ proveedor LLM, `setup`).
     la creó la instalación).
   - `LITMAN_PURGE_DATA=1`: también borra el token, el cliente OAuth, los
     ajustes locales, los planes y el directorio de trabajo.
-  Nunca desinstala Git, uv, la CLI del proveedor ni un navegador.
+  Nunca desinstala Git, uv, la CLI del proveedor ni un navegador. Si algún
+  archivo o carpeta está en uso, el script se detiene con un error
+  (`uninstall_incomplete`) sin desinstalar `litman-harness` ni borrar el
+  clon local; cierre el programa que lo bloquea y vuelva a ejecutar el
+  script.
 
 ### `litman install` / `litman uninstall` (lo que ejecutan los scripts)
 

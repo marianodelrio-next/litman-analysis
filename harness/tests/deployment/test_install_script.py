@@ -175,3 +175,79 @@ def test_install_and_uninstall_ps1_contain_the_official_links_and_no_elevation()
              f"[System.Management.Automation.Language.Parser]::ParseFile('{script}', [ref]$null, [ref]$null)"],
             capture_output=True, text=True)
         assert parse.returncode == 0, parse.stderr
+
+
+def test_without_provider_cli_stops_before_cloning_or_installing(tmp_path: Path):
+    git_bin = tmp_path / "git-bin"
+    git_bin.mkdir()
+    real_git = shutil.which("git")
+    assert real_git
+    (git_bin / "git").symlink_to(real_git)
+
+    uv_log = tmp_path / "uv-calls.log"
+    fake_bin = tmp_path / "fake-bin"
+    fake_bin.mkdir()
+    uv_script = fake_bin / "uv"
+    uv_script.write_text(f'#!/bin/sh\necho "$@" >> "{uv_log}"\nexit 0\n')
+    uv_script.chmod(0o755)
+
+    home = tmp_path / "home"
+    src = tmp_path / "src"
+    env = {"PATH": f"{git_bin}:{fake_bin}", "HOME": str(home), "LITMAN_APP": "codex",
+           "LITMAN_SRC_DIR": str(src)}
+    result = _run(["/bin/sh", str(INSTALL_SH)], env=env)
+    assert result.returncode != 0
+    assert "github.com/openai/codex" in result.stdout + result.stderr
+    assert not src.exists()
+    assert not uv_log.exists()
+
+
+def test_install_ps1_checks_provider_cli_before_clone_and_tool_install():
+    text = INSTALL_PS1.read_text(encoding="utf-8")
+    codex_check = text.index("Get-Command codex")
+    claude_check = text.index("Get-Command claude")
+    clone_idx = text.index("git clone")
+    tool_install_idx = text.index("uv tool install")
+    assert codex_check < clone_idx and claude_check < clone_idx
+    assert codex_check < tool_install_idx and claude_check < tool_install_idx
+
+
+def test_uninstall_sh_stops_before_uv_tool_uninstall_when_litman_uninstall_fails(tmp_path: Path):
+    bin_dir = tmp_path / "uv-bin"
+    bin_dir.mkdir()
+    litman_bin = bin_dir / "litman"
+    litman_bin.write_text("#!/bin/sh\nexit 2\n")
+    litman_bin.chmod(0o755)
+
+    uv_log = tmp_path / "uv-calls.log"
+    fake_bin = tmp_path / "fake-bin"
+    fake_bin.mkdir()
+    uv_script = fake_bin / "uv"
+    uv_script.write_text(
+        "#!/bin/sh\n"
+        f'echo "$@" >> "{uv_log}"\n'
+        'if [ "$1" = "tool" ] && [ "$2" = "dir" ]; then\n'
+        f'  echo "{bin_dir}"\n'
+        "  exit 0\n"
+        "fi\n"
+        "exit 0\n"
+    )
+    uv_script.chmod(0o755)
+
+    src = tmp_path / "src"
+    src.mkdir()
+    (src / "marker.txt").write_text("keep")
+
+    env = {"PATH": str(fake_bin), "HOME": str(tmp_path / "home"), "LITMAN_SRC_DIR": str(src)}
+    result = _run(["/bin/sh", str(UNINSTALL_SH)], env=env)
+    assert result.returncode != 0
+    assert src.exists()
+    assert "uninstall" not in (uv_log.read_text() if uv_log.exists() else "")
+
+
+def test_uninstall_ps1_checks_lastexitcode_after_litman_uninstall():
+    text = UNINSTALL_PS1.read_text(encoding="utf-8")
+    call_idx = text.index("& $LitmanBin uninstall")
+    check_idx = text.index("$LASTEXITCODE -ne 0", call_idx)
+    tool_uninstall_idx = text.index("uv tool uninstall", call_idx)
+    assert call_idx < check_idx < tool_uninstall_idx
