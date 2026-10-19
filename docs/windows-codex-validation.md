@@ -250,9 +250,14 @@ they inherit from the expected user profile and are not broadly readable.
   distinct `local_name` values (each prefixed with its `file_id`) and neither
   overwrites the other. A true `local_name` collision raises
   `local_name_collision`.
-- **Deep work path.** Configure a very deep `LITMAN_HARNESS_WORK_DIR` (or
-  default path) so the resulting path exceeds Windows' 260-character limit
-  with margin. Expected: an early error,
+- **Long Drive names.** With `LITMAN_HARNESS_WORK_DIR` unset, analyse a
+  dossier with an original whose Drive name exceeds 100 characters. Expected:
+  the analysis succeeds; its `local_name` is shortened (keeping the
+  `<file_id>-` prefix and the extension) while `name` keeps the full Drive
+  name.
+- **Deep work path.** Configure a very deep `LITMAN_HARNESS_WORK_DIR` so that
+  not even `<file_id>-`, one character and the extension fit within Windows'
+  260-character limit with margin. Expected: an early error,
   `work_path_too_long` — *"La ruta de trabajo es demasiado larga; configure
   LITMAN_HARNESS_WORK_DIR con una ruta más corta"* — before any partial
   download is treated as published. Do not enable `LongPathsEnabled` to make

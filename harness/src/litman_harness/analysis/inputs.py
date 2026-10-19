@@ -22,6 +22,8 @@ WINDOWS_INVALID = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 WINDOWS_RESERVED = frozenset({"CON", "PRN", "AUX", "NUL", *(f"COM{i}" for i in range(1, 10)),
                               *(f"LPT{i}" for i in range(1, 10))})
 WINDOWS_COMPONENT_LIMIT = 120
+# A longer suffix after the last dot is part of the document name, not an extension.
+MAX_EXTENSION = 10
 # Keep a margin below the traditional 260-character Windows path limit for
 # directories Core creates below the input/output locations.
 WINDOWS_PATH_LIMIT = 260
@@ -82,7 +84,7 @@ def verify_originals(drive: Any, root: Resource, plan: Plan, *, during_download:
         validate_original(drive, root, current)
 
 
-def _windows_local_name(file_id: str, name: str) -> str:
+def _windows_local_name(file_id: str, name: str, limit: int = WINDOWS_COMPONENT_LIMIT) -> str:
     """A traceable Windows component which keeps useful document-name clues."""
     # Drive names are labels, not paths: retain all words around either separator.
     visible = name
@@ -90,7 +92,7 @@ def _windows_local_name(file_id: str, name: str) -> str:
     if not visible:
         visible = "original"
     stem, dot, suffix = visible.rpartition(".")
-    if not dot or not stem:
+    if not dot or not stem or len(suffix) > MAX_EXTENSION:
         stem, suffix = visible, ""
     stem = stem.rstrip(". ") or "original"
     if stem.upper() in WINDOWS_RESERVED:
@@ -98,24 +100,31 @@ def _windows_local_name(file_id: str, name: str) -> str:
     suffix = WINDOWS_INVALID.sub("_", suffix).rstrip(". ")
     extension = f".{suffix}" if suffix else ""
     prefix = f"{file_id}-"
-    available = WINDOWS_COMPONENT_LIMIT - len(prefix) - len(extension)
-    return f"{prefix}{stem[:max(1, available)].rstrip('. ') or 'original'}{extension}"
+    # Only the stem is truncated; a single character is kept so callers can detect an impossible fit.
+    available = max(1, limit - len(prefix) - len(extension))
+    return f"{prefix}{stem[:available].rstrip('. ') or 'original'[:available]}{extension}"
 
 
-def local_original_name(file_id: str, name: str) -> str:
-    """Return the local filename without changing the original Drive name."""
+def local_original_name(file_id: str, name: str, limit: int = WINDOWS_COMPONENT_LIMIT) -> str:
+    """Return the local filename without changing the original Drive name.
+
+    On Windows the name fits in ``limit`` characters when possible; POSIX ignores it.
+    """
     if platform.system() == "Windows":
-        return _windows_local_name(file_id, name)
+        return _windows_local_name(file_id, name, limit)
     return f"{file_id}-{Path(name).name}"
 
 
 def _download_targets(plan: Plan, inputs_dir: Path) -> list[tuple[Any, Path, str]]:
     targets: list[tuple[Any, Path, str]] = []
     seen: set[str] = set()
+    # The component budget left below the actual input directory (minus the separator).
+    budget = WINDOWS_PATH_LIMIT - CORE_PATH_MARGIN - len(str(inputs_dir)) - 1
+    limit = min(WINDOWS_COMPONENT_LIMIT, budget)
     for action in plan.actions:
         if action.kind != "download_original" or not action.resource_id:
             continue
-        local_name = local_original_name(action.resource_id, action.name)
+        local_name = local_original_name(action.resource_id, action.name, limit)
         target = inputs_dir / local_name
         key = local_name.casefold()
         if key in seen:
