@@ -120,3 +120,14 @@ def test_real_loader_keeps_the_scopes_granted_in_the_token_file(tmp_path: Path):
     token.write_text(json.dumps({"token": "t", "refresh_token": "r", "client_id": "c", "client_secret": "s",
                                  "scopes": ["https://www.googleapis.com/auth/drive.file"]}))
     assert _load_credentials(token).scopes == ["https://www.googleapis.com/auth/drive.file"]
+
+
+def test_docs_service_uses_the_same_drive_scope_credentials(tmp_path: Path):
+    from google.oauth2.credentials import Credentials as GoogleCredentials
+    credentials = GoogleCredentials(token="access-secret", scopes=["https://www.googleapis.com/auth/drive"])
+    provider = DesktopOAuthProvider(tmp_path / "token.json", credentials=credentials)
+    service = provider.docs_service()
+    assert service._baseUrl.startswith("https://docs.googleapis.com/") and hasattr(service, "documents")
+    injected = DesktopOAuthProvider(tmp_path / "token.json", credentials=credentials,
+                                    service_factory=lambda creds: ("service", creds))
+    assert injected.docs_service() == ("service", credentials)

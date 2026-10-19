@@ -7,7 +7,7 @@ exactly one ``documents.batchUpdate`` guarded by the revision of the preview.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from hashlib import sha256
 import unicodedata
 from typing import Any
@@ -47,63 +47,22 @@ class DocumentText:
     ``suggestion`` (a hidden suggested insertion) or ``break`` (a table border,
     section break or non-text element).
     """
-    text: str = ""
-    index: list[int] = field(default_factory=list)
-    deleted: list[bool] = field(default_factory=list)
-    gaps: dict[int, str] = field(default_factory=dict)
-    final_newline: int | None = None
-    _chars: list[str] = field(default_factory=list)
-    _expected: int | None = None
-    _pending: str | None = None
+    text: str
+    index: list[int]
+    deleted: list[bool]
+    gaps: dict[int, str]
+    final_newline: int | None
 
     @classmethod
     def parse(cls, body: dict[str, Any]) -> "DocumentText":
-        model = cls()
         content = body.get("content") or []
-        model._walk(content)
-        if model._pending:
-            model.gaps[len(model._chars)] = model._pending
-        model.text = "".join(model._chars)
+        builder = _TextBuilder()
+        builder.walk(content)
+        if builder.pending:
+            builder.gaps[len(builder.chars)] = builder.pending
         last = content[-1] if content else {}
-        if "paragraph" in last and isinstance(last.get("endIndex"), int):
-            model.final_newline = last["endIndex"] - 1
-        return model
-
-    def _walk(self, content: list[dict[str, Any]]) -> None:
-        for element in content:
-            if "paragraph" in element:
-                for item in element["paragraph"].get("elements") or []:
-                    run = item.get("textRun")
-                    if run is None:
-                        self._gap("break")
-                    elif run.get("suggestedInsertionIds"):
-                        self._gap("suggestion")
-                    else:
-                        self._run(item["startIndex"], run.get("content") or "", bool(run.get("suggestedDeletionIds")))
-            elif "table" in element:
-                self._gap("break")
-                for row in element["table"].get("tableRows") or []:
-                    for cell in row.get("tableCells") or []:
-                        self._walk(cell.get("content") or [])
-                self._gap("break")
-            else:  # sectionBreak, tableOfContents: no text
-                self._gap("break")
-
-    def _gap(self, kind: str) -> None:
-        if self._pending != "suggestion":
-            self._pending = kind
-
-    def _run(self, start: int, text: str, deleted: bool) -> None:
-        position = start
-        for char in text:
-            offset = len(self._chars)
-            if self._pending == "suggestion" or (offset and (self._pending or position != self._expected)):
-                self.gaps[offset] = self._pending or "break"
-            self._chars.append(char)
-            self.index.append(position)
-            self.deleted.append(deleted)
-            position += utf16_units(char)
-            self._expected, self._pending = position, None
+        final_newline = last["endIndex"] - 1 if "paragraph" in last and isinstance(last.get("endIndex"), int) else None
+        return cls("".join(builder.chars), builder.index, builder.deleted, builder.gaps, final_newline)
 
     def end_index(self, offset: int) -> int:
         """Docs index just after the visible character before ``offset``."""
@@ -131,6 +90,54 @@ class DocumentText:
         return {"offset": begin, "text": self.text[begin:end],
                 "before": self.text[max(0, begin - CONTEXT_CHARS):begin],
                 "after": self.text[end:end + CONTEXT_CHARS]}
+
+
+class _TextBuilder:
+    """Walks paragraphs, then table rows and cells in order, recording each visible character's index."""
+
+    def __init__(self):
+        self.chars: list[str] = []
+        self.index: list[int] = []
+        self.deleted: list[bool] = []
+        self.gaps: dict[int, str] = {}
+        self.expected: int | None = None
+        self.pending: str | None = None
+
+    def walk(self, content: list[dict[str, Any]]) -> None:
+        for element in content:
+            if "paragraph" in element:
+                for item in element["paragraph"].get("elements") or []:
+                    run = item.get("textRun")
+                    if run is None:
+                        self.gap("break")
+                    elif run.get("suggestedInsertionIds"):
+                        self.gap("suggestion")
+                    else:
+                        self.run(item["startIndex"], run.get("content") or "", bool(run.get("suggestedDeletionIds")))
+            elif "table" in element:
+                self.gap("break")
+                for row in element["table"].get("tableRows") or []:
+                    for cell in row.get("tableCells") or []:
+                        self.walk(cell.get("content") or [])
+                self.gap("break")
+            else:  # sectionBreak, tableOfContents: no text
+                self.gap("break")
+
+    def gap(self, kind: str) -> None:
+        if self.pending != "suggestion":
+            self.pending = kind
+
+    def run(self, start: int, text: str, deleted: bool) -> None:
+        position = start
+        for char in text:
+            offset = len(self.chars)
+            if self.pending == "suggestion" or (offset and (self.pending or position != self.expected)):
+                self.gaps[offset] = self.pending or "break"
+            self.chars.append(char)
+            self.index.append(position)
+            self.deleted.append(deleted)
+            position += utf16_units(char)
+            self.expected, self.pending = position, None
 
 
 @dataclass(frozen=True)
