@@ -2,12 +2,17 @@
 
 ## Development-agent system
 
-- Development agents live in `AGENTS.md`, `.codex/`, and `.agents/`; they are isolated from the product pipeline and its Codex CLI.
-- Tasks that opt into the design workflow use untracked local memory in
-  `.agent-work/<task>/`. A design.md requires human approval before `implement`;
-  authorized direct changes may proceed without that workflow.
-- Global memory is limited to essential architecture, durable decisions, and a navigation map. Memory Manager updates it after a satisfactory review.
-- Coordination allows at most three concurrent subagents. Implementation remains sequential to avoid contention on shared files.
+- The former `research-design` / `implement` skills, their development agents,
+  and `.agent-work/<task>/` task folders were retired when the Software Factory
+  was adopted on 2026-10-19. Existing local task folders remain historical
+  records; new Factory state is managed only through `swfactory`.
+- The current development workflow lives in the root `AGENTS.md`, Factory
+  skills under `.agents/` and `.claude/`, and `.factory/config.toml`. It remains
+  separate from the product pipeline and its Codex CLI. Authorized direct
+  changes may still proceed without a Factory task.
+- Durable architecture and product decisions remain in the relevant package
+  documentation; the [codebase map](../../docs/codebase-map.md) is the navigation
+  index.
 
 ## Application namespace and Docker boundary
 

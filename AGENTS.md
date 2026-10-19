@@ -16,30 +16,30 @@ Start with `AGENTS.md`, then use the [codebase map](docs/codebase-map.md) to loc
 ## Work modes
 
 Choose the mode from the user's explicit request.
-Factory skills are a separate workflow used when the user invokes them.
+Factory skills are an opt-in workflow used when the user invokes them.
 
 ### Direct change (default)
 
 When the user asks to change, fix, add, remove, or update a scoped part of the
-repository, make the change directly. Do not create `.agent-work/`, `design.md`,
-`progress.md`, or `plan.md`, and do not invoke `research-design` or `implement`
+repository, make the change directly. Do not create a Factory change or task
 unless the user explicitly requests that workflow.
 
 Inspect the relevant code, make the smallest scoped change, update affected
 tests and documentation, and run validation proportionate to the change.
 
-### Research and design workflow (opt-in)
+### Software Factory workflow (opt-in)
 
-Use `research-design` only when the user explicitly asks to investigate
-interactively, create a design/task, seek design approval, or use the
-multi-agent implementation workflow.
+Use `/factory-design` when the user explicitly requests a Factory design or
+change. It registers a change with acceptance criteria and tasks. A person
+must explicitly approve a named change before implementation.
 
-Use `implement` only when the user explicitly requests it and an approved
-`design.md` exists. Its `planner` → `coder` → `reviewer` → `memory-manager`
-sequence applies only within that workflow.
+Use `/factory-implement <task>` only for an approved Factory task. The task
+runs in its own Orca workspace and closes after its checks and acceptance
+criteria are verified. Use `/factory-status` for tracking and recovery.
 
-Task memory lives in untracked `.agent-work/<task>/`; create it only for this
-opt-in workflow and keep it concise.
+The retired `.agent-work/` directories are historical local records; do not
+create new tasks there. Development skills in `.agents/` and `.claude/` are
+separate from product agent resources in `harness/agent/`.
 
 ## Software Factory
 

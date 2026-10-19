@@ -2,7 +2,7 @@
 
 ## Process
 
-- Use the direct change mode for scoped edits; use the repository's design workflows only when explicitly requested. (2026-10-19, user-provided `AGENTS.md`)
+- Use the direct change mode for scoped edits; use Software Factory for designs and tasks only when explicitly requested. (2026-10-19, user-provided `AGENTS.md` and approved legacy workflow cleanup)
 - Use `swfactory` for Factory state and explicit named approval for designs. (2026-10-19, approved Factory initialization)
 
 ## Code
