@@ -24,8 +24,9 @@ Drive IDs and MIME types enter the in-memory bundle. Digests are calculated
 from downloaded bytes and carried into manifests, evidence, and lineage. All
 four local/Drive source and destination combinations are supported.
 
-Codex is the default LLM provider. Claude Code is also supported for local
-Ubuntu and Windows execution. Provider selection and the optional model come
+Codex is the default LLM provider and defaults to the `gpt-5.6-luna` model.
+Claude Code is also supported for local Ubuntu and Windows execution and
+defaults to `claude-sonnet-5`. Provider selection and the optional model come
 from `[llm]` in `config.toml`; there is no provider-selection environment
 variable.
 
