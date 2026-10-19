@@ -46,3 +46,8 @@ it does not replace or repeat those instructions.
 - The root `.claude/` directory was ignored before Factory installation; only
   explicitly unignored Factory files are tracked. (2026-10-19, Factory
   initialization)
+- Harness test directories have no `__init__.py` and pytest uses its default
+  import mode, so two test modules with the same basename (for example
+  `tests/adapters/test_documents.py` and `tests/dossier/test_documents.py`)
+  fail collection; give each test module a unique name. (2026-10-19,
+  CHG-0006-01)
