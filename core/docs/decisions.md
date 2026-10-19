@@ -4,8 +4,8 @@
 
 - The former `research-design` / `implement` skills, their development agents,
   and `.agent-work/<task>/` task folders were retired when the Software Factory
-  was adopted on 2026-10-19. Existing local task folders remain historical
-  records; new Factory state is managed only through `swfactory`.
+  was adopted on 2026-10-19. The local task folders were later removed at the
+  person's request; new Factory state is managed only through `swfactory`.
 - The current development workflow lives in the root `AGENTS.md`, Factory
   skills under `.agents/` and `.claude/`, and `.factory/config.toml`. It remains
   separate from the product pipeline and its Codex CLI. Authorized direct

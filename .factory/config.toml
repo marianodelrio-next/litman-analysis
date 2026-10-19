@@ -4,8 +4,8 @@ schema_version = 1
 min_version = "1.4.229"
 
 [checks]
-test = "UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv --directory core run pytest -q && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv --directory harness run pytest -q"
-build = "uv build core --out-dir dist/core && uv build harness --out-dir dist/harness"
+test = "bash -lc 'UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv --directory core run pytest -q && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv --directory harness run pytest -q'"
+build = "bash -lc 'uv build core --out-dir dist/core && uv build harness --out-dir dist/harness'"
 
 [review]
 quality = "auto"

@@ -1,0 +1,44 @@
+change: CHG-0003
+design_digest: sha256:fa0e0a4a67c0dd80e48a64b715c94a8b857a26d22db5f8fb94fdee24a4c5b2ef
+tasks:
+- id: CHG-0003-01
+  title: Report failed uninstall removals and check the provider CLI before installing
+  depends_on: []
+  complexity: normal
+  review:
+  - quality
+  - conformance
+  scope:
+  - harness/src/litman_harness/installation.py
+  - harness/src/litman_harness/interfaces/cli.py
+  - harness/deployment/**
+  - harness/tests/**
+  acceptance:
+    AC-01: bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q tests/test_installation.py'
+    AC-02: bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q tests/test_installation.py tests/interfaces tests/deployment/test_install_script.py'
+    AC-03: bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q tests/deployment/test_install_script.py'
+    AC-06: bash -lc 'cd core && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q && cd ../harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest -q'
+- id: CHG-0003-02
+  title: Replace both manual validation documents with one Windows Codex app guide
+  depends_on:
+  - CHG-0003-01
+  complexity: normal
+  review:
+  - conformance
+  scope:
+  - docs/**
+  - README.md
+  - core/README.md
+  - core/docs/**
+  - harness/docs/**
+  - harness/deployment/README.md
+  acceptance:
+    AC-04: bash -lc 'test ! -e docs/validacion_manual_instalacion.md && test ! -e
+      docs/windows_manual.md && test -f docs/windows-codex-validation.md && ! grep
+      -rIl --exclude-dir=.factory --exclude-dir=dist --exclude-dir=.git -e validacion_manual_instalacion
+      -e windows_manual .'
+    AC-05: manual

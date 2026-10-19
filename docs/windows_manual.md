@@ -8,10 +8,6 @@ necesiten requieren autorización explícita
 y datos de prueba. No guardar tokens, rutas privadas completas ni contenido de
 licitaciones en capturas o incidencias.
 
-Diseños relacionados:
-`../.agent-work/compatibilidad-windows-core/design.md` y
-`../.agent-work/compatibilidad-windows-harness/design.md`.
-
 ## Preparar el entorno de prueba
 
 - Registrar edición y versión de Windows, versión de Python 3.11, versiones de

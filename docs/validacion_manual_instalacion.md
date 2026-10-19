@@ -8,7 +8,6 @@ siempre cuentas y carpetas de prueba autorizadas explícitamente. No guardar
 tokens, rutas privadas completas ni contenido de licitaciones en capturas o
 incidencias.
 
-Diseño relacionado: `../.agent-work/distribucion-instalacion/design.md`.
 Comprobaciones de compatibilidad Windows de Core/harness (no de
 instalación): `windows_manual.md`.
 

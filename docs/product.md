@@ -1,19 +1,33 @@
 # Product
 
-## What it is
+## Purpose
 
-LitMan has two Python 3.11 distributions. [Core](../core/README.md) analyzes procurement files locally or in optional Docker isolation. [Harness](../harness/README.md) manages a procurement dossier in Google Drive using a person's OAuth account and runs Core through its public CLI. See the [architecture](architecture.md) and [shared contract](contracts.md).
+LitMan supports the evaluation of procurement opportunities and the management
+of their working dossiers. [Core](../core/README.md) performs the analysis;
+[Harness](../harness/README.md) manages the dossier and publication workflow.
+The packages communicate only through Core's versioned
+[public CLI contract](contracts.md).
 
-## Who it is for
+## Audiences and supported flows
 
-The documented installation serves business users working on procurement dossiers through Codex or Claude. Core also supports a standalone analysis flow without Harness. See the [root README](../README.md) for the two installation paths.
+- Business users can install Harness and Core together, connect a Google Drive
+  folder with personal OAuth, and work through Codex or Claude. The
+  [Harness installation guide](../harness/deployment/README.md) owns this setup.
+- Users who only need local procurement analysis can install and run Core on
+  its own. The [Core entry point](../core/README.md) owns that route.
+- Integrators can invoke `litman-core` as a process and consume its versioned
+  JSON output. The [public CLI contract](contracts.md) is the stable interface.
+- Contributors work on Core and Harness as separate distributions and follow
+  the root [development rules](../AGENTS.md).
 
-## What it is not
+## Product boundary
 
-The Software Factory and development agent skills in the repository root are development tooling, not part of the LitMan product runtime. Harness does not run Core by importing its Python modules; the process boundary and output schema are part of the [public contract](contracts.md).
+The Software Factory, Orca workspaces, and development-agent skills in the
+repository root are development tooling. They are not part of the LitMan
+product runtime. Product-agent resources are owned separately by
+`harness/agent/`.
 
-## Main flows
-
-- Standalone Core analysis: local inputs and configuration enter `litman-core`; outputs follow the versioned CLI contract. See [Core operations](../core/docs/operations.md).
-- Dossier management: `litman` or `litman-mcp` inspects a connected Drive folder, previews changes, applies a person's accepted plan, runs Core, and publishes results. See [Harness development](../harness/docs/development.md).
-- End user setup: guided installation registers the product skills, MCP server, and workspace. See [Harness deployment](../harness/deployment/README.md).
+Harness does not import Core's Python modules. It invokes `litman-core` as a
+child process, validates the public result, and publishes the selected
+artifacts. See the [shared architecture](architecture.md) for this boundary and
+the package documentation for internal behavior.
