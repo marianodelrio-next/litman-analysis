@@ -3,12 +3,14 @@ from __future__ import annotations
 import json
 from pathlib import Path
 import subprocess
+import sysconfig
 import tomllib
 
 import pytest
 
 from litman_harness.errors import HarnessError
 from litman_harness import installation
+from litman_harness.adapters.core import script_path
 
 REPO = Path(__file__).parents[2]
 
@@ -472,3 +474,29 @@ def test_status_reports_installed_state_and_detects_removed_skill(tmp_path: Path
     report = installation.status(env=env, home=home)
     assert report["skills"] is False
     assert str(tmp_path) not in repr(report)
+
+
+def test_litman_command_on_windows_runs_the_cli_through_the_tool_python(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(installation.platform, "system", lambda: "Windows")
+    python = Path(sysconfig.get_path("scripts")) / "python.exe"
+    assert installation.litman_command() == f'& "{python}" -m litman_harness.interfaces.cli'
+
+
+def test_litman_command_on_posix_is_the_litman_script(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(installation.platform, "system", lambda: "Linux")
+    assert installation.litman_command() == str(script_path("litman"))
+
+
+def test_install_on_windows_renders_the_python_m_litman_command(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    env = _env(tmp_path, monkeypatch)
+    home = tmp_path / "home"
+    monkeypatch.setattr(installation.platform, "system", lambda: "Windows")
+
+    installation.install(app="codex", source=REPO, home=home, env=env)
+
+    agents_md = (home / "LitMan" / "AGENTS.md").read_text(encoding="utf-8")
+    python = Path(sysconfig.get_path("scripts")) / "python.exe"
+    assert f'`& "{python}" -m litman_harness.interfaces.cli`' in agents_md
+    assert "litman.exe" not in agents_md
+    config = tomllib.loads((Path(env["CODEX_HOME"]) / "config.toml").read_text(encoding="utf-8"))
+    assert config["mcp_servers"]["litman"]["command"] == str(Path(sysconfig.get_path("scripts")) / "litman-mcp.exe")
