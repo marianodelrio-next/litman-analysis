@@ -1,0 +1,54 @@
+change: CHG-0004
+design_digest: sha256:202cfa85bedf378b1327318a083a314a23d0b97c6cce1fd417f3c5fb4f1e405c
+tasks:
+- id: CHG-0004-01
+  title: Place incorporated and registered originals in the Originales folder by Drive
+    capability
+  depends_on: []
+  complexity: complex
+  review:
+  - quality
+  - conformance
+  scope:
+  - harness/src/litman_harness/**
+  - harness/tests/**
+  - harness/docs/**
+  - docs/guia-litman-windows.md
+  - docs/windows-codex-validation.md
+  acceptance:
+    AC-01: bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q tests/dossier/test_dossier_service.py'
+    AC-02: bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q tests/dossier/test_dossier_service.py'
+    AC-03: bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q tests/dossier/test_dossier_service.py tests/dossier/test_recommendation.py'
+    AC-04: bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q tests/dossier/test_dossier_service.py tests/adapters/test_drive_adapter.py'
+    AC-05: bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q tests/dossier'
+    AC-07: manual
+    AC-08: bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q'
+- id: CHG-0004-02
+  title: Publish analysis artifacts directly in the phase folder with date-suffixed
+    collisions
+  depends_on:
+  - CHG-0004-01
+  complexity: normal
+  review:
+  - quality
+  - conformance
+  scope:
+  - harness/src/litman_harness/dossier/publication.py
+  - harness/src/litman_harness/interfaces/**
+  - harness/agent/**
+  - harness/tests/**
+  - harness/docs/**
+  - docs/guia-litman-windows.md
+  - docs/windows-codex-validation.md
+  acceptance:
+    AC-06: bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q tests/dossier/test_publication.py tests/analysis/test_analysis_publication.py'
+    AC-07: manual
+    AC-08: bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q'

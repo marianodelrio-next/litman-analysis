@@ -59,6 +59,17 @@ Harness validates and stores one Core provider and optional model through
 provider changes between preview and execution and leaves provider execution
 inside Core.
 
+## Originals are placed by capability, never deleted
+
+Tender originals belong in the `Originales` folder, but a team member's
+shared-drive role may allow copying without moving or deleting. Harness reads
+`canMoveItemWithinDrive` and `canCopy` per file: it moves when allowed, copies
+otherwise, and registers the file in place with a visible warning when neither
+is possible. It never trashes the source, because the person may lack the right
+and the file belongs to the team. Copying then trashing and always copying were
+rejected: the first is destructive and often not permitted, and the second
+duplicates files even when moving is allowed.
+
 ## Publication is part of analysis execution
 
 An accepted analysis plan includes its publication actions. Harness validates

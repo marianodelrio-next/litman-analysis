@@ -1,7 +1,8 @@
 """The single next step of the guided path, computed deterministically from known state.
 
-organise (structure + originals) → initial analysis (+ publication) → summary →
-detailed analysis? (+ publication, live offer) → refresh summary → the person decides.
+organise (structure + originals) → place registered originals in ``Originales`` →
+initial analysis (+ publication) → summary → detailed analysis? (+ publication, live offer) →
+refresh summary → the person decides.
 """
 from __future__ import annotations
 
@@ -15,8 +16,13 @@ def _action(kind: str, reason: str, tool: str | None, arguments: dict[str, Any] 
 
 
 def recommend(*, folder_id: str, state: str, manifest: Manifest | None, candidates: dict[str, Any] | None = None,
-              pending: list[dict[str, Any]] | None = None) -> dict[str, Any] | None:
-    """First applicable step; ``None`` when nothing is pending (ask the person)."""
+              pending: list[dict[str, Any]] | None = None,
+              misplaced_originals: list[str] | None = None) -> dict[str, Any] | None:
+    """First applicable step; ``None`` when nothing is pending (ask the person).
+
+    ``misplaced_originals`` are registered originals outside ``Originales`` that can
+    still be placed; originals kept ``in_place`` never appear, so the step cannot loop.
+    """
     candidates = candidates or {}
     pending = pending or []
     if state in ("partial", "unsupported_manifest"):
@@ -39,6 +45,9 @@ def recommend(*, folder_id: str, state: str, manifest: Manifest | None, candidat
                            "apply_publication", {"plan_id": item["publication_plan_id"]})
         return _action("publish_analysis", "Hay un análisis local validado sin publicar.", "preview_publication",
                        {"analysis_operation_id": item["operation_id"]})
+    if misplaced_originals:
+        return _action("organize_originals", "Colocar los pliegos registrados en la carpeta Originales.",
+                       "preview_incorporation", {"folder_id": folder_id})
     originals = [item["file_id"] for item in manifest.originals]
     if not published:
         return _action("run_assessment", "Analizar la oportunidad (análisis inicial) y publicar sus resultados.",

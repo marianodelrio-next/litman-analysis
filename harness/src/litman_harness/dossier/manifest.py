@@ -129,8 +129,13 @@ class Manifest:
             raise HarnessError("invalid_manifest", "El resumen de la licitación no cumple el contrato v1")
 
     def summary_sources(self) -> dict[str, str]:
-        """Registered documents a summary line may cite: file_id → kind (original or artifact)."""
+        """Registered documents a summary line may cite: file_id → kind (original or artifact).
+
+        The source of a copied original stays citable: earlier summaries and analyses used its ID.
+        """
         sources = {item["file_id"]: "original" for item in self.originals}
+        sources.update({item["copied_from"]: "original" for item in self.originals
+                        if isinstance(item.get("copied_from"), str)})
         for analysis in self.analyses:
             if analysis.get("status") == "published":
                 for artifact in analysis.get("artifacts") or []:

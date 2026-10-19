@@ -22,6 +22,27 @@ from .shared_state import SharedStateCapability, UnavailableSharedState
 from .tree import LITMAN_FOLDER, TreeItem, suggested_folder_ids, walk_tree
 
 _FOLDER_LABELS = dict(FOLDER_ROLES)
+_ORIGINALS = _FOLDER_LABELS["originals"]
+
+
+def placement_strategy(item: Resource) -> str:
+    """How an original reaches the ``originals`` folder; a missing capability counts as ``False``."""
+    if item.capabilities.get("canMoveItemWithinDrive", False):
+        return "move"
+    return "copy" if item.capabilities.get("canCopy", False) else "in_place"
+
+
+def placement_warning(strategy: str, name: str) -> str | None:
+    if strategy == "copy":
+        return (f"Sólo se puede copiar «{name}»: la copia queda en {_ORIGINALS} y el archivo de origen sigue "
+                "donde estaba.")
+    if strategy == "in_place":
+        return (f"No hay permiso para mover ni copiar «{name}»: queda registrado donde está, fuera de "
+                f"{_ORIGINALS}.")
+    if strategy == "skipped":
+        return (f"«{name}» cambió desde que se registró: no se coloca en {_ORIGINALS} hasta que una persona "
+                "lo revise.")
+    return None
 
 
 def action_id(plan: Plan, action: PlanAction) -> str:
@@ -159,9 +180,21 @@ class ExpedienteService:
                        "pending_publications": pending,
                        "next_actions": self._status_actions(state, result["candidates"], result["next_actions"],
                                                             pending),
-                       "recommended_action": recommend(folder_id=root.id, state=state.state, manifest=manifest,
-                                                       candidates=result["candidates"], pending=pending)})
+                       "recommended_action": recommend(
+                           folder_id=root.id, state=state.state, manifest=manifest, candidates=result["candidates"],
+                           pending=pending, misplaced_originals=self._misplaced_originals(root, manifest))})
         return result
+
+    def _misplaced_originals(self, root: Resource, manifest: Manifest | None) -> list[str]:
+        """Registered originals the incorporation preview would place (content unchanged since registration)."""
+        if manifest is None or not manifest.folders.get("originals"):
+            return []
+        try:
+            folder = self._originals_folder(manifest, {})
+        except HarnessError:
+            return []
+        return [item.id for original, item in self._placeable_originals(root, manifest, folder)
+                if item.md5_checksum == original.get("md5_checksum")]
 
     def recommendation_after(self, root_id: str, manifest: Manifest | None) -> dict[str, Any] | None:
         """Next step after a write, from the resulting manifest and local records (no Drive calls)."""
@@ -273,7 +306,10 @@ class ExpedienteService:
         if target_phase != current_phase:
             actions.append(PlanAction("set_phase", None, target_phase, None, metadata={"previous": current_phase}))
         actions += self._folder_actions(root, manifest, folder_ids)
-        registered = {item["file_id"] for item in manifest.originals} if manifest else set()
+        registered = ({value for item in manifest.originals for value in (item["file_id"], item.get("copied_from"))
+                       if value} if manifest else set())
+        originals_folder = self._originals_folder(manifest, folder_ids)
+        placements = self._registered_placements(root, manifest, originals_folder)
         for identifier in original_ids:
             if identifier in registered:
                 continue
@@ -290,6 +326,9 @@ class ExpedienteService:
             actions.append(PlanAction("register_original", item.id, item.name, None, md5,
                                       {"mime_type": item.mime_type, "size": item.size,
                                        "drive_version": item.version}))
+            if not self._inside(originals_folder, item):
+                placements.append(self._placement(item, md5, registered=False))
+        actions += placements
         if live_offer_id:
             current_offer = manifest.live_offer["document_id"] if manifest and manifest.live_offer else None
             if current_offer and current_offer != live_offer_id:
@@ -300,8 +339,10 @@ class ExpedienteService:
                 actions.append(PlanAction("register_external_offer", offer.id, offer.name, None))
         if overwrite_context and (manifest is None or not manifest.context_file_id):
             raise HarnessError("context_not_registered", "No hay contexto.md registrado que sobrescribir")
-        if manifest is not None and not actions and not overwrite_context:
-            raise HarnessError("no_changes", "El expediente ya contiene todo lo solicitado")
+        if manifest is not None and not overwrite_context and all(
+                action.kind == "place_original" and action.metadata["strategy"] == "skipped" for action in actions):
+            raise HarnessError("no_changes", "El expediente ya contiene todo lo solicitado",
+                               details={"placement_warnings": [action.metadata["warning"] for action in actions]})
         if manifest is None:
             actions.append(PlanAction("create_context", None, CONTEXT_NAME, root.id))
             actions.append(PlanAction("create_manifest", None, MANIFEST_NAME, None, metadata={"role": "litman"}))
@@ -355,6 +396,52 @@ class ExpedienteService:
             else:
                 actions.append(PlanAction("create_folder", None, _FOLDER_LABELS[role], root.id,
                                           metadata={"role": role}))
+        return actions
+
+    def _originals_folder(self, manifest: Manifest | None, folder_ids: dict[str, str]) -> Resource | None:
+        """The ``originals`` folder already registered or being registered; ``None`` if the plan creates it."""
+        folder_id = (manifest.folders.get("originals") if manifest else None) or folder_ids.get("originals")
+        return self.drive.get(folder_id) if folder_id else None
+
+    def _inside(self, folder: Resource | None, item: Resource) -> bool:
+        return folder is not None and belongs_to_root(self.drive, folder, item)
+
+    @staticmethod
+    def _placement(item: Resource, md5: str | None, *, registered: bool, strategy: str | None = None) -> PlanAction:
+        strategy = strategy or placement_strategy(item)
+        return PlanAction("place_original", item.id, item.name, None, md5, {
+            "strategy": strategy, "can_copy": item.capabilities.get("canCopy", False), "role": "originals",
+            "registered": registered, "warning": placement_warning(strategy, item.name)})
+
+    def _placeable_originals(self, root: Resource, manifest: Manifest | None,
+                             originals_folder: Resource | None) -> list[tuple[dict[str, Any], Resource]]:
+        """Registered originals in the dossier but outside ``originals``; never one kept ``in_place``.
+
+        Unreachable, trashed or moved-out originals are left to status (``missing_resources``).
+        Both the preview and the ``organize_originals`` recommendation use this one rule.
+        """
+        if manifest is None:
+            return []
+        placeable = []
+        for original in manifest.originals:
+            if original.get("placement") == "in_place":
+                continue
+            try:
+                item = self.drive.get(original["file_id"])
+            except HarnessError:
+                continue
+            if belongs_to_root(self.drive, root, item) and not self._inside(originals_folder, item):
+                placeable.append((original, item))
+        return placeable
+
+    def _registered_placements(self, root: Resource, manifest: Manifest | None,
+                               originals_folder: Resource | None) -> list[PlanAction]:
+        """An original whose content no longer matches the manifest is not placed (``skipped``, only a warning)."""
+        actions = []
+        for original, item in self._placeable_originals(root, manifest, originals_folder):
+            expected = original.get("md5_checksum")
+            strategy = None if item.md5_checksum == expected else "skipped"
+            actions.append(self._placement(item, expected, registered=True, strategy=strategy))
         return actions
 
     def apply_incorporation(self, accepted_plan_id: str) -> dict[str, Any]:
@@ -416,6 +503,12 @@ class ExpedienteService:
         return result
 
     def _run_incorporation(self, run: OperationRun, root: Resource) -> dict[str, Any]:
+        result = self._incorporate(run, root)
+        warnings = [run.output(action).get("warning", action.metadata.get("warning"))
+                    for action in run.plan.actions if action.kind == "place_original"]
+        return {**result, "placement_warnings": [warning for warning in warnings if warning]}
+
+    def _incorporate(self, run: OperationRun, root: Resource) -> dict[str, Any]:
         plan = run.plan
         resumed = self.resume_after_manifest(run)
         if resumed is not None:
@@ -448,6 +541,10 @@ class ExpedienteService:
                                            "drive_version": action.metadata.get("drive_version"),
                                            "md5_checksum": action.expected_version, "sha256": None,
                                            "provenance": "external"})
+            elif action.kind == "place_original":
+                if not run.done(action):
+                    run.complete(action, self._place_original(run, action, manifest.folders.get("originals")))
+                self._record_placement(manifest, action, run.output(action))
             elif action.kind == "register_external_offer":
                 manifest.live_offer = {"document_id": action.resource_id, "origin_kind": "existing_external",
                                        "origin_analysis_id": None, "origin_artifact_id": None,
@@ -456,6 +553,45 @@ class ExpedienteService:
                                  "completed_at": now()})
         context_conflict = self.write_shared_state(run, root, manifest, base, manifest_version=manifest_version)
         return self.shared_result(run, manifest, context_conflict)
+
+    def _place_original(self, run: OperationRun, action: PlanAction, folder_id: str | None) -> dict[str, Any]:
+        """Move, copy or keep one original; a rejected move falls back to copy, then to ``in_place``."""
+        strategy = action.metadata["strategy"]
+        if strategy in ("in_place", "skipped"):
+            return {"strategy": strategy, "resource_id": action.resource_id, "warning": action.metadata["warning"]}
+        if not folder_id:
+            raise HarnessError("invalid_plan", "El plan no registra la carpeta de originales")
+        folder = self.drive.get(folder_id)
+        if strategy == "move":
+            item = self.drive.get(action.resource_id)
+            if belongs_to_root(self.drive, folder, item):  # moved before an interruption
+                return {"strategy": "move", "resource_id": item.id, "warning": None}
+            try:
+                moved = self.drive.move(item.id, folder.id, item.parents)
+            except HarnessError as exc:
+                if exc.code != "insufficient_permission":
+                    raise
+                strategy = "copy" if action.metadata.get("can_copy") else "in_place"
+                if strategy == "in_place":
+                    return {"strategy": strategy, "resource_id": action.resource_id,
+                            "warning": placement_warning(strategy, action.name)}
+            else:
+                if not belongs_to_root(self.drive, folder, moved):
+                    raise HarnessError("invalid_created_resource", "Drive no movió el original a su carpeta")
+                return {"strategy": "move", "resource_id": moved.id, "warning": None}
+        copied = self.ensure_marked(run, action, folder.id, lambda: self.drive.copy(
+            action.resource_id, action.name, folder.id, run.plan.operation_id, action_id(run.plan, action)))
+        if not belongs_to_root(self.drive, folder, copied) or copied.md5_checksum != action.expected_version:
+            raise HarnessError("invalid_created_resource", "La copia del original no coincide con el original")
+        return {"strategy": "copy", "resource_id": copied.id, "warning": placement_warning("copy", action.name)}
+
+    @staticmethod
+    def _record_placement(manifest: Manifest, action: PlanAction, outcome: dict[str, Any]) -> None:
+        original = next(item for item in manifest.originals if item["file_id"] == action.resource_id)
+        if outcome["strategy"] == "copy":
+            original.update(file_id=outcome["resource_id"], copied_from=action.resource_id, provenance="copied")
+        elif outcome["strategy"] == "in_place":
+            original["placement"] = "in_place"
 
     def read_manifest_unchanged(self, update: PlanAction) -> tuple[Manifest, Manifest, str]:
         """Strict plans: the manifest must have the content seen in the preview.
@@ -643,7 +779,8 @@ class ExpedienteService:
             return
         root = self.root(plan.root_folder_id)
         for action in plan.actions:
-            if action.kind == "register_original":
+            if action.kind == "register_original" or (
+                    action.kind == "place_original" and action.metadata["strategy"] != "skipped"):
                 item = self.drive.get(action.resource_id)
                 if item.trashed or not belongs_to_root(self.drive, root, item):
                     raise stale(item.id, "outside_tree_or_trashed")
@@ -683,6 +820,8 @@ class ExpedienteService:
                         and "publication_contract" in item.resource.app_properties]
         excluded |= {item.resource.id for item in core_folders}
         registered = {item["file_id"] for item in manifest.originals} if manifest else set()
+        if manifest:  # the source of a copied original stays in place but is already registered
+            registered |= {item["copied_from"] for item in manifest.originals if item.get("copied_from")}
         if manifest and manifest.context_file_id:
             registered.add(manifest.context_file_id)
         if manifest and manifest.live_offer:

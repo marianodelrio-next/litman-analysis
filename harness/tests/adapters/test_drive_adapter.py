@@ -31,6 +31,15 @@ class Files:
             {"id": "a", "name": "x", "appProperties": {"litman_operation_id": "op", "litman_action_id": "act"}},
             {"id": "b", "name": "x", "appProperties": {"litman_operation_id": "op", "litman_action_id": "other"}}]})
 
+    def update(self, **kwargs):
+        self.calls.append(("update", kwargs))
+        return Request({"id": kwargs["fileId"], "parents": [kwargs["addParents"]]})
+
+    def copy(self, **kwargs):
+        self.calls.append(("copy", kwargs))
+        return Request({"id": "copy", "name": kwargs["body"]["name"], "parents": kwargs["body"]["parents"],
+                        "appProperties": kwargs["body"]["appProperties"]})
+
     def create(self, **kwargs):
         self.calls.append(("create", kwargs))
         return Request({"id": "new", "mimeType": kwargs["body"].get("mimeType", "application/pdf"),
@@ -118,4 +127,33 @@ def test_gateway_requests_only_the_capabilities_it_checks():
     service = Service()
     GoogleDriveGateway(service).get("f")
     fields = service.files_api.calls[0][1]["fields"]
-    assert "capabilities(canListChildren,canAddChildren,canDownload,canEdit)" in fields
+    assert ("capabilities(canListChildren,canAddChildren,canDownload,canEdit,canMoveItemWithinDrive,canCopy)"
+            in fields)
+
+
+def test_move_changes_parents_and_copy_carries_markers_into_destination():
+    service = Service()
+    gateway = GoogleDriveGateway(service)
+    moved = gateway.move("pliego", "originales", ("root",))
+    name, kwargs = service.files_api.calls[-1]
+    assert name == "update" and kwargs["addParents"] == "originales" and kwargs["removeParents"] == "root"
+    assert kwargs["body"] == {} and kwargs["supportsAllDrives"] is True
+    assert moved.id == "pliego" and moved.parents == ("originales",)
+    copied = gateway.copy("pliego", "pliego.pdf", "originales", "op", "act")
+    name, kwargs = service.files_api.calls[-1]
+    assert name == "copy" and kwargs["fileId"] == "pliego" and kwargs["supportsAllDrives"] is True
+    assert kwargs["body"] == {"name": "pliego.pdf", "parents": ["originales"],
+                              "appProperties": {"litman_operation_id": "op", "litman_action_id": "act"}}
+    assert copied.id == "copy" and copied.has_markers("op", "act")
+
+
+def test_move_and_copy_match_the_real_drive_v3_discovery_document():
+    moved = '{"id": "p", "mimeType": "application/pdf", "parents": ["o"]}'
+    copied = '{"id": "c", "mimeType": "application/pdf", "parents": ["o"]}'
+    gateway = _real_gateway([({"status": "200"}, moved), ({"status": "200"}, copied),
+                             ({"status": "403"}, '{"error": {"message": "x"}}')])
+    assert gateway.move("p", "o", ("root",)).parents == ("o",)
+    assert gateway.copy("p", "pliego.pdf", "o", "op", "act").id == "c"
+    with pytest.raises(HarnessError) as raised:
+        gateway.move("p", "o", ("root",))
+    assert raised.value.code == "insufficient_permission"

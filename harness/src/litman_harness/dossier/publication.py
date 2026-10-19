@@ -169,7 +169,8 @@ class PublicationService:
                    for item in result["input_snapshot"]]
         for original in manifest.originals:
             for source in sources:
-                if (original["file_id"] == source["file_id"] and original.get("sha256") is None
+                if (source["file_id"] in (original["file_id"], original.get("copied_from"))
+                        and original.get("sha256") is None
                         and source["md5_checksum"] and original.get("md5_checksum") == source["md5_checksum"]):
                     original["sha256"] = source["sha256"]
         manifest.analyses.append({

@@ -122,7 +122,7 @@ def test_new_incorporation_creates_tree_context_and_manifest_once(tmp_path: Path
     assert manifest.originals[0] | {} == {"file_id": "source", "observed_name": "pliego.pdf", "mime_type": PDF,
                                           "size": 123, "drive_version": "4",
                                           "md5_checksum": hashlib.md5(b"pliego").hexdigest(), "sha256": None,
-                                          "provenance": "external"}
+                                          "provenance": "external", "placement": "in_place"}
     assert manifest.live_offer["document_id"] == "offer-doc"
     assert manifest.live_offer["origin_kind"] == "existing_external"
     assert manifest.history[0]["performed_by"] == "person-1@example.test"
@@ -192,8 +192,8 @@ def test_adopted_incorporation_proposes_only_missing_registrations(tmp_path: Pat
                                          phase="analisis_detallado")
     kinds = [action.kind for action in plan.actions]
     assert "create_folder" not in kinds and "create_manifest" not in kinds
-    assert kinds == ["set_phase", "register_original", "register_external_offer", "update_context",
-                     "update_manifest"]
+    assert kinds == ["set_phase", "register_original", "place_original", "register_external_offer",
+                     "update_context", "update_manifest"]
     assert service.apply_incorporation(plan.id)["status"] == "succeeded"
     _, manifest = manifest_of(drive)
     assert [item["file_id"] for item in manifest.originals] == ["source", "annex"]
@@ -404,3 +404,178 @@ def test_old_manifest_originals_without_md5_still_parse(tmp_path: Path):
     drive.write_text(resource.id, manifest.serialize())
     assert service.status("root")["state"] == "adopted"
     assert "md5_checksum" not in Manifest.parse(drive.contents[resource.id].decode()).originals[0]
+
+
+# -- placement of originals ------------------------------------------------------------------------
+
+MOVE, COPY = {"canDownload": True, "canMoveItemWithinDrive": True, "canCopy": True}, {"canDownload": True,
+                                                                                      "canCopy": True}
+
+
+def with_original(tmp_path: Path, capabilities: dict[str, bool], identifier: str = "tender"):
+    drive, state, service = services(tmp_path)
+    drive.add(Resource(identifier, "pliego-tecnico.pdf", PDF, "3", 77, "shared", ("root",),
+                       capabilities=capabilities), b"tecnico")
+    return drive, state, service
+
+
+def placement(plan) -> list:
+    return [action for action in plan.actions if action.kind == "place_original"]
+
+
+def legacy_misplaced(drive, capabilities: dict[str, bool]) -> None:
+    """A dossier registered before placement existed: ``source`` sits in the root without ``placement``."""
+    resource, manifest = manifest_of(drive)
+    manifest.originals[0].pop("placement")
+    drive.write_text(resource.id, manifest.serialize())
+    drive.add(replace(drive.resources["source"], capabilities=capabilities))
+
+
+def test_movable_original_is_moved_into_originals_keeping_its_id(tmp_path: Path):
+    drive, _, service = with_original(tmp_path, MOVE)
+    plan = service.preview_incorporation("root", ["tender"])
+    [action] = placement(plan)
+    assert action.resource_id == "tender" and action.metadata["strategy"] == "move"
+    assert action.metadata["warning"] is None and action.metadata["registered"] is False
+    result = service.apply_incorporation(plan.id)
+    _, manifest = manifest_of(drive)
+    assert drive.resources["tender"].parents == (manifest.folders["originals"],)
+    assert manifest.originals[0]["file_id"] == "tender" and manifest.originals[0]["provenance"] == "external"
+    assert "placement" not in manifest.originals[0] and "copied_from" not in manifest.originals[0]
+    assert result["placement_warnings"] == [] and drive.moved == ["tender"]
+    assert "tender" not in service.status("root")["candidates"]["originals"]
+
+
+def test_copy_only_original_is_copied_and_the_source_is_hidden_from_status(tmp_path: Path):
+    drive, _, service = with_original(tmp_path, COPY)
+    source = drive.resources["tender"]
+    plan = service.preview_incorporation("root", ["tender"])
+    [action] = placement(plan)
+    assert action.metadata["strategy"] == "copy" and "copia" in action.metadata["warning"]
+    result = service.apply_incorporation(plan.id)
+    _, manifest = manifest_of(drive)
+    [copy] = [item for item in drive.resources.values() if item.parents == (manifest.folders["originals"],)]
+    assert copy.name == source.name and copy.md5_checksum == source.md5_checksum
+    assert copy.app_properties["litman_operation_id"] == plan.operation_id
+    assert copy.app_properties["litman_action_id"]
+    assert drive.resources["tender"] == source and drive.moved == []
+    entry = manifest.originals[0]
+    assert entry["file_id"] == copy.id and entry["copied_from"] == "tender" and entry["provenance"] == "copied"
+    assert entry["md5_checksum"] == source.md5_checksum and entry["observed_name"] == source.name
+    assert result["placement_warnings"] == [action.metadata["warning"]]
+    assert "tender" not in service.status("root")["candidates"]["originals"]
+    assert "tender" in service.inspect("root")["candidates"]["originals"]
+    with pytest.raises(HarnessError) as raised:  # the source is already registered through its copy
+        service.preview_incorporation("root", ["tender"])
+    assert raised.value.code == "no_changes"
+
+
+@pytest.mark.parametrize("capabilities", ({"canDownload": True},
+                                          {"canDownload": True, "canMoveItemWithinDrive": False, "canCopy": False}))
+def test_original_that_cannot_be_moved_or_copied_stays_in_place_with_a_warning(tmp_path: Path, capabilities):
+    drive, _, service = with_original(tmp_path, capabilities)
+    plan = service.preview_incorporation("root", ["tender"])
+    [action] = placement(plan)
+    assert action.metadata["strategy"] == "in_place" and "ni copiar" in action.metadata["warning"]
+    result = service.apply_incorporation(plan.id)
+    _, manifest = manifest_of(drive)
+    assert manifest.originals[0]["file_id"] == "tender" and manifest.originals[0]["placement"] == "in_place"
+    assert drive.resources["tender"].parents == ("root",)
+    assert result["placement_warnings"] == [action.metadata["warning"]]
+    status = service.status("root")
+    assert status["recommended_action"]["kind"] == "run_assessment"
+    assert status["recommended_action"]["arguments"]["original_ids"] == ["tender"]
+
+
+def test_original_already_inside_originals_is_only_registered(tmp_path: Path):
+    drive, _, service = services(tmp_path)
+    drive.add(Resource("orig-folder", "Pliegos", FOLDER_MIME, "1", drive_id="shared", parents=("root",)))
+    drive.add(Resource("inside", "pliego.pdf", PDF, "1", 5, "shared", ("orig-folder",), capabilities=MOVE), b"x")
+    plan = service.preview_incorporation("root", ["inside"], folder_ids={"originals": "orig-folder"})
+    assert placement(plan) == []
+    assert service.apply_incorporation(plan.id)["placement_warnings"] == []
+    assert drive.moved == [] and manifest_of(drive)[1].originals[0]["file_id"] == "inside"
+
+
+def test_rejected_move_falls_back_to_copy(tmp_path: Path):
+    drive, _, service = with_original(tmp_path, MOVE)
+    drive.move_denied = {"tender"}
+    plan = service.preview_incorporation("root", ["tender"])
+    assert placement(plan)[0].metadata["strategy"] == "move"
+    result = service.apply_incorporation(plan.id)
+    entry = manifest_of(drive)[1].originals[0]
+    assert entry["copied_from"] == "tender" and entry["provenance"] == "copied" and entry["file_id"] != "tender"
+    assert drive.resources["tender"].parents == ("root",) and len(result["placement_warnings"]) == 1
+
+
+def test_rejected_move_without_copy_stays_in_place(tmp_path: Path):
+    drive, _, service = with_original(tmp_path, {"canDownload": True, "canMoveItemWithinDrive": True})
+    drive.move_denied = {"tender"}
+    result = service.apply_incorporation(service.preview_incorporation("root", ["tender"]).id)
+    assert manifest_of(drive)[1].originals[0]["placement"] == "in_place"
+    assert "ni copiar" in result["placement_warnings"][0]
+
+
+def test_interrupted_copy_is_adopted_on_resume_without_a_second_copy(tmp_path: Path):
+    drive, _, service = with_original(tmp_path, MOVE)
+    drive.move_denied = {"tender"}
+    plan = service.preview_incorporation("root", ["tender"])
+    drive.crash_on_create = {sum(action.kind == "create_folder" for action in plan.actions) + 1}  # the copy
+    with pytest.raises(HarnessError) as raised:
+        service.apply_incorporation(plan.id)
+    assert raised.value.code == "operation_interrupted"
+    drive.crash_on_create = set()
+    assert service.apply_incorporation(plan.id)["status"] == "succeeded"
+    _, manifest = manifest_of(drive)
+    copies = [item for item in drive.resources.values() if item.name == "pliego-tecnico.pdf"
+              and item.parents == (manifest.folders["originals"],)]
+    assert len(copies) == 1 and manifest.originals[0]["file_id"] == copies[0].id
+
+
+def test_registered_original_outside_originals_is_organized_from_status(tmp_path: Path):
+    drive, _, service, _ = incorporate(tmp_path)
+    legacy_misplaced(drive, COPY)
+    status = service.status("root")
+    assert status["recommended_action"]["kind"] == "organize_originals"
+    assert status["recommended_action"]["tool"] == "preview_incorporation"
+    plan = service.preview_incorporation(**status["recommended_action"]["arguments"])
+    assert [action.kind for action in plan.actions] == ["place_original", "update_context", "update_manifest"]
+    assert placement(plan)[0].metadata["registered"] is True
+    assert service.apply_incorporation(plan.id)["status"] == "succeeded"
+    _, manifest = manifest_of(drive)
+    entry = manifest.originals[0]
+    assert entry["copied_from"] == "source" and entry["provenance"] == "copied"
+    assert entry["md5_checksum"] == hashlib.md5(b"pliego").hexdigest()
+    assert manifest.summary_sources()["source"] == "original"
+    status = service.status("root")
+    assert status["recommended_action"]["kind"] == "run_assessment"
+    assert status["recommended_action"]["arguments"]["original_ids"] == [entry["file_id"]]
+
+
+def test_registered_original_with_changed_content_is_not_placed(tmp_path: Path):
+    drive, _, service, _ = incorporate(tmp_path)
+    legacy_misplaced(drive, MOVE)
+    drive.write_text("source", "otro contenido")
+    assert service.status("root")["recommended_action"]["kind"] == "run_assessment"
+    with pytest.raises(HarnessError) as raised:
+        service.preview_incorporation("root")
+    assert raised.value.code == "no_changes" and "cambió" in raised.value.details["placement_warnings"][0]
+    plan = service.preview_incorporation("root", phase="analisis_inicial")
+    [action] = placement(plan)
+    assert action.metadata["strategy"] == "skipped"
+    result = service.apply_incorporation(plan.id)
+    assert result["status"] == "succeeded" and result["placement_warnings"] == [action.metadata["warning"]]
+    assert drive.moved == [] and manifest_of(drive)[1].originals[0]["file_id"] == "source"
+
+
+@pytest.mark.parametrize("change", (lambda item: replace(item, trashed=True),
+                                    lambda item: replace(item, parents=("elsewhere",))))
+def test_registered_original_outside_the_dossier_is_not_recommended_for_placement(tmp_path: Path, change):
+    drive, _, service, _ = incorporate(tmp_path)
+    legacy_misplaced(drive, MOVE)
+    drive.add(change(drive.resources["source"]))
+    status = service.status("root")
+    assert status["state"] == "degraded" and status["recommended_action"]["kind"] == "run_assessment"
+    with pytest.raises(HarnessError) as raised:
+        service.preview_incorporation("root")
+    assert raised.value.code == "no_changes"

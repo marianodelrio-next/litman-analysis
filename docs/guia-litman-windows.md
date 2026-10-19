@@ -117,7 +117,7 @@ https://drive.google.com/drive/folders/1AbCdEfGhIjKlMnOpQrStUvWxYz
 1. En Codex, con la carpeta LitMan abierta, escribe: **conecta la licitación con ID** y pega el ID.
 2. El asistente te cuenta qué hay en la carpeta y te propone el siguiente paso. Antes de cambiar nada en Drive te enseña un **plan** y espera tu sí.
 3. Ve aceptando los pasos que te proponga. El recorrido habitual es:
-   1. **Preparar la carpeta**: organiza la carpeta y crea una carpeta interna `_LitMan` que no debes tocar.
+   1. **Preparar la carpeta**: organiza la carpeta, coloca los pliegos en la carpeta `Originales` y crea una carpeta interna `_LitMan` que no debes tocar. Si tu permiso en Drive permite mover archivos, los pliegos se mueven; si solo permite copiarlos, se copian en `Originales` y el archivo de la raíz se queda donde estaba (LitMan nunca borra nada); si no permite ninguna de las dos cosas, se quedan donde están y el asistente te avisa.
    2. **Analizar**: LitMan lee los documentos y prepara el análisis inicial. Puede tardar de varios minutos a media hora; no cierres Codex mientras tanto.
    3. **Publicar**: sube el resultado (ficha de la oportunidad y resumen) a la carpeta de Drive.
    4. **Resumen de contexto**: te propone una ficha con objeto, organismo, presupuesto, fecha límite, etc. Cada dato indica de qué documento sale; si un dato no aparece, pone "No consta".
