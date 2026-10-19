@@ -520,7 +520,7 @@ def test_interrupted_copy_is_adopted_on_resume_without_a_second_copy(tmp_path: P
     drive, _, service = with_original(tmp_path, MOVE)
     drive.move_denied = {"tender"}
     plan = service.preview_incorporation("root", ["tender"])
-    drive.crash_on_create = {8}  # seven folders, then the copy
+    drive.crash_on_create = {sum(action.kind == "create_folder" for action in plan.actions) + 1}  # the copy
     with pytest.raises(HarnessError) as raised:
         service.apply_incorporation(plan.id)
     assert raised.value.code == "operation_interrupted"
@@ -566,3 +566,16 @@ def test_registered_original_with_changed_content_is_not_placed(tmp_path: Path):
     result = service.apply_incorporation(plan.id)
     assert result["status"] == "succeeded" and result["placement_warnings"] == [action.metadata["warning"]]
     assert drive.moved == [] and manifest_of(drive)[1].originals[0]["file_id"] == "source"
+
+
+@pytest.mark.parametrize("change", (lambda item: replace(item, trashed=True),
+                                    lambda item: replace(item, parents=("elsewhere",))))
+def test_registered_original_outside_the_dossier_is_not_recommended_for_placement(tmp_path: Path, change):
+    drive, _, service, _ = incorporate(tmp_path)
+    legacy_misplaced(drive, MOVE)
+    drive.add(change(drive.resources["source"]))
+    status = service.status("root")
+    assert status["state"] == "degraded" and status["recommended_action"]["kind"] == "run_assessment"
+    with pytest.raises(HarnessError) as raised:
+        service.preview_incorporation("root")
+    assert raised.value.code == "no_changes"

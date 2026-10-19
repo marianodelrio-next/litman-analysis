@@ -182,33 +182,19 @@ class ExpedienteService:
                                                             pending),
                        "recommended_action": recommend(
                            folder_id=root.id, state=state.state, manifest=manifest, candidates=result["candidates"],
-                           pending=pending, misplaced_originals=self._misplaced_originals(manifest))})
+                           pending=pending, misplaced_originals=self._misplaced_originals(root, manifest))})
         return result
 
-    def _misplaced_originals(self, manifest: Manifest | None) -> list[str]:
-        """Registered originals outside the ``originals`` folder that can still be placed there.
-
-        Originals kept ``in_place`` (no permission), unreachable ones and ones whose
-        content changed since registration are left to human review.
-        """
-        folder_id = manifest.folders.get("originals") if manifest else None
-        if not folder_id:
+    def _misplaced_originals(self, root: Resource, manifest: Manifest | None) -> list[str]:
+        """Registered originals the incorporation preview would place (content unchanged since registration)."""
+        if manifest is None or not manifest.folders.get("originals"):
             return []
         try:
-            folder = self.drive.get(folder_id)
+            folder = self._originals_folder(manifest, {})
         except HarnessError:
             return []
-        misplaced = []
-        for original in manifest.originals:
-            if original.get("placement") == "in_place":
-                continue
-            try:
-                item = self.drive.get(original["file_id"])
-            except HarnessError:
-                continue
-            if not belongs_to_root(self.drive, folder, item) and item.md5_checksum == original.get("md5_checksum"):
-                misplaced.append(item.id)
-        return misplaced
+        return [item.id for original, item in self._placeable_originals(root, manifest, folder)
+                if item.md5_checksum == original.get("md5_checksum")]
 
     def recommendation_after(self, root_id: str, manifest: Manifest | None) -> dict[str, Any] | None:
         """Next step after a write, from the resulting manifest and local records (no Drive calls)."""
@@ -427,16 +413,16 @@ class ExpedienteService:
             "strategy": strategy, "can_copy": item.capabilities.get("canCopy", False), "role": "originals",
             "registered": registered, "warning": placement_warning(strategy, item.name)})
 
-    def _registered_placements(self, root: Resource, manifest: Manifest | None,
-                               originals_folder: Resource | None) -> list[PlanAction]:
-        """Place registered originals that are outside ``originals``; never one kept ``in_place``.
+    def _placeable_originals(self, root: Resource, manifest: Manifest | None,
+                             originals_folder: Resource | None) -> list[tuple[dict[str, Any], Resource]]:
+        """Registered originals in the dossier but outside ``originals``; never one kept ``in_place``.
 
-        An original whose content no longer matches the manifest is not placed
-        (strategy ``skipped``, only a warning).  Unreachable ones are reported by status.
+        Unreachable, trashed or moved-out originals are left to status (``missing_resources``).
+        Both the preview and the ``organize_originals`` recommendation use this one rule.
         """
         if manifest is None:
             return []
-        actions = []
+        placeable = []
         for original in manifest.originals:
             if original.get("placement") == "in_place":
                 continue
@@ -444,8 +430,15 @@ class ExpedienteService:
                 item = self.drive.get(original["file_id"])
             except HarnessError:
                 continue
-            if not belongs_to_root(self.drive, root, item) or self._inside(originals_folder, item):
-                continue
+            if belongs_to_root(self.drive, root, item) and not self._inside(originals_folder, item):
+                placeable.append((original, item))
+        return placeable
+
+    def _registered_placements(self, root: Resource, manifest: Manifest | None,
+                               originals_folder: Resource | None) -> list[PlanAction]:
+        """An original whose content no longer matches the manifest is not placed (``skipped``, only a warning)."""
+        actions = []
+        for original, item in self._placeable_originals(root, manifest, originals_folder):
             expected = original.get("md5_checksum")
             strategy = None if item.md5_checksum == expected else "skipped"
             actions.append(self._placement(item, expected, registered=True, strategy=strategy))
