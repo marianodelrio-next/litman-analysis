@@ -38,6 +38,7 @@ public compatibility promise.
   development-process decisions. Package decisions remain with Core or
   Harness.
 
-The Spanish [Windows manual](windows_manual.md) and
-[installation validation manual](validacion_manual_instalacion.md) are
-maintained separately from this documentation consolidation.
+The [Windows Codex app validation guide](windows-codex-validation.md) is the
+manual checklist for installing and operating LitMan with the Codex app on
+native Windows; it is maintained separately from this documentation
+consolidation.
