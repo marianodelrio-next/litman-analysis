@@ -176,7 +176,27 @@ def test_uninstall_without_manifest_is_ok(tmp_path, capsys, monkeypatch):
         code = exc.code
     captured = capsys.readouterr()
     payload = json.loads(captured.out if code == 0 else captured.err)
-    assert code == 0 and payload == {"ok": True, "result": {"removed": [], "kept": []}}
+    assert code == 0 and payload == {"ok": True, "result": {"removed": [], "kept": [], "failed": []}}
+
+
+def test_uninstall_with_failed_items_is_an_error_envelope(tmp_path, capsys, monkeypatch):
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
+    monkeypatch.setattr(Path, "home", lambda: tmp_path / "home")
+    fake_result = {"removed": ["skill:resumir-licitacion"], "kept": [], "failed": ["skill:conectar-licitacion"]}
+    monkeypatch.setattr(cli.installation, "uninstall", lambda **kwargs: fake_result)
+
+    try:
+        cli.main(["uninstall"])
+        code = 0
+    except SystemExit as exc:
+        code = exc.code
+    captured = capsys.readouterr()
+    payload = json.loads(captured.out if code == 0 else captured.err)
+    assert code == 2
+    assert payload["ok"] is False
+    assert payload["error"]["code"] == "uninstall_incomplete"
+    assert payload["error"]["details"] == fake_result
 
 
 def test_oauth_client_flag_only_works_without_app(tmp_path, capsys, monkeypatch):

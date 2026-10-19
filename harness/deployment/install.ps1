@@ -24,6 +24,18 @@ if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
     exit 1
 }
 
+if ($env:LITMAN_APP -eq 'codex') {
+    if (-not (Get-Command codex -ErrorAction SilentlyContinue)) {
+        Write-Error "Falta la CLI de Codex. Instalela siguiendo:`n  https://github.com/openai/codex"
+        exit 1
+    }
+} else {
+    if (-not (Get-Command claude -ErrorAction SilentlyContinue)) {
+        Write-Error "Falta la CLI de Claude Code. Instalela siguiendo:`n  https://docs.claude.com/en/docs/claude-code/setup"
+        exit 1
+    }
+}
+
 $Src = if ($env:LITMAN_SRC_DIR) { $env:LITMAN_SRC_DIR } else { "$env:LOCALAPPDATA\LitMan\src" }
 $Repo = if ($env:LITMAN_REPO) { $env:LITMAN_REPO } else { "https://github.com/marianodelrio-next/litman-analysis.git" }
 
@@ -45,18 +57,6 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 uv tool install --force --python 3.11 "$Src\harness" --with "$Src\core"
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-if ($env:LITMAN_APP -eq 'codex') {
-    if (-not (Get-Command codex -ErrorAction SilentlyContinue)) {
-        Write-Error "Falta la CLI de Codex. Instalela siguiendo:`n  https://github.com/openai/codex"
-        exit 1
-    }
-} else {
-    if (-not (Get-Command claude -ErrorAction SilentlyContinue)) {
-        Write-Error "Falta la CLI de Claude Code. Instalela siguiendo:`n  https://docs.claude.com/en/docs/claude-code/setup"
-        exit 1
-    }
-}
 
 $LitmanBin = Join-Path (uv tool dir --bin) "litman.exe"
 & $LitmanBin install --app $env:LITMAN_APP --source $Src

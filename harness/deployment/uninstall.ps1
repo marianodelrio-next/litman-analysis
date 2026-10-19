@@ -15,6 +15,7 @@ if (Get-Command uv -ErrorAction SilentlyContinue) {
     $LitmanBin = Join-Path (uv tool dir --bin) "litman.exe"
     if (Test-Path $LitmanBin) {
         & $LitmanBin uninstall @UninstallArgs
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     }
     uv tool uninstall litman-harness 2>$null
 }
