@@ -1,24 +1,24 @@
-# Desarrollo local desde checkout
+# Local development from the checkout
 
-Esta guía es para contribuir desde el checkout. Requiere Python 3.11, `uv` y
-la autenticación de Codex (`codex login` una vez; Core lee la sesión en
-`CODEX_HOME/auth.json`) o, en Ubuntu o Windows 10/11, de Claude Code (sesión `claude` ya
-iniciada; `[llm] provider = "claude-code"` en `config.toml`; no hay variable
-de entorno para elegir el proveedor).
+Use this workflow to contribute to Core. It requires Python 3.11 and `uv`, plus
+an authenticated Codex or Claude Code installation for real analysis runs.
+Tests do not require provider or Drive credentials.
 
-Desde la raíz de `core/` (este `core/` del monorepo, no la raíz del
-repositorio):
+From the repository's `core/` directory:
 
 ```sh
 uv sync
-uv run pytest -q
+UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest -q
 cp deployment/config_example.toml deployment/config.toml
 cd deployment
 uv run litman-core run
 ```
 
-La CLI local ejecuta `JobRunner` directamente desde el código del checkout.
-En Windows usa PowerShell o `cmd` para los comandos equivalentes; Core emplea
-un workspace bajo el temporal del sistema y Claude requiere un `.exe` nativo.
-Para consumir una wheel instalada sin checkout, consulta
-[`deployment/local-install`](../local-install/README.md).
+The local CLI executes `JobRunner` directly from the checkout. Configure the
+job and provider as described in the [common deployment guide](../README.md).
+On Windows, use the equivalent PowerShell or `cmd` commands. Core creates its
+private workspace under the system temporary directory, and Claude Code must
+resolve to a native `.exe`, not a `.cmd` or `.bat` launcher.
+
+To consume an installed distribution instead of checkout source, use the
+[local wheel installation guide](../local-install/README.md).

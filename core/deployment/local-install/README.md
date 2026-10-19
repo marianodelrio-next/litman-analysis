@@ -1,52 +1,45 @@
-# Instalación local de una wheel
+# Local wheel installation
 
-Esta guía consume una distribución construida de `litman-core`, sin ejecutar
-el código desde un checkout. Requiere Python 3.11, `uv` y autenticación de
-Codex configurada por el usuario (`codex login` una vez; Core lee la sesión en
-`CODEX_HOME/auth.json`, por defecto `~/.codex/auth.json`).
+Use this workflow to run a built `litman-core` distribution without executing
+source from a checkout. It requires Python 3.11 and `uv`.
 
-Construye u obtén una wheel como paso de empaquetado/release:
+Build or obtain a wheel as a packaging step:
 
 ```sh
 uv build --wheel --out-dir ./dist
 ```
 
-En el directorio donde conservarás la instalación, crea un entorno e instala
-la wheel concreta:
+In the directory that will hold the installation, create an environment and
+install the exact wheel:
 
 ```sh
 uv venv --python 3.11 .venv
-uv pip install --python .venv/bin/python /ruta/a/litman_core-0.1.0-py3-none-any.whl
+uv pip install --python .venv/bin/python /path/litman_core-0.1.0-py3-none-any.whl
 ```
 
-El único comando público de ejecución es:
+Run the installed CLI:
 
 ```sh
 .venv/bin/litman-core run
-.venv/bin/litman-core run --config /ruta/a/config.toml
+.venv/bin/litman-core run --config /path/config.toml
 ```
 
-En Windows, las rutas equivalentes son `.venv\\Scripts\\python.exe` y
-`.venv\\Scripts\\litman-core.exe`. El workspace temporal usa el directorio
-temporal del sistema; `LITMAN_CORE_WORKSPACE_DIR` puede reemplazarlo.
+On Windows, the equivalent paths are `.venv\\Scripts\\python.exe` and
+`.venv\\Scripts\\litman-core.exe`.
 
-Las rutas relativas del TOML se resuelven respecto al propio archivo. En POSIX,
-el workspace temporal de LitMan usa `/tmp/litman-core` por defecto; en Windows
-usa el directorio temporal del sistema más `litman-core`. Se elimina al terminar
-la ejecución. El contrato de `config.toml` (claves obligatorias y
-opcionales, valores por defecto) está en
-[`../../../docs/contracts.md`](../../../docs/contracts.md); no hay superficie
-pública para configurar plantillas de generación (`detailed-analysis` siempre
-usa la plantilla aprobada). Configura la autenticación de Codex y, si usas
-Drive, `GOOGLE_APPLICATION_CREDENTIALS` según tu entorno; esta guía no crea
-credenciales ni instaladores.
+Configure jobs, environment loading, and authentication through the
+[common deployment guide](../README.md). The exact configuration surface is
+the [public CLI contract](../../../docs/contracts.md); generation templates
+are not publicly configurable.
 
-Para Claude Code en Ubuntu o Windows, autentícate previamente con `claude`, usa
-`[llm] provider = "claude-code"` en `config.toml` y, opcionalmente,
-`LITMAN_CORE_CLAUDE_CONFIG_DIR` (variable de máquina; Core la reenvía
-internamente como `CLAUDE_CONFIG_DIR`). El modelo por defecto de Claude Code es
-`claude-sonnet-5`; para fijar otro usa `[llm] model` en el job. En Windows
-configura `LITMAN_CORE_CLAUDE_BINARY` con el binario `.exe` nativo, no con un
-lanzador `.cmd`/`.bat`.
-LitMan nunca copia ni inspecciona tokens. El smoke autenticado de Codex/Claude
-queda pendiente de ejecutarse manualmente en una terminal del usuario.
+Core uses `/tmp/litman-core` as its temporary workspace on POSIX and the
+system temporary directory plus `litman-core` on Windows. Override it with
+`LITMAN_CORE_WORKSPACE_DIR`; Core removes the workspace after execution.
+
+For Claude Code on Ubuntu or Windows, authenticate with `claude`, select
+`[llm] provider = "claude-code"`, and optionally set
+`LITMAN_CORE_CLAUDE_CONFIG_DIR`. Core forwards that directory internally as
+`CLAUDE_CONFIG_DIR`. The default model is `claude-sonnet-5`; select another
+with `[llm] model` in `config.toml`. On Windows,
+`LITMAN_CORE_CLAUDE_BINARY` must identify the native `.exe`, not a `.cmd` or
+`.bat` launcher. Core does not copy or inspect provider tokens.

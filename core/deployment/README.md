@@ -1,34 +1,52 @@
-# Operación de LitMan Core
+# Running LitMan Core
 
-`config.toml` es el único contrato operativo. `input.kind` e
-`input.location` definen el origen; `output.directory` define la raíz local de
-los runs y `output.google_drive_folder_id` configura una réplica Drive.
-Ejecute desde este directorio:
+This page owns the common procedure for configuring and running Core. Use the
+linked guides for environment-specific installation and deployment steps.
 
-Para preparar una configuración local, copie [`config_example.toml`](config_example.toml)
-a `config.toml` y ajuste sus rutas o IDs. `config.toml` es local y no se versiona.
+## Configure a run
+
+Copy [`config_example.toml`](config_example.toml) to `config.toml`, then set
+the input and output locations. The operational file is ignored by Git.
+
+`config.toml` selects the job, source, local run root, optional Drive replica,
+LLM provider, and publication mode. Relative paths are resolved from the TOML
+file. The complete list of keys and defaults belongs to the
+[public CLI contract](../../docs/contracts.md).
+
+Authentication is supplied by the environment, never by the job:
+
+- Codex uses the session created by `codex login` and reads
+  `CODEX_HOME/auth.json` (`~/.codex/auth.json` by default).
+- Claude Code uses an existing Claude session when `[llm] provider =
+  "claude-code"`; the provider and optional model are selected only in
+  `config.toml`.
+- Google Drive requires explicit Google credentials for Drive input or output.
+
+## Run
+
+From this directory, with `litman-core` available in the active environment:
 
 ```sh
 litman-core run
-litman-core run --config /ruta/config.toml --env-file /ruta/.env
+litman-core run --config /path/config.toml --env-file /path/.env
 ```
 
-Las rutas locales se resuelven respecto al TOML. `[output].directory` siempre
-recibe la carpeta final `<job.id>-<timestamp UTC>`; `google_drive_folder_id`
-añade una réplica Drive. `.env` solo contiene autenticación y rutas a
-`local-secrets/`; nunca se copia a un run. El entorno heredado prevalece sobre
-`.env`. `include_run_files = false` (por defecto) conserva solo los entregables;
-`true` conserva y replica el árbol completo del run. Los fallos conservan ese
-árbol local y no promueven una carpeta final en Drive.
+Without `--config`, Core loads `./config.toml`. Without `--env-file`, it loads
+an adjacent `.env` when present. Existing environment variables take
+precedence over `.env`; the file is never copied into a run.
 
-Use `type = "assessment"` para generar `ficha_oportunidad.pdf`; para
-`detailed-analysis` se generan siempre los cuatro entregables con la plantilla
-aprobada (`technical_document` y `economic_simulator`); no existe una clave
-pública `[analysis]` para configurarla: se rechaza como desconocida. `[llm]
-provider` (`codex`, por defecto, o `claude-code`) y `model` opcional eligen el
-proveedor y modelo del análisis; ver el contrato completo en
-[`../../docs/contracts.md`](../../docs/contracts.md).
+`output.directory` receives the final `<job.id>-<UTC timestamp>` directory.
+Setting `output.google_drive_folder_id` adds a Drive replica. With
+`publication.include_run_files = false` (the default), a successful
+publication retains only public deliverables; `true` retains and replicates
+the complete run tree. A failed run keeps its local diagnostics and does not
+promote a final Drive folder.
 
-Las guías de [desarrollo local](local-dev/README.md),
-[instalación wheel](local-install/README.md) y [Docker](docker/README.md)
-contienen sus requisitos e invocación específicos.
+## Choose an environment
+
+- [Develop from the checkout](local-dev/README.md)
+- [Install and run a wheel](local-install/README.md)
+- [Run the optional Docker deployment](docker/README.md)
+
+Core does not translate host paths into container paths. Each environment
+guide documents the paths visible to that runtime.

@@ -1,54 +1,69 @@
-# Contratos vigentes de LitMan Core
+# LitMan Core internal run contract
 
-Describe el comportamiento actual de Core, no una API futura.
+This page describes Core's current internal execution artifacts. It does not
+define the process interface used by Harness or other consumers. Commands,
+configuration keys, standard-output JSON, exit codes, artifact roles, and
+compatibility rules belong exclusively to the repository
+[public CLI contract](../../docs/contracts.md).
 
-## Comandos y ciclo de vida
+Internal files may evolve without increasing the public contract version.
+Process consumers must not read them.
 
-| Comando | Audiencia | Ciclo | Estado |
-|---|---|---|---|
-| `litman-core run` | usuario local | carga `./config.toml` (y su `.env` adyacente) y ejecuta `JobRunner` | canónico |
-| `litman-core run --config RUTA [--env-file RUTA]` | usuario local, integración (harness) | carga una configuración y un `.env` explícitos | canónico |
-| `litman-core info` | integración (harness) | imprime versión y contrato | canónico |
+## Run lifecycle and layout
 
-El contrato de la CLI (claves de configuración, forma exacta del JSON de
-`run`/`info`, roles de artefacto, códigos de error y política de
-versionado) vive en [`docs/contracts.md`](../../docs/contracts.md); no se
-repite aquí.
+`JobRunner` materializes and normalizes one input bundle, executes either the
+`assessment` or `detailed-analysis` pipeline, validates the complete run, and
+publishes only after validation succeeds.
 
-## Job y run
+Each execution receives one `publication_id` and creates a persistent run
+under `output.directory/<publication_id>/` with these internal directories:
 
-Un job contiene `job.type` (`assessment` o `detailed-analysis`),
-`input.location` y `output.directory` como claves obligatorias, además de
-`job.id`, `input.kind`, `output.google_drive_folder_id`, `[llm]` y
-`[publication]` opcionales (ver el contrato enlazado arriba). `JobRunner`
-materializa, normaliza, analiza, valida y publica atómicamente.
+- `input/` contains the materialized source set.
+- `output/` contains pipeline results, validation, manifests, and generated
+  deliverables.
+- `logs/` contains run diagnostics.
 
-Cada ejecución crea una publicación identificada por un `publication_id` y un
-run con `input/`, `output/` y `logs/`. Ambos pipelines producen
-`output/validation.json` y `output/result.json`; detailed-analysis añade
-`dossier.json`, `generation_manifest.json` y su `lineage.json`, que contiene
-versión, origen, ruta y SHA-256 del dossier.
+Both pipelines produce `output/validation.json` and `output/result.json`.
+Detailed analysis also produces `dossier.json`, `generation_manifest.json`,
+and lineage metadata. Lineage records the dossier version, origin, relative
+path, and SHA-256 digest used for generation.
 
-## Publicación
+## Validation and evidence
 
-Ambos destinos publican el mismo catálogo cerrado, sin diagnósticos, lineage ni
-manifiesto de publicación: assessment publica
-la ficha PDF; detailed-analysis publica los dos resúmenes, un DOCX técnico y
-el simulador económico según el manifiesto. Drive usa carpeta temporal y solo
-la renombra tras completar la subida.
+Versioned pipeline bundles declare their resources and hashes. Validation
+results cover schema, semantic, and evidence errors. Document references keep
+the source identifier, name, MIME type, and cited page or text when available.
 
-El catálogo público se construye desde el run de cada `publication_id`; los
-archivos internos permanecen en el run local según la configuración de
-publicación. Los hashes se calculan sobre los bytes de cada ejecución. No se comparan entre
-ejecuciones. Un `validation.json` inválido, un artefacto ausente o una subida
-incompleta impide presentar el run como éxito.
+Every provider response passes structural and semantic validation before
+publication. A missing artifact, invalid `validation.json`, invalid manifest,
+or incomplete upload prevents the run from being reported as successful.
 
-## Versiones, evidencias y runtime
+## Publication internals
 
-Los pipelines declaran sus bundles versionados y sus hashes; los resultados
-de validación incluyen errores de schema, semántica y evidencias. Las
-referencias de documentos conservan identificador, nombre, MIME, páginas o
-texto citado cuando están disponibles. Drive requiere credenciales explícitas;
-esta línea base no usa red, credenciales ni servicios externos en tests. Las
-comprobaciones de usuario, capabilities, mounts y `no-new-privileges` son
-preflight opcional de `deployment/docker`, no parte del contrato de Core.
+The publisher derives a closed deliverable catalog from the current run:
+
+- `assessment` publishes `ficha_oportunidad.pdf`.
+- `detailed-analysis` publishes `resumen_tecnico.docx`,
+  `guia_preparacion_oferta.docx`, exactly one technical DOCX declared by the
+  generation manifest, and `simulador_economico.xlsx`.
+
+Diagnostics, lineage, and publication manifests are not deliverables. With
+`publication.include_run_files = false`, the local run is reduced to the
+catalog only after validation and any Drive replica both succeed. With
+`true`, the complete tree is retained and published using `run_file` roles.
+
+The immutable publication inventory contains relative paths and SHA-256
+digests calculated from that execution's bytes. Digests are not compared
+between executions. Drive uploads use a temporary folder that is promoted to
+the final `publication_id` only after every upload succeeds.
+
+## Runtime boundary
+
+Core supports local and Google Drive sources and destinations in every
+combination. Drive requires explicit credentials; tests use fakes and do not
+access external services.
+
+Container user checks, mounts, capabilities, and `no-new-privileges` are
+deployment preflight concerns, not part of either the internal run model or
+the public process contract. See [Core operations](operations.md) and the
+[Docker guide](../deployment/docker/README.md).
