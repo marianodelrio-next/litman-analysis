@@ -46,3 +46,13 @@ class MetadataGateway:
 
     def upload_converted(self, *args):
         raise HarnessError("read_only_adapter", "El adaptador de metadatos no puede escribir")
+
+
+class MetadataDocsGateway:
+    """Docs counterpart of the metadata adapter: it holds no document content and never writes."""
+
+    def get(self, *args):
+        raise HarnessError("read_only_adapter", "El adaptador de metadatos no puede leer documentos de Google Docs")
+
+    def batch_update(self, *args):
+        raise HarnessError("read_only_adapter", "El adaptador de metadatos no puede escribir")

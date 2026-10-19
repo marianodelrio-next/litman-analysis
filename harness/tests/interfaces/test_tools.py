@@ -9,7 +9,8 @@ from litman_harness.interfaces.tools import invoke, registry, tool_descriptors
 
 OPERATIONS = {"identity", "diagnose", "inspect", "status", "preview_incorporation", "apply_incorporation",
               "preview_analysis", "execute_analysis", "discard_analysis", "preview_publication", "apply_publication",
-              "read_document", "preview_summary", "apply_summary", "recover", "setup"}
+              "read_document", "preview_summary", "apply_summary", "recover", "setup", "read_google_doc",
+              "preview_document_edit", "apply_document_edit"}
 
 
 def test_registry_exposes_operations_with_schema_and_kind():
@@ -26,7 +27,8 @@ def test_registry_exposes_operations_with_schema_and_kind():
     assert "codex" in setup_schema["properties"]["provider"]["enum"]
     assert {tool.name for tool in registry().values() if tool.mutates} == {"apply_incorporation", "execute_analysis",
                                                                               "discard_analysis", "apply_publication",
-                                                                              "apply_summary", "setup"}
+                                                                              "apply_summary", "setup",
+                                                                              "apply_document_edit"}
 
 
 def test_invalid_arguments_are_invalid_request_before_building_services():
@@ -42,6 +44,21 @@ def test_invalid_arguments_are_invalid_request_before_building_services():
     envelope = invoke("preview_analysis", {"folder_id": "r", "original_ids": ["a"], "job_type": "assessment",
                                            "provider": "other"}, factory)
     assert envelope["error"]["code"] == "invalid_request"
+
+
+def test_document_tools_declare_closed_operations_and_reject_bad_arguments_before_services():
+    def factory():
+        raise AssertionError("services must not be built for invalid arguments")
+
+    operations = registry()["preview_document_edit"].input_schema["properties"]["operations"]
+    assert operations["maxItems"] == 20 and operations["items"]["additionalProperties"] is False
+    assert operations["items"]["properties"]["op"]["enum"] == ["replace_text", "insert_after", "append"]
+    assert registry()["read_google_doc"].input_schema["required"] == ["folder_id", "document_id"]
+    for name, args in (("read_google_doc", {"folder_id": "root", "document_id": 1}),
+                       ("preview_document_edit", {"folder_id": "root", "document_id": "d", "operations": {}}),
+                       ("preview_document_edit", {"folder_id": "root", "document_id": "d", "operations": ["x"]}),
+                       ("apply_document_edit", {"plan_id": "p", "operations": []})):
+        assert invoke(name, args, factory)["error"]["code"] == "invalid_request"
 
 
 def test_preview_analysis_no_longer_accepts_a_provider_argument():

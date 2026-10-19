@@ -46,7 +46,11 @@ def test_cli_and_mcp_return_the_same_envelope_for_queries_and_errors(harness_env
              ("read_document", {"folder_id": "root", "file_id": "source", "offset": "0"}),
              ("preview_summary", {"folder_id": "root",
                                   "items": [{"key": "objeto", "value": "x", "source_file_id": "source"}]}),
-             ("apply_summary", {"plan_id": "a" * 64})]
+             ("apply_summary", {"plan_id": "a" * 64}),
+             ("read_google_doc", {"folder_id": "root", "document_id": "source"}),
+             ("preview_document_edit", {"folder_id": "root", "document_id": "source",
+                                        "operations": [{"op": "append", "text": "x"}]}),
+             ("apply_document_edit", {"plan_id": "a" * 64})]
     for name, arguments in cases:
         code, cli_envelope = run_cli(capsys, name.replace("_", "-"), arguments)
         is_error, mcp_envelope = call_mcp(name, arguments)

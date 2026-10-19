@@ -8,11 +8,13 @@ from typing import Any, Callable, Mapping
 
 from .. import installation
 from ..adapters import core
+from ..adapters.docs import DocsGateway, GoogleDocsGateway
 from ..adapters.drive import DriveGateway, GoogleDriveGateway
 from ..adapters.drive_state import DriveSharedState
-from ..adapters.metadata import MetadataGateway
+from ..adapters.metadata import MetadataDocsGateway, MetadataGateway
 from ..adapters.oauth import DesktopOAuthProvider
 from ..analysis.service import AnalysisService
+from ..dossier.documents import DocumentService
 from ..dossier.publication import PublicationService
 from ..dossier.service import ExpedienteService
 from ..dossier.summary import SummaryService
@@ -32,6 +34,8 @@ class Services:
     analysis: AnalysisService
     publication: PublicationService
     summary: SummaryService
+    docs: DocsGateway
+    documents: DocumentService
 
 
 def adapter_kind(env: Mapping[str, str]) -> str:
@@ -63,16 +67,19 @@ def build_services(env: Mapping[str, str] | None = None, *, provider: DesktopOAu
     shared_state: SharedStateCapability
     if kind == "metadata":
         drive: DriveGateway = MetadataGateway(Path(env[METADATA_ENV]))
+        docs: DocsGateway = MetadataDocsGateway()
         shared_state = UnavailableSharedState()
     else:
         provider = provider or oauth_provider(env)
         drive = GoogleDriveGateway(provider.drive_service())
+        docs = GoogleDocsGateway(provider.docs_service())
         shared_state = DriveSharedState(session_factory(provider.authorized_credentials()), drive)
     expediente = ExpedienteService(drive, store, shared_state)
     publication = PublicationService(expediente, work)
     analysis = AnalysisService(drive, store, work_root=work, publication=publication,
                                settings=lambda: load_settings(env))
-    return Services(kind, drive, shared_state, expediente, analysis, publication, SummaryService(expediente))
+    return Services(kind, drive, shared_state, expediente, analysis, publication, SummaryService(expediente), docs,
+                    DocumentService(expediente, docs))
 
 
 def diagnose(env: Mapping[str, str] | None = None) -> dict[str, Any]:
