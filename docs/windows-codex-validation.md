@@ -3,9 +3,9 @@
 Manual checks for installing and operating LitMan with the **Codex app on
 native Windows 10/11**. These checks cannot run in CI: they need a real
 Windows machine, the Codex app signed in with a real account, and in some
-steps an authorized Google Workspace test account and OAuth client. They
-replace the former `docs/validacion_manual_instalacion.md` and
-`docs/windows_manual.md`.
+steps an authorized Google Workspace test account and OAuth client. This
+guide replaces the two prior Spanish manual-validation documents, which mixed
+platforms and providers and did not state expected outputs.
 
 Use only authorized test accounts and an authorized test Drive folder — never
 production data. Do not record tokens, full private paths, or tender content
@@ -171,7 +171,9 @@ Action: sign in with the second Workspace test account.
 Command: `litman login`
 
 Expected output: opens the browser for the account picker; on success,
-`{"ok": true, "result": {...}}`.
+`{"ok": true, "result": {...}}`. If the local loopback callback fails,
+**observe and record** whether a firewall or Windows machine policy is
+blocking loopback traffic.
 
 Action: confirm the session recovers a test dossier by ID.
 
