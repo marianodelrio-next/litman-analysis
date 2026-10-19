@@ -7,7 +7,7 @@ data models, or development process.
 Package-specific decisions remain with their owner:
 
 - [Core decisions](../../core/docs/decisions.md)
-- [Harness documentation](../../harness/docs/development.md)
+- [Harness decisions](../../harness/docs/decisions.md)
 
 ## Index
 
