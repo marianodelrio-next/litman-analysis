@@ -5,7 +5,7 @@ actual antes de editarlo.
 
 | Área | Rutas | Propósito de navegación |
 | --- | --- | --- |
-| Documentación y tooling transversal | `README.md`, `AGENTS.md`, `docs/`, `.codex/`, `.agents/` | Visión de los dos paquetes, contrato público entre ellos y reglas de desarrollo. No forman parte del runtime de producto. |
+| Documentación y tooling transversal | `README.md`, `AGENTS.md`, `docs/`, `.codex/`, `.agents/`, `.factory/changes/` | Visión de los dos paquetes, contrato público entre ellos y reglas de desarrollo. No forman parte del runtime de producto. |
 | Contrato CLI versionado | `docs/contracts.md`, `docs/contracts/` (`core-result.schema.json`, `core-info.schema.json`, `core-config.minimal.toml`, `examples/`) | Fuente única del contrato `litman-core run`/`info`: esquemas, ejemplos y plantilla mínima que usa el harness. |
 | Distribución Core | `core/pyproject.toml`, `core/uv.lock`, `core/README.md` | Paquete `litman-core`, dependencias y entrada de desarrollo. |
 | Ejecución y contrato de Core | `core/src/litman_core/cli.py`, `core/src/litman_core/errors.py`, `core/src/litman_core/execution/job_runner.py`, `core/src/litman_core/application/` | CLI `litman-core` (JSON único y `info`), códigos de error cerrados (`CoreError`), carga de jobs y orquestación local de análisis. |
