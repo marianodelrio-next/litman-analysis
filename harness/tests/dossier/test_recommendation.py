@@ -38,6 +38,11 @@ def kind(**kwargs):
     ({"state": "adopted", "manifest": manifest(analyses=[("a1", "assessment"), ("d1", "detailed-analysis")],
                                                summary_on=["a1", "d1"])}, None),
     ({"state": "adopted", "manifest": manifest(), "pending": [{"operation_id": "x"}]}, "publish_analysis"),
+    ({"state": "adopted", "manifest": manifest(), "misplaced_originals": ["pliego"]}, "organize_originals"),
+    ({"state": "adopted", "manifest": manifest(analyses=[("a1", "assessment")], summary_on=["a1"]),
+      "misplaced_originals": ["pliego"]}, "organize_originals"),
+    ({"state": "adopted", "manifest": manifest(), "pending": [{"operation_id": "x"}],
+      "misplaced_originals": ["pliego"]}, "publish_analysis"),
     ({"state": "partial", "manifest": None}, "review_manifest"),
     ({"state": "unsupported_manifest", "manifest": None}, "review_manifest"),
 ))
@@ -77,3 +82,15 @@ def test_unregistered_candidates_do_not_loop_once_originals_are_registered(tmp_p
     assert status["candidates"]["originals"] == ["not-a-pliego"]
     assert status["recommended_action"]["kind"] == "run_assessment"
     assert "incorporate" in [action["kind"] for action in status["next_actions"]]
+
+
+def test_original_kept_in_place_reaches_the_assessment_without_looping(tmp_path):
+    from fakes import AtomicSharedState, dossier_drive
+
+    from litman_harness.dossier.service import ExpedienteService
+    from litman_harness.plans import PlanStore
+    drive = dossier_drive()  # ``source`` reports neither canMoveItemWithinDrive nor canCopy
+    service = ExpedienteService(drive, PlanStore(tmp_path / "plans"), AtomicSharedState(drive))
+    result = service.apply_incorporation(service.preview_incorporation("root", ["source"]).id)
+    assert result["placement_warnings"] and result["recommended_action"]["kind"] == "run_assessment"
+    assert service.status("root")["recommended_action"]["kind"] == "run_assessment"

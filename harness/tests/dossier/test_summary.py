@@ -77,6 +77,24 @@ def test_read_document_reads_originals_and_artifacts_without_writing(tmp_path: P
     assert setup.drive.created == created and setup.state.writes == writes
 
 
+def test_copied_original_keeps_the_source_id_citable_and_readable(tmp_path: Path):
+    setup = Setup(tmp_path)
+    resource = next(item for item in setup.drive.resources.values() if item.name == "manifest.json")
+    manifest = setup.manifest()
+    manifest.originals[0].pop("placement")  # registered before placement existed
+    setup.drive.write_text(resource.id, manifest.serialize())
+    setup.drive.add(replace(setup.drive.resources["source"], capabilities={"canDownload": True, "canCopy": True}))
+    setup.dossier.apply_incorporation(setup.dossier.preview_incorporation("root").id)
+    copy_id = setup.manifest().originals[0]["file_id"]
+    assert copy_id != "source"
+    for file_id in ("source", copy_id):
+        setup.drive.contents[file_id] = minimal_pdf("Pliego de condiciones")
+        document = setup.summary.read_document("root", file_id)
+        assert document["kind"] == "original" and "Pliego de condiciones" in document["text"]
+    assert setup.accept()["status"] == "succeeded"
+    assert {item.get("source_file_id") for item in setup.manifest().summary["items"]} >= {"source"}
+
+
 def test_read_document_rejects_unregistered_outside_and_unsupported(tmp_path: Path):
     setup = Setup(tmp_path)
     for file_id, code in (("offer-doc", "document_not_registered"), ("other-file", "document_not_registered"),

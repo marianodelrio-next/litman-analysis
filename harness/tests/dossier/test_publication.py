@@ -212,3 +212,20 @@ def test_only_the_closed_public_catalogue_reaches_drive(tmp_path: Path):
                       if result["run_folder_id"] in item.parents)
     assert uploaded == sorted(item["name"] for item in analysis["public_artifacts"])
     assert "validation.json" not in uploaded
+
+
+def test_publication_backfills_the_sha256_of_an_original_copied_after_the_analysis(tmp_path: Path):
+    from dataclasses import replace
+    setup = Setup(tmp_path)
+    analysis = setup.analyse("assessment")  # Core read the source ID
+    resource = next(item for item in setup.drive.resources.values() if item.name == "manifest.json")
+    manifest = setup.manifest()
+    manifest.originals[0].pop("placement")
+    setup.drive.write_text(resource.id, manifest.serialize())
+    setup.drive.add(replace(setup.drive.resources["source"], capabilities={"canDownload": True, "canCopy": True}))
+    setup.dossier.apply_incorporation(setup.dossier.preview_incorporation("root").id)
+    assert setup.manifest().originals[0]["copied_from"] == "source"
+    setup.publish(analysis)
+    original = setup.manifest().originals[0]
+    assert original["file_id"] != "source" and original["sha256"]
+    assert setup.manifest().analyses[0]["source_originals"][0]["file_id"] == "source"
