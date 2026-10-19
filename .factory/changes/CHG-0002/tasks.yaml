@@ -1,0 +1,98 @@
+change: CHG-0002
+design_digest: sha256:b92c8c40a11c6068465acc7630ac5ed42171ab516948b987ef3f876e4ebf2194
+tasks:
+- id: CHG-0002-01
+  title: Establish the repository documentation architecture
+  depends_on: []
+  complexity: normal
+  review:
+  - quality
+  - conformance
+  scope:
+  - README.md
+  - AGENTS.md
+  - CLAUDE.md
+  - docs/README.md
+  - docs/product.md
+  - docs/architecture.md
+  - docs/codebase-map.md
+  - docs/contracts.md
+  - docs/conventions.md
+  - docs/working-agreements.md
+  - docs/decisions/**
+  acceptance:
+    AC-02: manual
+    AC-09: manual
+- id: CHG-0002-02
+  title: Consolidate the Core documentation
+  depends_on:
+  - CHG-0002-01
+  complexity: normal
+  review:
+  - quality
+  - conformance
+  scope:
+  - core/README.md
+  - core/AGENTS.md
+  - core/docs/**
+  - core/deployment/**/*.md
+  acceptance:
+    AC-06: manual
+- id: CHG-0002-03
+  title: Consolidate the Harness documentation
+  depends_on:
+  - CHG-0002-01
+  complexity: normal
+  review:
+  - quality
+  - conformance
+  scope:
+  - harness/README.md
+  - harness/AGENTS.md
+  - harness/docs/**
+  - harness/deployment/README.md
+  acceptance:
+    AC-05: manual
+- id: CHG-0002-04
+  title: Reconcile and verify the complete documentation set
+  depends_on:
+  - CHG-0002-02
+  - CHG-0002-03
+  complexity: normal
+  review:
+  - quality
+  - conformance
+  scope:
+  - README.md
+  - AGENTS.md
+  - CLAUDE.md
+  - docs/README.md
+  - docs/product.md
+  - docs/architecture.md
+  - docs/codebase-map.md
+  - docs/contracts.md
+  - docs/conventions.md
+  - docs/working-agreements.md
+  - docs/decisions/**
+  - core/README.md
+  - core/AGENTS.md
+  - core/docs/**
+  - core/deployment/**/*.md
+  - harness/README.md
+  - harness/AGENTS.md
+  - harness/docs/**
+  - harness/deployment/README.md
+  acceptance:
+    AC-01: manual
+    AC-02: manual
+    AC-03: manual
+    AC-04: manual
+    AC-05: manual
+    AC-06: manual
+    AC-07: bash -lc 'UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv --directory core run
+      pytest -q && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv --directory harness run
+      pytest -q && uv build core --out-dir dist/core && uv build harness --out-dir
+      dist/harness && docker compose -f core/deployment/docker/compose.yaml config
+      --quiet && docker compose -f core/deployment/docker/compose.yaml build'
+    AC-08: manual
+    AC-09: manual
