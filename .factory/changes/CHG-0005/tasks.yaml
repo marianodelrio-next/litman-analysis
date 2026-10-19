@@ -1,0 +1,60 @@
+change: CHG-0005
+design_digest: sha256:1b1696b4c87ca05da274f75501b99d92bf15193009f25aa2a19d678165b3e5bf
+tasks:
+- id: CHG-0005-01
+  title: Run the Harness CLI on Windows via python -m (installer scripts and rendered
+    litman command)
+  depends_on: []
+  complexity: normal
+  review:
+  - quality
+  - conformance
+  scope:
+  - harness/deployment/**
+  - harness/tests/deployment/**
+  - harness/src/litman_harness/installation.py
+  - harness/src/litman_harness/adapters/core.py
+  - harness/tests/test_installation.py
+  - harness/tests/adapters/**
+  - docs/guia-litman-windows.md
+  - docs/windows-codex-validation.md
+  acceptance:
+    AC-01: bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q tests/deployment/test_install_script.py'
+    AC-02: bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q tests/deployment/test_install_script.py'
+    AC-03: bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q tests/deployment/test_install_script.py'
+    AC-04: bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q tests/test_installation.py'
+    AC-09: manual
+    AC-10: manual
+    AC-11: bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q'
+- id: CHG-0005-02
+  title: Shorten Windows local original names to fit the actual input path budget
+  depends_on:
+  - CHG-0005-01
+  complexity: normal
+  review:
+  - quality
+  - conformance
+  scope:
+  - harness/src/litman_harness/analysis/inputs.py
+  - harness/tests/analysis/**
+  - harness/docs/operations.md
+  - docs/guia-litman-windows.md
+  - docs/windows-codex-validation.md
+  acceptance:
+    AC-05: bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q tests/analysis/test_inputs.py'
+    AC-06: bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q tests/analysis/test_inputs.py'
+    AC-07: bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q tests/analysis/test_inputs.py'
+    AC-08: bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q tests/analysis/test_inputs.py'
+    AC-09: manual
+    AC-10: manual
+    AC-11: bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q'
