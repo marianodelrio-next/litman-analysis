@@ -70,6 +70,17 @@ and the file belongs to the team. Copying then trashing and always copying were
 rejected: the first is destructive and often not permitted, and the second
 duplicates files even when moving is allowed.
 
+## Results are published flat in the phase folder
+
+Analysis artifacts are uploaded straight into the registered `Analisis inicial`
+or `Analisis detallado` folder, so the person finds the latest results where
+they expect them. Core's artifact names are fixed, so a repeated analysis gets
+a date suffix (`<stem> (YYYY-MM-DD)<ext>`, then `-2`, …) instead of a new
+folder. Emptying the folder first was rejected because it deletes results the
+manifest, summary and `contexto.md` still cite, and the person may lack the
+right; uploading a new revision of the previous file was rejected because two
+analyses would share one file ID and lose manifest traceability.
+
 ## Publication is part of analysis execution
 
 An accepted analysis plan includes its publication actions. Harness validates

@@ -1,7 +1,9 @@
 """Publication of a validated local Core result into the connected dossier (decision 7).
 
 The result is read from the local PlanStore record of the analysis, never from
-agent input.  Uploads go directly to destinations by ID inside the dossier.
+agent input.  Uploads go directly to destinations by ID inside the dossier: the
+artifacts land flat in the registered phase folder, never overwriting a file
+already there (decision "Results are published flat in the phase folder").
 """
 from __future__ import annotations
 
@@ -69,7 +71,7 @@ class PublicationService:
         return self.apply(plan_id)
 
     def preview(self, analysis_operation_id: str) -> Plan:
-        """Plan the run folder, uploads, optional live-offer conversion, phase and shared-state updates."""
+        """Plan the uploads, optional live-offer conversion, phase and shared-state updates."""
         store = self.dossier.store()
         account = self.dossier.account_id()
         analysis = self._analysis(account, analysis_operation_id)
@@ -84,11 +86,15 @@ class PublicationService:
             raise HarnessError("already_published", "Ese análisis ya figura en el manifiesto")
         phase_folder = self._registered_folder(root, manifest, _PHASE_FOLDER[result["job_type"]])
         self._verify_local(result)
-        actions = [PlanAction("create_run_folder", None, f"{result['completed_at'][:10]} {result['publication_id']}",
-                              phase_folder.id, metadata={"role": "run_folder"})]
+        # Names are fixed here, so action IDs and a resumed apply stay stable.
+        taken = {item.name for item in self.drive.children(phase_folder.id, phase_folder.drive_id)}
+        actions = []
         for artifact in result["public_artifacts"]:
-            actions.append(PlanAction("upload_public_artifact", None, artifact["name"], None, metadata={
-                "role": artifact["role"], "sha256": artifact["sha256"], "mime_type": artifact["mime_type"]}))
+            name = _available_name(artifact["name"], taken, result["completed_at"][:10])
+            taken.add(name)
+            actions.append(PlanAction("upload_public_artifact", None, name, phase_folder.id, metadata={
+                "artifact": artifact["name"], "role": artifact["role"], "sha256": artifact["sha256"],
+                "mime_type": artifact["mime_type"]}))
         if result["job_type"] == "detailed-analysis" and manifest.live_offer is None:
             offer_folder = self._registered_folder(root, manifest, "offer")
             technical = next(item for item in result["public_artifacts"] if item["role"] == TECHNICAL_DOCUMENT_ID)
@@ -128,24 +134,26 @@ class PublicationService:
         self._verify_local(result)
         self._check_folders(run, manifest, result["job_type"])
         local = {item["name"]: item for item in result["public_artifacts"]}
-        run_folder = None
+        folder_id = None
         artifacts = []
         live_offer = None
         for action in plan.actions:
             aid = action_id(plan, action)
-            if action.kind == "create_run_folder":
+            if action.kind == "create_run_folder":  # plans stored before the flat layout
                 if not run.done(action):
                     created = self.dossier.ensure_marked(run, action, action.parent_id, lambda a=action, i=aid: (
                         self.drive.create_folder(a.name, a.parent_id, plan.operation_id, i)))
                     self._check_created(root, created, action.parent_id, FOLDER_MIME)
                     run.complete(action, {"resource_id": created.id})
-                run_folder = run.output(action)["resource_id"]
+                folder_id = run.output(action)["resource_id"]
             elif action.kind == "upload_public_artifact":
+                folder_id = action.parent_id or folder_id
                 if not run.done(action):
-                    source = Path(local[action.name]["path"])
-                    created = self.dossier.ensure_marked(run, action, run_folder, lambda a=action, i=aid, p=source: (
-                        self.drive.upload(a.name, run_folder, p, a.metadata["mime_type"], plan.operation_id, i)))
-                    self._check_created(root, created, run_folder, None)
+                    source = Path(local[action.metadata.get("artifact", action.name)]["path"])
+                    created = self.dossier.ensure_marked(
+                        run, action, folder_id, lambda a=action, i=aid, p=source, f=folder_id: self.drive.upload(
+                            a.name, f, p, a.metadata["mime_type"], plan.operation_id, i))
+                    self._check_created(root, created, folder_id, None)
                     run.complete(action, {"resource_id": created.id})
                 artifacts.append({"role": action.metadata["role"], "name": action.name,
                                   "file_id": run.output(action)["resource_id"], "sha256": action.metadata["sha256"]})
@@ -177,7 +185,7 @@ class PublicationService:
             "operation_id": analysis_id, "publication_id": result["publication_id"], "type": result["job_type"],
             "provider": result["provider"], "core_version": result.get("core_version"),
             "harness_version": result.get("harness_version"), "performed_by": result.get("performed_by"),
-            "source_originals": sources, "folder_id": run_folder, "artifacts": artifacts, "status": "published"})
+            "source_originals": sources, "folder_id": folder_id, "artifacts": artifacts, "status": "published"})
         if live_offer and manifest.live_offer is None:
             manifest.live_offer = live_offer
         for action in plan.actions:
@@ -195,17 +203,20 @@ class PublicationService:
                                "aceptación para reanudar sin volver a subir nada",
                                details={"operation_id": plan.operation_id}) from exc
         self._finalize(run, analysis_id)
-        return self.dossier.shared_result(run, manifest, context_conflict, run_folder_id=run_folder,
+        return self.dossier.shared_result(run, manifest, context_conflict, folder_id=folder_id,
                                           next_actions=summary_suggestions(manifest),
                                           artifacts=artifacts, live_offer=manifest.live_offer)
 
     @staticmethod
     def _check_folders(run: OperationRun, manifest: Manifest, job_type: str) -> None:
         """Pending destinations must still be the registered phase and offer folders."""
-        expected = {"create_run_folder": _PHASE_FOLDER[job_type], "convert_live_offer": "offer"}
+        phase = _PHASE_FOLDER[job_type]
+        expected = {"create_run_folder": phase, "upload_public_artifact": phase, "convert_live_offer": "offer"}
         for action in run.plan.actions:
             role = expected.get(action.kind)
-            if not role or run.done(action) or (role == "offer" and manifest.live_offer is not None):
+            # A legacy upload has no parent_id: it goes into the run folder created by the same plan.
+            if (not role or not action.parent_id or run.done(action)
+                    or (role == "offer" and manifest.live_offer is not None)):
                 continue
             if manifest.folders.get(role) != action.parent_id:
                 raise OperationConflict("La carpeta de destino ya no es la registrada en el manifiesto",
@@ -255,3 +266,14 @@ class PublicationService:
             if not path.is_file() or sha256_file(path) != artifact["sha256"]:
                 raise HarnessError("local_artifact_changed", "Un artefacto local cambió o falta; no se publica",
                                    details={"name": artifact["name"]})
+
+
+def _available_name(name: str, taken: set[str], day: str) -> str:
+    """``name``, or ``<stem> (YYYY-MM-DD[-N])<ext>`` when the phase folder already holds it."""
+    if name not in taken:
+        return name
+    path = Path(name)
+    candidate, number = f"{path.stem} ({day}){path.suffix}", 2
+    while candidate in taken:
+        candidate, number = f"{path.stem} ({day}-{number}){path.suffix}", number + 1
+    return candidate

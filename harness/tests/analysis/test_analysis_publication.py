@@ -7,7 +7,7 @@ from fakes import AtomicSharedState, core_run, dossier_drive
 
 from litman_harness.analysis.service import AnalysisService
 from litman_harness.dossier.manifest import Manifest
-from litman_harness.dossier.models import GOOGLE_DOC_MIME
+from litman_harness.dossier.models import FOLDER_MIME, GOOGLE_DOC_MIME
 from litman_harness.dossier.publication import PublicationService
 from litman_harness.dossier.service import ExpedienteService
 from litman_harness.dossier.shared_state import UnavailableSharedState
@@ -145,6 +145,20 @@ def test_publication_can_also_be_resumed_with_apply_publication(tmp_path: Path):
     publication_plan = setup.store.record(setup.drive.user, plan.operation_id).result["publication_plan_id"]
     assert setup.publication.apply(publication_plan)["status"] == "succeeded"
     assert analysis.execute(plan.id)["publication"]["already_published"] is True
+
+
+def test_repeated_analysis_is_published_in_the_phase_folder_without_overwriting(tmp_path: Path):
+    setup = Setup(tmp_path)
+    results = []
+    for _ in range(2):
+        analysis = setup.analysis()
+        results.append(analysis.execute(analysis.preview("root", ["source"], "assessment").id)["publication"])
+    initial = setup.manifest().folders["initial"]
+    assert [item["folder_id"] for item in results] == [initial, initial]
+    day = setup.manifest().analyses[1]["artifacts"][0]["name"]
+    names = sorted(item.name for item in setup.drive.resources.values() if initial in item.parents)
+    assert names == sorted(["ficha_oportunidad.pdf", day]) and day.startswith("ficha_oportunidad (")
+    assert not any(item.mime_type == FOLDER_MIME and initial in item.parents for item in setup.drive.resources.values())
 
 
 def test_gate_closed_publication_keeps_the_analysis_local(tmp_path: Path):

@@ -101,10 +101,16 @@ artifact role, path containment, presence, and SHA-256, then records a closed
 local catalog. Core-internal files such as `validation.json` and
 `generation_manifest.json` are never consumed.
 
-An analysis plan includes publication. Publication creates a dated
-`YYYY-MM-DD <publication_id>` directory in the registered analysis folder,
-uploads each validated artifact, and, for a detailed analysis without a live
-offer, converts the technical DOCX to a Google Doc in `Oferta`. It never
+An analysis plan includes publication. Publication uploads each validated
+artifact directly into the registered phase folder (`Analisis inicial` or
+`Analisis detallado`), without a dated subfolder, and records that folder as
+`analyses[].folder_id`. A name already present there is uploaded as
+`<stem> (YYYY-MM-DD)<ext>`, then `<stem> (YYYY-MM-DD-2)<ext>`, and so on, with
+the date taken from the analysis `completed_at`; names are fixed in the
+preview, so a resumed publication never uploads twice and nothing existing is
+overwritten or removed. Plans stored before this layout, which create a dated
+run folder, still resume. For a detailed analysis without a live offer,
+publication also converts the technical DOCX to a Google Doc in `Oferta`. It never
 replaces an existing live offer. Manifest changes are merged additively; a
 concurrent manifest write makes the operation recoverable and retrying resumes
 without rerunning Core or re-uploading completed artifacts. A fully published
