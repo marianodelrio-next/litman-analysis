@@ -1,0 +1,13 @@
+change: CHG-0001
+design_digest: sha256:7953cab6be4ec621780369332bad9a986b36fe14e0d1d018c6ffd08e97a52fa6
+tasks:
+- id: CHG-0001-01
+  title: Verify the completed bid preparation guide migration
+  depends_on: []
+  complexity: trivial
+  review: []
+  acceptance:
+    AC-01: UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv --directory core run pytest -q
+      tests/unit/generation/test_bid_preparation_guide.py
+    AC-02: test ! -e .agent-work && test -f core/docs/decisions.md
+    AC-03: manual
