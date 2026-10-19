@@ -151,9 +151,9 @@ Still pending:
 3. Confirm that the configured two-hour MCP tool timeout permits a synchronous
    analysis in each real client.
 
-The excluded Spanish
-[manual validation guide](../../docs/validacion_manual_instalacion.md) owns the
-detailed checklist. It is linked here but is not maintained by this task. A
-local MCP smoke can use temporary `LITMAN_HARNESS_METADATA` and send
-`initialize`, `notifications/initialized`, `tools/list`, then an `inspect`
-`tools/call` over stdin.
+The [Windows Codex app validation guide](../../docs/windows-codex-validation.md)
+owns the detailed checklist, including the long-MCP-call timeout check. It is
+linked here but is not maintained by this task. A local MCP smoke can use
+temporary `LITMAN_HARNESS_METADATA` and send `initialize`,
+`notifications/initialized`, `tools/list`, then an `inspect` `tools/call`
+over stdin.
