@@ -1,5 +1,18 @@
-# Decisions
+# Repository decisions
 
-No Factory ADR has been recorded here yet. Add new records in number order when an architecture, public contract, data model, or security decision warrants one.
+This directory records accepted decisions that affect more than one package or
+establish durable repository-level architecture, public contracts, security,
+data models, or development process.
 
-Existing decisions are documented in [Core decisions](../../core/docs/decisions.md), [Harness development](../../harness/docs/development.md), and the [cross-package architecture](../architecture.md). Link those sources instead of duplicating them here.
+Package-specific decisions remain with their owner:
+
+- [Core decisions](../../core/docs/decisions.md)
+- [Harness documentation](../../harness/docs/development.md)
+
+## Index
+
+- [0001 — Separate development workflow from product runtime](0001-development-workflow-boundary.md)
+
+Add new records in number order. Once a decision is accepted, change only its
+status; record a replacement in a new decision and mark the old one as
+superseded.

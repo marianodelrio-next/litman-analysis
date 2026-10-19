@@ -1,37 +1,50 @@
-# Arquitectura transversal
+# Shared architecture
 
-LitMan se compone de dos distribuciones Python 3.11 hermanas y de tooling de
-desarrollo en la raíz. Cada distribución tiene su propio proyecto, lock,
-entorno, documentación, pruebas y despliegue.
-
-`litman-core` vive en `core/` y analiza licitaciones. Su interfaz pública es la
-CLI `litman-core`. `litman-harness` vive en `harness/`, administra el expediente
-con OAuth personal y expone las interfaces `litman` y `litman-mcp`. El harness
-declara Core como dependencia de distribución, pero no importa sus módulos: lo
-ejecuta mediante `litman-core run --config` y consume el resultado público de
-ese proceso. Los detalles de ese límite están en el
-[contrato compartido](contracts.md).
+LitMan contains two independent Python 3.11 distributions and repository-level
+development tooling. Each distribution owns its project metadata, lockfile,
+environment, tests, operations, and internal decisions.
 
 ```text
-Usuario o agente de producto
+Person or product agent
         |
         v
-litman / litman-mcp  (harness/)
+litman / litman-mcp  (Harness)
         |
-        | proceso: litman-core run --config
+        | child process: litman-core run --config
         v
-litman-core          (core/)
+litman-core          (Core)
 ```
 
-Core puede instalarse y ejecutarse por sí solo. El harness requiere una
-instalación compatible de Core, tanto en desarrollo como al instalar las dos
-wheels. Docker es una opción de despliegue exclusiva de Core; el harness no
-forma parte de esa imagen.
+## Package boundary
 
-La raíz contiene la visión del repositorio, este documento, el contrato
-compartido, el mapa de código y configuración de desarrollo (`.codex/` y
-`.agents/`). Ese tooling no es runtime de producto. La arquitectura y las
-decisiones internas de cada paquete se mantienen junto a su propietario:
+`litman-core` lives in `core/` and analyzes procurement material. Its only
+public application entry point is the `litman-core` CLI. It can be installed
+and run independently, with Docker available as an optional Core-only
+deployment boundary.
 
-- [Core: operaciones y documentación](../core/docs/operations.md)
-- [Harness: desarrollo](../harness/docs/development.md)
+`litman-harness` lives in `harness/` and exposes the `litman` and `litman-mcp`
+interfaces. It manages a dossier with personal OAuth and declares Core as a
+distribution dependency, but it does not import `litman_core`. For each
+analysis it creates a minimal configuration, runs `litman-core run --config`,
+and consumes the process result.
+
+The versioned [public CLI contract](contracts.md) owns command behavior, public
+configuration, exit behavior, and JSON schemas at this boundary. Core's
+[internal run contract](../core/docs/contracts.md) owns workspace layout,
+lineage, and internal publication details; those details are not a stable
+interface for Harness or other consumers.
+
+## Documentation and tooling boundary
+
+The repository root owns the product overview, this cross-package architecture,
+the public contract, the [codebase map](codebase-map.md), and development rules.
+Package-specific architecture, operations, and decisions remain with their
+owners:
+
+- [Core documentation](../core/README.md)
+- [Harness documentation](../harness/README.md)
+
+Development configuration under `.codex/`, `.agents/`, `.claude/`, and
+`.factory/` is separate from the product runtime. Product-agent prompts,
+skills, and workspace resources live under `harness/agent/` and are part of
+Harness, not the repository development workflow.

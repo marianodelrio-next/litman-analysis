@@ -1,18 +1,30 @@
 # Working agreements
 
-## Process
+These agreements record durable collaboration choices. The complete and
+current operational instructions are in [AGENTS.md](../AGENTS.md).
 
-- Use the direct change mode for scoped edits; use Software Factory for designs and tasks only when explicitly requested. (2026-10-19, user-provided `AGENTS.md` and approved legacy workflow cleanup)
-- Use `swfactory` for Factory state and explicit named approval for designs. (2026-10-19, approved Factory initialization)
+## Change process
 
-## Code
+- Scoped repository changes use direct-change mode by default. The Software
+  Factory is an opt-in workflow used only when a person explicitly requests
+  it. (2026-10-19)
+- Factory state is changed only through `swfactory`; designs require explicit,
+  named human approval before implementation. (2026-10-19)
 
-- Keep changes small and within the existing architecture; do not add dependencies or alter the product LLM CLI, prompts, schemas, templates, pipelines, or Docker isolation outside the authorized scope. (2026-10-19, user-provided `AGENTS.md`)
+## Ownership and scope
 
-## Tests
+- Changes stay within their authorized package and avoid unrelated
+  dependencies, refactors, or product behavior. (2026-10-19)
+- Core and Harness retain separate ownership, with their public interaction
+  governed by the root CLI contract. (2026-10-19)
 
-- Validate functional changes with relevant tests and real results; both package test suites are the initial Factory test check. (2026-10-19, user-provided `AGENTS.md` and Factory approval)
+## Evidence
+
+- Functional claims require relevant tests and real results. Factory tasks
+  close only after their configured checks and acceptance criteria have been
+  verified. (2026-10-19)
 
 ## Communication
 
-- Write repository artifacts in English; respond to the person in their language. (2026-10-19, approved Factory initialization)
+- Repository artifacts are written in English; agent conversation follows the
+  person's language. (2026-10-19)
