@@ -1,0 +1,60 @@
+schema_version = 1
+
+[orca]
+min_version = "1.4.229"
+
+[checks]
+test = "UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv --directory core run pytest -q && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv --directory harness run pytest -q"
+build = "uv build core --out-dir dist/core && uv build harness --out-dir dist/harness"
+
+[review]
+quality = "auto"
+conformance = "auto"
+max_rounds = 2
+
+[git]
+pr_on_done = "offer"
+
+[language]
+artifacts = "en"
+
+[board]
+port = 8765
+idle_minutes = 30
+
+[templates]
+".agents/skills/factory-board/SKILL.md" = "sha256:e0d9f6f0c3f340810d66bc175bc67cba7ad4a286bd3f16456e3cfdcdb8a8c999"
+".agents/skills/factory-design/SKILL.md" = "sha256:c6fbcce6ebdbb47f823ae369b5eece1329fd16c0c39a3ff0ec56e234e54417ce"
+".agents/skills/factory-design/references/approval.md" = "sha256:b5b39373b4522776920bbea96f17a828b35ff8b3aeb8905d1388e5abe89acdd2"
+".agents/skills/factory-design/references/design-template.md" = "sha256:7e58eb47efeb4e32066bbd86da2d025ba57700dd602a2383e301f2f2f336d2ea"
+".agents/skills/factory-design/references/reviews.md" = "sha256:60d5e043bac897662a9f917f0c8c8feaaba8488d6a91af51a3499609e1124c2e"
+".agents/skills/factory-design/references/roles/design_critic.md" = "sha256:ae904b29b4b492b13a4560efa0ecbd86bf5b136a9d608bbbaf3417d0e1f98eed"
+".agents/skills/factory-design/references/roles/designer.md" = "sha256:c34fe72cd447bf5f038d5e86ba13d675f502faabceaa5ed50204e303136ad685"
+".agents/skills/factory-implement/SKILL.md" = "sha256:9c570ae5bee651b498c603989a99ee1bf52b7fef01515dc791fbda21dcd85324"
+".agents/skills/factory-implement/references/adr-template.md" = "sha256:fe9ccf37114b4f49b8464495dcd09c2a7d4d881e27f6d9c2b9173844bf3e9a47"
+".agents/skills/factory-implement/references/lead.md" = "sha256:7c53b6f65b51a9b149f5d0378ef0ee945b5302e4d35d30571a267e475add0805"
+".agents/skills/factory-implement/references/memory.md" = "sha256:d0c39cbe3cf1fef0782866ce871baa96dfdd2b8918ddce8601a3208f5ec1eae7"
+".agents/skills/factory-implement/references/roles/lead.md" = "sha256:4ffded53db92e35ad36c5d77f22c40d00f7fbf26b822158ba9dca570a776efa4"
+".agents/skills/factory-implement/references/roles/planner.md" = "sha256:d1e9f48504c5d1be215e8df2a8acbb199fd1682aed29b1779d15bb8322e37c9f"
+".agents/skills/factory-implement/references/roles/quality_reviewer.md" = "sha256:304ab0099e6d1425dd4acdf1334af4f089fc932349a8a8ae3ea119ba0bbc3714"
+".agents/skills/factory-init/SKILL.md" = "sha256:18bb9d7fbd84545f0951f18843364eaca1d512e3cd2248e2989f92678ebd2f3d"
+".agents/skills/factory-status/SKILL.md" = "sha256:930cda9e910ac8b0c712353552dae6dfbaaf8934e4a5d3fc2d750af4b716da9b"
+".agents/skills/factory-status/references/recover.md" = "sha256:a25966078a03d51eee5c6939e1a5711848494eefd9c5f1fb219f13c624608614"
+".claude/skills/factory-board/SKILL.md" = "sha256:e0d9f6f0c3f340810d66bc175bc67cba7ad4a286bd3f16456e3cfdcdb8a8c999"
+".claude/skills/factory-design/SKILL.md" = "sha256:c6fbcce6ebdbb47f823ae369b5eece1329fd16c0c39a3ff0ec56e234e54417ce"
+".claude/skills/factory-design/references/approval.md" = "sha256:b5b39373b4522776920bbea96f17a828b35ff8b3aeb8905d1388e5abe89acdd2"
+".claude/skills/factory-design/references/design-template.md" = "sha256:7e58eb47efeb4e32066bbd86da2d025ba57700dd602a2383e301f2f2f336d2ea"
+".claude/skills/factory-design/references/reviews.md" = "sha256:60d5e043bac897662a9f917f0c8c8feaaba8488d6a91af51a3499609e1124c2e"
+".claude/skills/factory-design/references/roles/design_critic.md" = "sha256:ae904b29b4b492b13a4560efa0ecbd86bf5b136a9d608bbbaf3417d0e1f98eed"
+".claude/skills/factory-design/references/roles/designer.md" = "sha256:c34fe72cd447bf5f038d5e86ba13d675f502faabceaa5ed50204e303136ad685"
+".claude/skills/factory-implement/SKILL.md" = "sha256:9c570ae5bee651b498c603989a99ee1bf52b7fef01515dc791fbda21dcd85324"
+".claude/skills/factory-implement/references/adr-template.md" = "sha256:fe9ccf37114b4f49b8464495dcd09c2a7d4d881e27f6d9c2b9173844bf3e9a47"
+".claude/skills/factory-implement/references/lead.md" = "sha256:7c53b6f65b51a9b149f5d0378ef0ee945b5302e4d35d30571a267e475add0805"
+".claude/skills/factory-implement/references/memory.md" = "sha256:d0c39cbe3cf1fef0782866ce871baa96dfdd2b8918ddce8601a3208f5ec1eae7"
+".claude/skills/factory-implement/references/roles/lead.md" = "sha256:4ffded53db92e35ad36c5d77f22c40d00f7fbf26b822158ba9dca570a776efa4"
+".claude/skills/factory-implement/references/roles/planner.md" = "sha256:d1e9f48504c5d1be215e8df2a8acbb199fd1682aed29b1779d15bb8322e37c9f"
+".claude/skills/factory-implement/references/roles/quality_reviewer.md" = "sha256:304ab0099e6d1425dd4acdf1334af4f089fc932349a8a8ae3ea119ba0bbc3714"
+".claude/skills/factory-init/SKILL.md" = "sha256:18bb9d7fbd84545f0951f18843364eaca1d512e3cd2248e2989f92678ebd2f3d"
+".claude/skills/factory-status/SKILL.md" = "sha256:930cda9e910ac8b0c712353552dae6dfbaaf8934e4a5d3fc2d750af4b716da9b"
+".claude/skills/factory-status/references/recover.md" = "sha256:a25966078a03d51eee5c6939e1a5711848494eefd9c5f1fb219f13c624608614"
+".codex/rules/factory.rules" = "sha256:05884929dd969b91e14df583564e14d47861adb0e167fe1686deaa2e18ffdc10"

@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "ask": [
+      "Bash(swfactory design approve:*)",
+      "Bash(swfactory design reject:*)"
+    ]
+  }
+}

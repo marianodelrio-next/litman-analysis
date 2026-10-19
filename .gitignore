@@ -21,6 +21,12 @@ build/
 dist/
 .agent-work/
 .claude/
+!.claude/
+.claude/*
+!.claude/settings.json
+!.claude/skills/
+.claude/skills/*
+!.claude/skills/factory-*/
 auth.json
 
 # Datos y documentos reales de licitaciones (pueden contener información sensible)
@@ -34,3 +40,4 @@ licitaciones/
 Thumbs.db
 *.swp
 *.swo
+.factory/state/
