@@ -58,8 +58,27 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 uv tool install --force --python 3.11 "$Src\harness" --with "$Src\core"
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-$LitmanBin = Join-Path (uv tool dir --bin) "litman.exe"
-& $LitmanBin install --app $env:LITMAN_APP --source $Src
+# uv escribe UTF-8; sin esto PowerShell lo decodifica con la pagina de codigos
+# de la consola y rompe rutas con acentos (por ejemplo, el perfil de usuario).
+# Sin consola no se puede cambiar: se sigue con la codificacion actual.
+$PreviousEncoding = [Console]::OutputEncoding
+$EncodingChanged = $false
+try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8; $EncodingChanged = $true } catch { }
+try {
+    $ToolDir = uv tool dir
+} finally {
+    if ($EncodingChanged) { [Console]::OutputEncoding = $PreviousEncoding }
+}
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+# La CLI se ejecuta con el python.exe del entorno de la herramienta, no con el
+# lanzador litman de uv: Smart App Control puede bloquear esos lanzadores.
+$Python = Join-Path $ToolDir 'litman-harness\Scripts\python.exe'
+if (-not (Test-Path $Python)) {
+    Write-Error "No se encuentra el interprete de LitMan en: $Python"
+    exit 1
+}
+& $Python -m litman_harness.interfaces.cli install --app $env:LITMAN_APP --source $Src
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 Write-Host ""

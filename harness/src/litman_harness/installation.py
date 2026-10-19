@@ -132,6 +132,18 @@ def _subagent_dest(paths: dict[str, Path], app: str) -> Path:
     return paths["agents"] / f"{SUBAGENT_NAME}.{ext}"
 
 
+def litman_command() -> str:
+    """Return the ``litman`` command the product agent is told to run.
+
+    On Windows it runs the CLI module through the tool environment's
+    ``python.exe`` (with the PowerShell call operator): Smart App Control may
+    block the uv-generated ``litman.exe`` launcher.
+    """
+    if platform.system() == "Windows":
+        return f'& "{script_path("python")}" -m litman_harness.interfaces.cli'
+    return str(script_path("litman"))
+
+
 def install(*, app: str, source: Path, home: Path, env: Mapping[str, str],
             run: Runner = subprocess.run) -> dict[str, Any]:
     """Create or update the workspace, skills, subagent and MCP registration for ``app``."""
@@ -166,7 +178,7 @@ def install(*, app: str, source: Path, home: Path, env: Mapping[str, str],
         raise HarnessError("install_conflict", "Ya existe un subagente con ese nombre",
                             details={"path": subagent_dest.name})
 
-    litman_bin = str(script_path("litman"))
+    litman_bin = litman_command()
     litman_mcp = str(script_path("litman-mcp"))
 
     codex_new_config_text: str | None = None

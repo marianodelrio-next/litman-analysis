@@ -7,6 +7,7 @@ import json
 import os
 from pathlib import Path
 import platform
+import re
 import shutil
 import subprocess
 
@@ -247,7 +248,48 @@ def test_uninstall_sh_stops_before_uv_tool_uninstall_when_litman_uninstall_fails
 
 def test_uninstall_ps1_checks_lastexitcode_after_litman_uninstall():
     text = UNINSTALL_PS1.read_text(encoding="utf-8")
-    call_idx = text.index("& $LitmanBin uninstall")
+    call_idx = text.index("& $Python -m litman_harness.interfaces.cli uninstall")
     check_idx = text.index("$LASTEXITCODE -ne 0", call_idx)
     tool_uninstall_idx = text.index("uv tool uninstall", call_idx)
     assert call_idx < check_idx < tool_uninstall_idx
+
+
+def test_ps1_scripts_run_the_cli_through_the_tool_python_not_the_litman_launcher():
+    install_text = INSTALL_PS1.read_text(encoding="utf-8")
+    uninstall_text = UNINSTALL_PS1.read_text(encoding="utf-8")
+    for text in (install_text, uninstall_text):
+        assert "litman.exe" not in text
+        assert "uv tool dir --bin" not in text
+        assert "$ToolDir = uv tool dir" in text
+        assert "$Python = Join-Path $ToolDir 'litman-harness\\Scripts\\python.exe'" in text
+    assert "& $Python -m litman_harness.interfaces.cli install --app $env:LITMAN_APP --source $Src" in install_text
+    assert "& $Python -m litman_harness.interfaces.cli uninstall @UninstallArgs" in uninstall_text
+
+
+def test_ps1_scripts_capture_the_uv_tool_dir_as_utf8_and_restore_the_encoding():
+    for script in (INSTALL_PS1, UNINSTALL_PS1):
+        text = script.read_text(encoding="utf-8")
+        save_idx = text.index("$PreviousEncoding = [Console]::OutputEncoding")
+        set_idx = text.index("[Console]::OutputEncoding = [System.Text.Encoding]::UTF8")
+        capture = re.search(r"try \{\s*\$ToolDir = uv tool dir\s*\} finally \{([^}]*)\}", text)
+        assert capture, script.name
+        assert save_idx < set_idx < capture.start()
+        assert "[Console]::OutputEncoding = $PreviousEncoding" in capture.group(1)
+
+
+def test_install_ps1_checks_the_tool_python_exists_before_running_it():
+    text = INSTALL_PS1.read_text(encoding="utf-8")
+    check_idx = text.index("if (-not (Test-Path $Python)) {")
+    call_idx = text.index("& $Python")
+    assert check_idx < call_idx
+    failure_branch = text[check_idx:text.index("}", check_idx)]
+    assert re.search(r'Write-Error "No se encuentra[^"]*\$Python', failure_branch)
+    assert "exit 1" in failure_branch
+
+
+def test_uninstall_ps1_skips_the_cli_uninstall_when_the_tool_python_is_absent():
+    text = UNINSTALL_PS1.read_text(encoding="utf-8")
+    guard_idx = text.index("if (Test-Path $Python) {")
+    call_idx = text.index("& $Python -m litman_harness.interfaces.cli uninstall")
+    tool_uninstall_idx = text.index("uv tool uninstall litman-harness")
+    assert guard_idx < call_idx < tool_uninstall_idx
