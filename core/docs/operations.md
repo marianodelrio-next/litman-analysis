@@ -1,61 +1,74 @@
-# Guía de LitMan Core
+# LitMan Core operations
 
-## Arquitectura de ejecución
+This page owns Core's execution architecture and operational internals. For
+configuration and commands, use the [deployment guide](../deployment/README.md).
+For the stable process interface, use the repository
+[public CLI contract](../../docs/contracts.md).
 
-La interfaz pública es `litman-core run`, que carga `config.toml` y ejecuta directamente `JobRunner`. Cada ejecución crea un `publication_id` y un `run` persistente bajo `output.directory`. Docker es opcional y se invoca desde `deployment/docker/compose.yaml`; la configuración y sus rutas se resuelven dentro del contenedor.
+## Execution architecture
 
-En local y dentro del contenedor, `litman-core` ejecuta el mismo `JobRunner`:
+Local and container installations execute the same flow:
 
 ```text
-litman-core run → origen → inventario/normalización → LLM (Codex o Claude Code)
-               → validación → publicador → limpieza temporal
+litman-core run -> source -> inventory and normalization -> LLM provider
+                -> validation -> publisher -> temporary cleanup
 ```
 
-El runner no conoce Docker. Selecciona `LocalDocumentSource` o `GoogleDriveDocumentSource`, construye un único `DocumentBundle`, ejecuta `AssessmentPipeline` o `DetailedAnalysisPipeline`, valida el run completo y solo entonces usa `LocalArtifactPublisher` o `GoogleDriveArtifactPublisher`. Los IDs y MIME types de Drive se incorporan al bundle en memoria; los hashes se calculan sobre los bytes descargados y llegan a manifests, evidencias y lineage.
+The CLI loads `config.toml` and invokes `JobRunner`; the runner has no Docker
+branches. It selects `LocalDocumentSource` or `GoogleDriveDocumentSource`,
+builds one `DocumentBundle`, executes `AssessmentPipeline` or
+`DetailedAnalysisPipeline`, validates the run, and then selects
+`LocalArtifactPublisher` or `GoogleDriveArtifactPublisher`.
 
-| Entrada | Salida | Estado |
-|---|---|---|
-| Local | Local | Soportada |
-| Local | Google Drive | Soportada |
-| Google Drive | Local | Soportada |
-| Google Drive | Google Drive | Soportada |
+Drive IDs and MIME types enter the in-memory bundle. Digests are calculated
+from downloaded bytes and carried into manifests, evidence, and lineage. All
+four local/Drive source and destination combinations are supported.
 
-## Persistencia y seguridad en Docker
+Codex is the default LLM provider. Claude Code is also supported for local
+Ubuntu and Windows execution. Provider selection and the optional model come
+from `[llm]` in `config.toml`; there is no provider-selection environment
+variable.
 
-- `/app/config.toml` y `/app/input` son mounts de solo lectura.
-- `/app/runs` y `/var/lib/litman-core/codex` son persistentes y escribibles.
-- `/run/secrets` es de solo lectura; contiene opcionalmente Google y la API key.
-- La raíz es de solo lectura y `/tmp` es `tmpfs`.
-- El workspace privado se elimina en `finally`; el run y sus diagnósticos no.
-- El proceso usa el UID/GID del host y no root.
+## Persistence and publication
 
-En Docker, Codex comparte el contenedor con las credenciales Google. Su entorno conserva solo las variables operativas necesarias y la autenticación elegida; los prompts no mencionan contenido de secretos. En POSIX, `auth.json` debe tener modo `0600`; en Windows Core sólo comprueba que el archivo sea legible y que `CODEX_HOME` sea escribible, porque los bits POSIX no representan la ACL. La prevalidación no cubre una sesión guardada exclusivamente en el almacén de credenciales del sistema. Nunca guardes claves en jobs, imágenes, manifests o resultados.
+One `publication_id` is assigned per execution using
+`<job_id>-<UTC timestamp with microseconds>Z`. Core creates the persistent run
+directly under `output.directory/<publication_id>/`. If Drive replication is
+configured, the same identity names the remote folder.
 
-No se instala Bubblewrap ni existe un sandbox anidado. Codex se ejecuta con
-`--dangerously-bypass-approvals-and-sandbox` y puede acceder al filesystem, la
-red y los secretos disponibles en el contenedor. Esta es una decisión aceptada
-para la herramienta interna: el contenedor no root, sin capabilities, con raíz
-de solo lectura, mounts mínimos y `no-new-privileges` es la frontera de
-aislamiento. No montes información ajena al job.
+The publisher validates an immutable inventory of relative paths and hashes
+before reducing or replicating the run. On any error, the complete local run
+is preserved. A Drive `storageQuotaExceeded` response is translated into an
+explicit recommendation to use a Shared Drive.
 
-La configuración Docker conserva usuario no root, filesystem de solo lectura,
-capabilities eliminadas y `no-new-privileges`; las credenciales se proporcionan
-explícitamente sin leer secretos durante las comprobaciones.
+Detailed-analysis output is always Spanish. Evidence quotations, identifiers,
+file names, stable references, proper names, and schema-designated literal
+formulas preserve the source text. Evidence verification requires the source
+document and page and allows only artificial whitespace introduced by PDF
+layout. An unverifiable quotation produces a partial report with warnings;
+structural and semantic failures remain blocking.
 
-## Extensión y operación
+## Container security boundary
 
-Los recursos versionados están en `resources/`; para añadir un origen o publicador implementa los puertos existentes y compón el adaptador en `JobRunner`, sin crear otro orquestador. Toda respuesta de Codex debe pasar la validación estructural y semántica antes de publicarse.
+The Docker deployment uses a non-root user, read-only root filesystem,
+temporary `/tmp`, dropped capabilities, minimal mounts, and
+`no-new-privileges`. The private LLM workspace is removed in `finally`; the
+persistent run and its diagnostics are not.
 
-`output.directory` es la raíz local obligatoria de los runs y publicaciones. Antes de ejecutar se asigna una sola vez el `publication_id` con el formato `<job_id>-<timestamp UTC con microsegundos>Z`; el run persistente se crea directamente en `output.directory/<publication_id>/`. Si se configura una réplica Drive, esa misma identidad nombra la carpeta remota y el inventario inmutable de rutas relativas y hashes se replica desde la carpeta local mediante una carpeta temporal y promoción atómica. Con `publication.include_run_files = false`, la carpeta local completa solo se reduce al catálogo final después de validar el inventario y, si corresponde, completar correctamente la réplica Drive; ante cualquier error se conserva el run completo local. Con `true`, se conserva el árbol completo tanto en local como en Drive. `storageQuotaExceeded` se traduce a una recomendación explícita de Shared Drive.
+Codex runs with `--dangerously-bypass-approvals-and-sandbox` inside the
+container and can access its filesystem, network, and mounted secrets. There
+is no nested Bubblewrap sandbox. The container is therefore the accepted
+isolation boundary: do not mount material unrelated to the job.
 
-El catálogo cerrado de `detailed-analysis` contiene `resumen_tecnico.docx` (ficha técnica breve y de lectura rápida para técnico, arquitecto o revisor), `guia_preparacion_oferta.docx` (guía operativa para bid manager o redactor), un único DOCX técnico declarado por `generation_manifest.json` y `simulador_economico.xlsx`. El nombre del DOCX técnico lo determina el manifiesto; debe existir exactamente uno. Los dos primeros se generan de forma determinista desde `dossier.json`; el ID canónico de la guía es `bid-preparation-guide`.
+On POSIX, Codex `auth.json` must have mode `0600`. On Windows, Core verifies
+that the file is readable and `CODEX_HOME` is writable because POSIX mode bits
+do not represent Windows ACLs. Preflight cannot detect a session stored only
+in an operating-system credential store.
 
-La salida del análisis y de todos los entregables es siempre española. Las
-citas de evidencia, identificadores, nombres de archivo, referencias estables o
-de página, nombres propios y fórmulas literales designadas por el schema se
-mantienen textualmente como material fuente; la generación no admite otro
-idioma de salida.
+## Extending Core
 
-La verificación de evidencias conserva documento y página estrictos. Tolera solamente espacios artificiales introducidos por el layout PDF y registra `verification_method` (`exact` o `layout_whitespace`). Una cita no comprobable produce un informe parcial con advertencias; los fallos estructurales o semánticos continúan siendo bloqueantes.
-
-Consulta el README para autenticación y comandos. Las salidas quedan en el destino indicado y los runs/diagnósticos bajo `output.directory`. Antes de cerrar cambios ejecuta pytest, `docker compose -f deployment/docker/compose.yaml config --quiet` y `docker compose -f deployment/docker/compose.yaml build`. Las llamadas reales a Drive requieren autorización explícita; los tests usan fakes.
+Versioned pipeline and generation resources live under
+`src/litman_core/resources/`. Add a source or publisher by implementing the
+existing ports and composing the adapter in `JobRunner`; do not introduce a
+second orchestrator. Any public CLI change must update the
+[public contract](../../docs/contracts.md) and its schemas and examples.
