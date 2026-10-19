@@ -1,0 +1,158 @@
+# Harness architecture
+
+This page owns the design of `litman-harness`. For commands, environment
+variables, failure recovery, and real-account validation, see
+[operations](operations.md). Durable rationale is recorded in
+[decisions](decisions.md).
+
+## Package boundary
+
+Harness connects one procurement dossier by its Google Drive folder ID, using
+each employee's personal OAuth account. It never uses Core's service account or
+Drive publisher, and it never accepts tokens or secrets through arguments,
+stdio, a manifest, or context.
+
+Harness invokes Core only through the versioned
+[public CLI contract](../../docs/contracts.md). It does not import Core or read
+Core-internal files. Core's [internal run documentation](../../core/docs/contracts.md)
+describes execution inside Core and has no stability guarantee for Harness.
+
+## Source layout
+
+```text
+harness/src/litman_harness/
+  errors.py          safe Harness errors and unexpected-error messages
+  local_paths.py     private state/configuration paths and checkout rejection
+  plans/             Plan, PlanAction, OperationRecord, and private PlanStore
+  dossier/           resources, membership, manifest v1, contexto.md,
+                     shared-state capability, inspection, incorporation,
+                     publication, and summary services
+  analysis/          originals, download, Core result validation, and catalog
+  adapters/          personal OAuth Drive, Drive v2 shared state, document
+                     extraction, development metadata, OAuth, and Core process
+  interfaces/        assembly, operation registry, CLI, and MCP
+  installation.py    idempotent guided install and uninstall
+harness/agent/       installed product skills, workspace instructions, and
+                     Claude/Codex reader-agent definitions
+harness/deployment/  guided install and uninstall scripts
+harness/tests/       dossier, analysis, adapters, interfaces, plans, deployment
+```
+
+`dossier/membership.py` is the single membership check. It follows parent IDs
+to the connected folder within the same Drive, without global searches.
+
+## Shared dossier
+
+`_LitMan/manifest.json` uses the `litman-dossier-v1` format. It stores resource
+IDs, the dossier phase, functional folders, context identity and checksum,
+originals and their provenance, published analyses and artifacts, the accepted
+procurement summary, the live offer, and history. References use Drive IDs, so
+renaming a resource does not break them. An unknown manifest version is exposed
+read-only.
+
+The phases are `sin_analisis`, `analisis_inicial`, `analisis_detallado`,
+`oferta_en_preparacion`, and `entregada`. An accepted incorporation may set the
+phase. Publishing `assessment` or `detailed-analysis` advances it only when it
+is behind and never moves it backwards.
+
+`contexto.md` is generated deterministically from the manifest. It contains the
+dossier name and phase, accepted summary, linked folders and documents, live
+offer, and published results. Every artifact is linked by Drive ID and described
+by a fixed sentence for its role. Core output content never controls this file.
+
+Each update reads the context and checks its SHA-256, writes the manifest, then
+writes the context with optimistic concurrency. An external context edit does
+not fail the completed business operation: Harness leaves the file untouched,
+retains the previous context checksum in the manifest, and returns a
+`context_conflict` with the proposed content. A later incorporation preview
+with `overwrite_context: true` can replace it only if the content still matches
+what the preview observed.
+
+## Plans and publication
+
+Every `preview_*` call stores an account-bound local plan. The matching
+`apply_*` call accepts only that `plan_id` and rejects plans for a different
+account or plans made stale by relevant Drive changes. Created resources carry
+`litman_operation_id` and `litman_action_id` in `appProperties`, allowing an
+interrupted operation to adopt exactly one prior result instead of duplicating
+it. Multiple matching resources are a conflict.
+
+Analysis downloads only planned originals into a private workspace whose input
+directory is the analysis operation UUID. Harness generates Core's minimal
+configuration and invokes `litman-core run --config`; it does not depend on a
+user-maintained Core configuration. Harness validates the public result by
+artifact role, path containment, presence, and SHA-256, then records a closed
+local catalog. Core-internal files such as `validation.json` and
+`generation_manifest.json` are never consumed.
+
+An analysis plan includes publication. Publication creates a dated
+`YYYY-MM-DD <publication_id>` directory in the registered analysis folder,
+uploads each validated artifact, and, for a detailed analysis without a live
+offer, converts the technical DOCX to a Google Doc in `Oferta`. It never
+replaces an existing live offer. Manifest changes are merged additively; a
+concurrent manifest write makes the operation recoverable and retrying resumes
+without rerunning Core or re-uploading completed artifacts. A fully published
+analysis removes its local workspace.
+
+On Windows, each downloaded original receives a safe, traceable `local_name`.
+Drive ID and MD5 remain its identity, while useful terms such as `PCAP`,
+`anuncio`, or `adjudicación` are retained for Core. Harness locates
+`litman-core.exe` in the active environment's scripts directory via
+`sysconfig.get_path("scripts")`, which also works with uv-managed tool
+environments.
+
+## Procurement summary
+
+Harness contains no LLM. The chat assistant, or the installed low-cost reader
+agent, proposes a summary and the person decides whether to accept it.
+`read_document` can read only a registered original or a published artifact in
+the same dossier. It returns PDF or DOCX text in pages of at most 20,000
+characters and marks the result as content, not instructions.
+
+The accepted `manifest.summary` has ordered, closed keys:
+`objeto`, `organismo`, `expediente`, `procedimiento`, `presupuesto`,
+`valor_estimado`, `plazo_ejecucion`, `fecha_limite`, `lotes`,
+`solvencia_economica`, `solvencia_tecnica`, `equipo`,
+`criterios_adjudicacion`, `recomendacion`, and `alertas`. The required keys are
+`objeto`, `organismo`, `presupuesto`, and `fecha_limite`. Each item is one line
+of 1–300 characters and cites a registered source file unless its value is
+`No consta`. Harness validates shape and provenance, not factual truth.
+
+`preview_summary` orders and validates the proposal; `apply_summary` stores it
+in the manifest and regenerates `contexto.md`. The context renders the summary
+immediately after phase and dossier, one linked source per line. Status and
+successful publication recommend `propose_summary` or `refresh_summary` when
+the accepted summary does not cover the current analyses.
+
+## Guided product flow
+
+The assistant follows one business flow: organize the dossier and originals,
+run and publish the initial analysis, propose a summary, ask whether a detailed
+analysis is wanted, publish it with the live offer, refresh the summary, then
+return control to the person.
+
+`inspect` and `status` traverse the complete tree breadth-first without global
+searches, excluding `_LitMan`, up to 2,000 resources. They identify candidate
+originals and offers, matching functional folders, and previous Core-publisher
+outputs. Suggested folders remain suggestions until the person confirms them.
+
+`dossier/recommendation.py` selects the first applicable recommendation from:
+`review_manifest`, `incorporate`, `publish_analysis`, `run_assessment`,
+`propose_summary` or `refresh_summary`, `decide_detailed_analysis`, then no
+recommendation. Each recommendation identifies its reason, tool, and arguments.
+
+The installed product resources support this flow:
+
+- `conectar-licitacion` guides connection and asks once whether to prepare a
+  summary after publication.
+- `resumir-licitacion` defines what to read, the fixed keys, sources, and
+  proposal format.
+- `preparar-equipo` guides diagnostics, OAuth, provider session, setup,
+  repair, update, and uninstall without independently running Git, uv, a
+  provider CLI, or a browser.
+- `lector-licitacion` is read-only. Claude uses Haiku with only the `status`
+  and `read_document` MCP tools; Codex uses `gpt-5.6-luna`, low reasoning, and
+  a read-only sandbox with the same two operations.
+
+Installation and exact destination paths belong to the
+[installation guide](../deployment/README.md).

@@ -1,24 +1,25 @@
 # LitMan Harness
 
-El harness administra un expediente con OAuth personal y expone `litman` y
-`litman-mcp`. Ejecuta Core únicamente mediante `litman-core`, instalado como
-dependencia de distribución en el mismo entorno.
+`litman-harness` manages a procurement dossier in Google Drive through each
+employee's personal OAuth account. It exposes the same operations through the
+`litman` command-line interface and the `litman-mcp` stdio server, and runs
+LitMan Core only as the separate `litman-core` process installed in the same
+Python environment.
 
-En Windows se usa el ejecutable instalado `litman-core.exe`, localizado en la
-carpeta de scripts del entorno activo (`sysconfig.get_path("scripts")`); no se
-busca Core en `PATH` ni junto al intérprete resuelto (eso falla con
-`uv tool install`, que usa un Python gestionado fuera del propio entorno de la
-herramienta). El estado privado por defecto se guarda bajo
-`%LOCALAPPDATA%/litman-harness` (los overrides `LITMAN_HARNESS_*` y `XDG_*`
-explícitos conservan precedencia).
+Choose the route that matches your goal:
 
-```sh
-cd harness
-uv sync
-UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest -q
-```
+- [Install or maintain LitMan](deployment/README.md), either with the guided
+  installer or from wheels in an IT-managed environment.
+- [Contribute to the Harness](docs/development.md), starting with the local
+  development setup and the Harness documentation map.
+- Review the Harness [architecture](docs/architecture.md),
+  [operations and recovery model](docs/operations.md), or
+  [durable decisions](docs/decisions.md).
+- Review the repository-owned [public Core process contract](../docs/contracts.md)
+  when changing the Core/Harness boundary. Core's
+  [internal run documentation](../core/docs/contracts.md) is not a Harness
+  integration contract.
 
-Consulta [docs/development.md](docs/development.md) para desarrollo y
-[deployment/README.md](deployment/README.md) para instalar LitMan (guiado,
-para una persona de negocio, o manual con wheels para un entorno controlado
-por IT).
+Repository-wide architecture, ownership, and contributor rules remain in the
+[root documentation](../docs/README.md), [codebase map](../docs/codebase-map.md),
+and [AGENTS.md](../AGENTS.md).
