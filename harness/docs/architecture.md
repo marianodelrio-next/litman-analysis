@@ -50,6 +50,22 @@ procurement summary, the live offer, and history. References use Drive IDs, so
 renaming a resource does not break them. An unknown manifest version is exposed
 read-only.
 
+Incorporation places each selected original, and each registered original
+outside the `originals` folder (`Originales`), into that folder with a
+`place_original` action. The preview chooses the strategy from the file's Drive
+capabilities: `move` when `canMoveItemWithinDrive` is true (same ID), otherwise
+`copy` when `canCopy` is true, otherwise `in_place`; a missing capability
+counts as false. A copy carries the action markers, must keep the source MD5,
+and is registered with `provenance: "copied"` and `copied_from: <source id>`;
+the source stays where it was, remains citable, and is no longer a candidate in
+`status`. A move rejected with `insufficient_permission` falls back to copy,
+then to `in_place`. An `in_place` original is recorded with
+`placement: "in_place"` and never planned again. A registered original whose
+MD5 no longer matches the manifest is not placed (strategy `skipped`). Every
+copy, `in_place`, or `skipped` outcome adds a Spanish message to the preview
+action and to the result's `placement_warnings`. Harness never deletes or
+trashes an original.
+
 The phases are `sin_analisis`, `analisis_inicial`, `analisis_detallado`,
 `oferta_en_preparacion`, and `entregada`. An accepted incorporation may set the
 phase. Publishing `assessment` or `detailed-analysis` advances it only when it
@@ -137,7 +153,9 @@ originals and offers, matching functional folders, and previous Core-publisher
 outputs. Suggested folders remain suggestions until the person confirms them.
 
 `dossier/recommendation.py` selects the first applicable recommendation from:
-`review_manifest`, `incorporate`, `publish_analysis`, `run_assessment`,
+`review_manifest`, `incorporate`, `publish_analysis`, `organize_originals`
+(registered originals outside `Originales` that can still be placed),
+`run_assessment`,
 `propose_summary` or `refresh_summary`, `decide_detailed_analysis`, then no
 recommendation. Each recommendation identifies its reason, tool, and arguments.
 

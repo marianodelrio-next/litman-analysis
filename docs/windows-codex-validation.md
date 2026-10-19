@@ -197,6 +197,17 @@ they inherit from the expected user profile and are not broadly readable.
 
 ## 6. Analysis from the app
 
+- **Originals placement.** Connect a test dossier whose tender PDFs sit in
+  its root and accept the incorporation. **Observe and record** the
+  `canMoveItemWithinDrive` and `canCopy` capabilities that `get` reports for
+  those PDFs with the person's real role, and the `place_original` strategy
+  the preview shows (`move`, `copy`, or `in_place`). Expected after applying:
+  with `move`, each PDF is in `Originales` with the same ID; with `copy`, a
+  copy with the same name is in `Originales`, its `md5Checksum` equals the
+  source's, the manifest registers it with `copied_from`, the source stays in
+  the root, and `placement_warnings` explains it; with `in_place`, the PDF stays
+  where it is with `placement: "in_place"` and a warning. Nothing is deleted
+  or trashed in any case.
 - **Reader subagent.** The `lector-licitacion` subagent is configured with
   `model = "gpt-5.6-luna"`, `model_reasoning_effort = "low"`, and
   `sandbox_mode = "read-only"`, using only the `status` and `read_document`
