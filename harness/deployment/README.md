@@ -1,20 +1,30 @@
-# Instalación de LitMan
+# Install LitMan
 
-## Para una persona de negocio (recomendado)
+This page is the canonical installation, maintenance, and uninstallation guide
+for LitMan Harness. For contributor setup, use the
+[Harness development guide](../docs/development.md).
 
-Pensado para alguien sin IT que ya tiene instalada Codex App o Claude
-Desktop, y Git. Pegue una sola frase en una terminal; el script es
-idempotente y sirve también para actualizar.
+## Guided installation for a business user
 
-| Elemento | Windows | Ubuntu |
+This route is for someone who already has Git and either Codex App or Claude
+Desktop. Paste one command into a terminal. The installer is idempotent, so the
+same command also updates an existing installation.
+
+| Component | Windows | Ubuntu |
 | --- | --- | --- |
-| Carpeta LitMan que se abre en la app (`AGENTS.md`; en Claude también `CLAUDE.md` con `@AGENTS.md`, porque Claude Desktop no lee `AGENTS.md`) | `%USERPROFILE%\LitMan` | `~/LitMan` |
-| Código del repo, oculto, nunca se abre | `%LOCALAPPDATA%\LitMan\src` | `~/.local/share/litman/src` |
-| `litman`, `litman-mcp`, `litman-core` | herramienta de uv (Python 3.11 gestionado por uv) | igual |
-| Skills (`conectar-licitacion`, `resumir-licitacion`, `preparar-equipo`) | Codex: `~/.agents/skills` · Claude: `~/.claude/skills` | igual |
-| Subagente `lector-licitacion` | `~/.codex/agents/*.toml` · `~/.claude/agents/*.md` | igual |
-| MCP `litman` (ruta absoluta, timeout 2 h) | bloque delimitado en `~/.codex/config.toml` · `~/.claude.json` (`--scope user`) | igual |
-| Cliente OAuth, token, ajustes, estado, manifiesto de instalación | `%LOCALAPPDATA%\litman-harness` | `~/.config` y `~/.local/state/litman-harness` |
+| LitMan folder opened in the app | `%USERPROFILE%\LitMan` | `~/LitMan` |
+| Hidden repository checkout, never opened in the app | `%LOCALAPPDATA%\LitMan\src` | `~/.local/share/litman/src` |
+| `litman`, `litman-mcp`, and `litman-core` | uv tool with uv-managed Python 3.11 | same |
+| Product skills | Codex: `~/.agents/skills`; Claude: `~/.claude/skills` | same |
+| `lector-licitacion` reader agent | `~/.codex/agents/*.toml`; `~/.claude/agents/*.md` | same |
+| `litman` MCP registration | delimited block in `~/.codex/config.toml`; `~/.claude.json` with user scope | same |
+| OAuth client/token, settings, state, install manifest | `%LOCALAPPDATA%\litman-harness` | `~/.config` and `~/.local/state/litman-harness` |
+
+The LitMan folder contains `AGENTS.md`; for Claude it also contains a
+`CLAUDE.md` bridge with `@AGENTS.md`, because Claude Desktop does not read
+`AGENTS.md` directly. MCP is configured with a two-hour tool timeout.
+
+For Codex:
 
 ```sh
 LITMAN_APP=codex bash -c "$(curl -fsSL https://raw.githubusercontent.com/marianodelrio-next/litman-analysis/master/harness/deployment/install.sh)"
@@ -24,94 +34,95 @@ LITMAN_APP=codex bash -c "$(curl -fsSL https://raw.githubusercontent.com/mariano
 $env:LITMAN_APP='codex'; irm https://raw.githubusercontent.com/marianodelrio-next/litman-analysis/master/harness/deployment/install.ps1 | iex
 ```
 
-(`LITMAN_APP` vale `codex` o `claude`, según la app que use.)
+Set `LITMAN_APP` to `claude` instead when installing for Claude.
 
-El script sólo hace lo estrictamente necesario para LitMan: clona o
-actualiza el repositorio, instala las herramientas con
-`uv tool install --python 3.11 harness --with core`, y ejecuta
-`litman install --app <app> --source <repo>`, que crea la carpeta LitMan,
-copia skills y subagente, registra el servidor MCP (con
-`tool_timeout_sec = 7200` en Codex, `MCP_TOOL_TIMEOUT` en Claude Code) y
-guarda un manifiesto de lo instalado. **Nunca instala Git, uv, la CLI del
-proveedor ni un navegador por su cuenta**: si falta algo, se detiene con el
-enlace oficial o el comando de un solo paso, y la persona lo ejecuta ella
-misma antes de volver a pegar la frase.
+The script clones or updates the repository, installs the tools with
+`uv tool install --python 3.11 harness --with core`, then runs
+`litman install --app <app> --source <repo>`. That command creates the LitMan
+folder, copies the product skills and reader agent, registers the MCP server,
+sets `tool_timeout_sec = 7200` for Codex or `MCP_TOOL_TIMEOUT` for Claude Code,
+and records an installation manifest.
 
-Al terminar: cierre y reabra la app, abra la carpeta `LitMan` y escriba
-**"prepara mi equipo"**; la skill homónima guía el resto (cliente OAuth de
-Drive vía `litman install --oauth-client`, `litman login`, sesión del
-proveedor LLM, `setup`).
+The installer never installs Git, uv, the provider CLI, or a browser by itself.
+If one is missing, it stops with an official link or one-step command for the
+person to run before repeating the installation command.
 
-### Mantenimiento
+When installation finishes, restart the app, open the `LitMan` folder, and
+write **“prepara mi equipo”**. The installed product skill guides OAuth client
+setup with `litman install --oauth-client`, `litman login`, provider sign-in,
+`setup`, and final diagnostics.
 
-- **Actualizar**: vuelva a pegar la misma frase de instalación y reinicie la
-  app.
-- **Reparar**: dentro de la app, escriba "prepara mi equipo" de nuevo
-  (ejecuta `diagnose` y resuelve sólo lo que falte).
-- **Desinstalar**: ejecute el script correspondiente.
+### Update, repair, or uninstall
+
+- Update by running the same guided installation command, then restart the app.
+- Repair by writing **“prepara mi equipo”** in the app. The skill runs
+  diagnostics and addresses only missing setup.
+- Uninstall with the script for the current platform:
+
   ```sh
   bash harness/deployment/uninstall.sh
   ```
+
   ```powershell
   harness/deployment/uninstall.ps1
   ```
-  Por defecto borra únicamente lo que registró `litman install` (skills,
-  subagente, bloque/registro MCP); conserva el token, el cliente OAuth y la
-  carpeta `LitMan`. Para ampliarlo:
-  - `LITMAN_REMOVE_WORKSPACE=1`: también borra la carpeta `LitMan` (sólo si
-    la creó la instalación).
-  - `LITMAN_PURGE_DATA=1`: también borra el token, el cliente OAuth, los
-    ajustes locales, los planes y el directorio de trabajo.
-  Nunca desinstala Git, uv, la CLI del proveedor ni un navegador. Si algún
-  archivo o carpeta está en uso, el script se detiene con un error
-  (`uninstall_incomplete`) sin desinstalar `litman-harness` ni borrar el
-  clon local; cierre el programa que lo bloquea y vuelva a ejecutar el
-  script.
 
-### `litman install` / `litman uninstall` (lo que ejecutan los scripts)
+By default uninstallation removes only resources recorded by `litman install`:
+product skills, the reader agent, and the MCP block or registration. It keeps
+the OAuth client and token, the LitMan folder, and private data.
+
+Set `LITMAN_REMOVE_WORKSPACE=1` to also remove the LitMan folder, but only when
+the installer created it. Set `LITMAN_PURGE_DATA=1` to also remove the OAuth
+client and token, local settings, plans, and work directory. Uninstallation
+never removes Git, uv, the provider CLI, or a browser. If a resource is in use,
+it returns `uninstall_incomplete` without uninstalling `litman-harness` or
+deleting the local checkout; close the program using it and retry.
+
+### Direct install and uninstall commands
+
+The scripts invoke these CLI-only operations:
 
 ```sh
-litman install --app codex --source /ruta/al/repo    # crea o actualiza
-litman install --oauth-client /ruta/client_secret.json [--delete-original]
+litman install --app codex --source /path/to/repository
+litman install --oauth-client /path/client_secret.json [--delete-original]
 litman uninstall [--remove-workspace] [--purge-data]
 ```
 
-Son operaciones sólo-CLI (como `litman login`): no aparecen en
-`tools/list` del MCP. Ver `harness/src/litman_harness/installation.py` para
-el detalle de idempotencia, detección de conflictos y el manifiesto.
+They are intentionally absent from MCP `tools/list`. See
+`harness/src/litman_harness/installation.py` for deterministic conflict and
+idempotency behavior and the installation manifest implementation.
 
-## Instalación avanzada (wheels, para quien ya opera un entorno Python)
+## Advanced installation from wheels
 
-Para un entorno controlado por IT, sin el instalador guiado: construya u
-obtenga wheels compatibles de `litman-core` y `litman-harness`, y póngalas
-fuera del checkout.
+This route is for an IT-managed Python environment. Build or obtain compatible
+`litman-core` and `litman-harness` wheels and keep them outside the checkout.
 
 ```sh
 uv venv --python 3.11 .venv
-uv pip install --python .venv/bin/python /ruta/litman_core-0.1.0-py3-none-any.whl /ruta/litman_harness-0.1.0-py3-none-any.whl
+uv pip install --python .venv/bin/python /path/litman_core-0.1.0-py3-none-any.whl /path/litman_harness-0.1.0-py3-none-any.whl
 .venv/bin/litman setup --json '{"provider": "codex"}'
 .venv/bin/litman diagnose
 .venv/bin/litman-mcp
 ```
 
-No use el `uv.lock` de desarrollo para una instalación de release: su fuente
-local `../core` sólo sirve al checkout. Configure OAuth y los directorios de
-estado fuera del clon; el harness localiza `litman-core` en la carpeta de
-scripts del entorno activo (`sysconfig.get_path("scripts")`), no junto al
-intérprete resuelto. `litman setup` comprueba `litman-core info` y guarda el
-proveedor (y modelo opcional) elegido para esta instalación antes de
-analizar cualquier licitación; ver el contrato en
-[`docs/contracts.md`](../../docs/contracts.md).
+Do not use the development `uv.lock` for a release installation: its local
+`../core` source applies only to the checkout. Keep OAuth and state directories
+outside the checkout. Harness locates `litman-core` in the active environment's
+scripts directory (`sysconfig.get_path("scripts")`), not beside the resolved
+Python interpreter. `litman setup` validates `litman-core info` and records the
+provider and optional model before any analysis.
 
-El harness nunca lee ni escribe el `config.toml` de LitMan Core: genera su
-propia configuración mínima en memoria para cada análisis (tipo de job,
-carpeta de entrada temporal, carpeta de salida temporal y el proveedor fijado
-por `setup`) y la pasa a `litman-core run --config`. No es necesario preparar
-`config.toml`/`local-secrets/` de Core para usar el harness; esos archivos
-sólo aplican al uso independiente de Core descrito en
-[`core/deployment/README.md`](../../core/deployment/README.md).
+Harness does not read or write LitMan Core's `config.toml`. It generates a
+minimal temporary configuration for each analysis and passes it to
+`litman-core run --config`. Core's `config.toml` and `local-secrets/` are needed
+only when operating Core independently, as described by the
+[Core deployment guide](../../core/deployment/README.md).
 
-Los resultados publicados no quedan en el disco local: `apply_publication`
-los sube a la carpeta Drive conectada, dentro de una carpeta con fecha
-(`AAAA-MM-DD <publication_id>`) bajo `Analisis inicial` o `Analisis
-detallado`, según el tipo de análisis.
+The repository [public Core CLI contract](../../docs/contracts.md) owns the
+fields Harness sends and consumes. Core's
+[internal run documentation](../../core/docs/contracts.md) is informative for
+Core contributors but is not the Harness compatibility boundary.
+
+Published results do not remain on local disk. Harness uploads them to a dated
+`YYYY-MM-DD <publication_id>` folder under the registered `Analisis inicial` or
+`Analisis detallado` Drive folder, according to the analysis type.
