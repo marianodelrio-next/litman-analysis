@@ -69,6 +69,7 @@ LitMan se instala pegando un solo comando. Tarda unos minutos.
      2. Abra la carpeta LitMan (%USERPROFILE%\LitMan).
      3. Escriba: prepara mi equipo
    ```
+   Funciona aunque tu nombre de usuario de Windows lleve tildes (por ejemplo, `María Núñez`) y con el Control inteligente de aplicaciones activado: no hace falta desactivarlo.
 4. Si en cambio sale un mensaje que empieza por **Falta**, el instalador te dice qué programa falta:
 
 | Mensaje | Qué hacer |
@@ -152,6 +153,7 @@ Para casi cualquier problema, lo primero es escribir **prepara mi equipo**: el a
 | PowerShell dice que no reconoce `git`, `uv` o `codex` justo después de instalarlos | Cierra PowerShell y ábrela de nuevo. |
 | Codex no reconoce "prepara mi equipo" | Cierra Codex del todo, ábrelo y comprueba que tienes abierta la carpeta **LitMan**. |
 | El navegador no vuelve a Codex después de entrar en Google | Puede ser el antivirus o el cortafuegos. Escribe "prepara mi equipo" para reintentarlo; si sigue igual, avisa a IT. |
+| Windows avisa de que el Control inteligente de aplicaciones ha bloqueado `litman.exe`, o sale `No se encuentra el interprete de LitMan` | Vuelve a pegar el comando de instalación del paso 2 y, al terminar, escribe "prepara mi equipo". La versión actual de LitMan ya no usa `litman.exe`. No desactives el Control inteligente de aplicaciones; si sigue pasando, avisa al equipo técnico. |
 | Google dice "aplicación no verificada" | Para y avisa al equipo técnico: no debería pasar. |
 | Un mensaje dice que la ruta de trabajo es demasiado larga | Avisa al equipo técnico: hay que configurar una carpeta de trabajo con un nombre más corto. |
 | El descarte de un análisis falla con "Fallo inesperado del harness" | Cierra los archivos de ese análisis que tengas abiertos y vuelve a descartarlo. |
