@@ -12,8 +12,8 @@ Represent one completed legacy task in Factory so its history and current verifi
 
 ## Acceptance criteria
 
-- AC-01: The current bid preparation guide still has five ordered operational sections, keeps offer documents, requirements, criteria, and pending actions, and omits the evidence appendix — verified by: `UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv --directory core run pytest -q tests/unit/generation/test_bid_preparation_guide.py`.
-- AC-02: The retired `.agent-work/` tree is removed after this task's completion evidence is represented here, while the durable guide decision remains in `core/docs/decisions.md` — verified by: `test ! -e .agent-work && test -f core/docs/decisions.md`.
+- AC-01: The current bid preparation guide still has five ordered operational sections, keeps offer documents, requirements, criteria, and pending actions, and omits the evidence appendix — verified by: `bash -lc 'UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv --directory core run pytest -q tests/unit/generation/test_bid_preparation_guide.py'`.
+- AC-02: The retired `.agent-work/` tree is removed after this task's completion evidence is represented here, while the durable guide decision remains in `core/docs/decisions.md` — verified by: `bash -lc 'test ! -e .agent-work && test -f core/docs/decisions.md'`.
 - AC-03: Factory shows one task whose title and scope clearly state that product implementation is already complete and only historical verification remains; the generator identity recorded above matches the current source — verified by: `swfactory design show CHG-0001 --json` and manual review of this design and `core/src/litman_core/generation/bid_preparation_guide/generator.py`.
 
 ## Approach
@@ -33,8 +33,8 @@ The verified product paths are `core/src/litman_core/generation/bid_preparation_
   complexity: trivial
   review: []
   acceptance:
-    AC-01: "UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv --directory core run pytest -q tests/unit/generation/test_bid_preparation_guide.py"
-    AC-02: "test ! -e .agent-work && test -f core/docs/decisions.md"
+    AC-01: "bash -lc 'UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv --directory core run pytest -q tests/unit/generation/test_bid_preparation_guide.py'"
+    AC-02: "bash -lc 'test ! -e .agent-work && test -f core/docs/decisions.md'"
     AC-03: manual
 ```
 
