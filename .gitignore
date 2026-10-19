@@ -29,13 +29,11 @@ dist/
 !.claude/skills/factory-*/
 auth.json
 
-# Datos y documentos reales de licitaciones (pueden contener información sensible)
-licitaciones/
 
-# Logs locales
+# Logs
 *.log
 
-# Archivos temporales del sistema/editor
+# Temporal files
 .DS_Store
 Thumbs.db
 *.swp

@@ -11,10 +11,6 @@ workflow as well as product-agent resources used by LitMan Harness. Keeping
 those systems mixed obscures ownership and risks changing product behavior
 while maintaining repository tooling.
 
-The former `research-design` and `implement` development skills, their agents,
-and `.agent-work/<task>/` folders were retired when the Software Factory was
-adopted. The local task folders were subsequently removed.
-
 ## Options considered
 
 - Keep development workflow decisions in Core's package decision log.

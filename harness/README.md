@@ -21,5 +21,5 @@ Choose the route that matches your goal:
   integration contract.
 
 Repository-wide architecture, ownership, and contributor rules remain in the
-[root documentation](../docs/README.md), [codebase map](../docs/codebase-map.md),
+[root documentation](../docs/index.md), [codebase map](../docs/codebase-map.md),
 and [AGENTS.md](../AGENTS.md).

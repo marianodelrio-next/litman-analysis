@@ -37,10 +37,6 @@ Use `/factory-implement <task>` only for an approved Factory task. The task
 runs in its own Orca workspace and closes after its checks and acceptance
 criteria are verified. Use `/factory-status` for tracking and recovery.
 
-The retired `.agent-work/` task directory has been removed; do not recreate it.
-Development skills in `.agents/` and `.claude/` are separate from product agent
-resources in `harness/agent/`.
-
 ## Software Factory
 
 This repository is developed with the Software Factory on local Orca.

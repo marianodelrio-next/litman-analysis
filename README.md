@@ -27,5 +27,5 @@ the boundary between the packages.
 - **Contribute to LitMan:** read the complete [agent and contributor rules](AGENTS.md),
   then use the [codebase map](docs/codebase-map.md) to find the owning package.
 
-The [documentation index](docs/README.md) lists every canonical topic and the
+The [documentation index](docs/index.md) lists every canonical topic and the
 entry points for Core and Harness.
