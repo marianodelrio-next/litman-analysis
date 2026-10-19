@@ -273,6 +273,11 @@ they inherit from the expected user profile and are not broadly readable.
 
 - Complete a local analysis on the synthetic tender, then either publish it
   (preview and apply publication) or discard it.
+- **Flat layout.** After publishing, **observe and record** that the artifacts
+  sit directly in `Analisis inicial` (or `Analisis detallado`) with no dated
+  subfolder, and that the result's `folder_id` is that folder. Run and publish
+  the same analysis type again and confirm the new files carry the date suffix
+  (`ficha_oportunidad (YYYY-MM-DD).pdf`) while the earlier files are unchanged.
 - **Discard with a locked file.** Open a file inside that analysis's local
   workspace in another program, then discard the analysis. Expected output
   today: an `internal_error` envelope (`"Fallo inesperado del harness"`) —
