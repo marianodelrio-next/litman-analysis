@@ -90,9 +90,14 @@ artifacts, errors, and versioning policy are owned by the repository
 [public Core CLI contract](../../docs/contracts.md), not by Core's internal
 documentation.
 
-If an analysis work path would be too deep on Windows, Harness returns
-`work_path_too_long` before download. Set `LITMAN_HARNESS_WORK_DIR` to a shorter
-path; Harness does not depend on `LongPathsEnabled`.
+On Windows, Harness shortens each local original name to fit the path budget
+left by the actual input directory: it keeps the `<file_id>-` prefix and the
+extension (a suffix longer than 10 characters counts as part of the name) and
+truncates the rest. The untouched Drive name stays in `input_snapshot.name`, so
+long Drive names work with the default work root. Only when
+`LITMAN_HARNESS_WORK_DIR` is so deep that not even the prefix, one character and
+the extension fit does Harness return `work_path_too_long` before download; set
+it to a shorter path. Harness does not depend on `LongPathsEnabled`.
 
 ## Concurrency and stale plans
 
