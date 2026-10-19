@@ -43,6 +43,17 @@ folder, copies the product skills and reader agent, registers the MCP server,
 sets `tool_timeout_sec = 7200` for Codex or `MCP_TOOL_TIMEOUT` for Claude Code,
 and records an installation manifest.
 
+On Windows, `install.ps1` and `uninstall.ps1` run the Harness CLI as
+`python.exe -m litman_harness.interfaces.cli` with the tool environment's
+interpreter (`<uv tool dir>\litman-harness\Scripts\python.exe`) instead of
+the uv-generated `litman.exe` launcher, because Smart App Control may block uv
+launchers. The `litman` command written into the workspace `AGENTS.md` uses
+the same form, with the PowerShell call operator:
+`& "<scripts dir>\python.exe" -m litman_harness.interfaces.cli`. The scripts
+read `uv tool dir` as UTF-8, so user profiles with accented characters are
+supported. The MCP server and Core still run through `litman-mcp.exe` and
+`litman-core.exe`.
+
 The installer never installs Git, uv, the provider CLI, or a browser by itself.
 If one is missing, it stops with an official link or one-step command for the
 person to run before repeating the installation command.

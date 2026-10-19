@@ -25,7 +25,7 @@ the text below.
 
 Confirm all of the following before starting:
 
-- The code for CHG-0003 is merged into the remote `master`. The guided
+- The code for CHG-0003 and CHG-0005 is merged into the remote `master`. The guided
   install one-liner installs the latest `v*` tag if one exists, otherwise
   `origin/HEAD` (`harness/deployment/install.ps1`), so without a tag it
   installs whatever is on `master` at the time.
@@ -81,8 +81,12 @@ $env:LITMAN_APP='codex'; irm https://raw.githubusercontent.com/marianodelrio-nex
 
 Expected output: the script clones or updates the repository under
 `%LOCALAPPDATA%\LitMan\src`, checks out the latest `v*` tag or `origin/HEAD`,
-runs `uv tool install --force --python 3.11` for `harness` with `core`, runs
-`litman install --app codex --source <repo>`, and prints:
+runs `uv tool install --force --python 3.11` for `harness` with `core`, reads
+`uv tool dir` as UTF-8, runs the Harness CLI through the tool environment's
+interpreter (`& $Python -m litman_harness.interfaces.cli install --app codex
+--source <repo>`, where `$Python` is
+`<uv tool dir>\litman-harness\Scripts\python.exe`; it never runs the uv
+`litman.exe` launcher), and prints:
 
 ```
 Instalacion completa. Para terminar:
@@ -94,6 +98,14 @@ Instalacion completa. Para terminar:
 **Observe and record:** the exact window/exit behavior of `irm | iex` when
 the script fails partway through (whether the PowerShell window stays open
 and whether the error is visible).
+
+Check: on a profile whose path contains an accented character (for example
+`C:\Users\María Núñez`) and with Smart App Control on, the install
+completes without manual workarounds. `%USERPROFILE%\LitMan\AGENTS.md`
+gives the `litman` command as
+`& "<uv tool dir>\litman-harness\Scripts\python.exe" -m litman_harness.interfaces.cli`,
+and "prepara mi equipo" runs `install --oauth-client` and `login` through
+that command.
 
 Action: restart the Codex app, open the `%USERPROFILE%\LitMan` folder, and
 type **"prepara mi equipo"**.
@@ -281,7 +293,11 @@ Command:
 $env:LITMAN_REMOVE_WORKSPACE='1'; harness\deployment\uninstall.ps1
 ```
 
-Expected output: `litman uninstall --remove-workspace` returns a `failed`
+Expected output: the script reads `uv tool dir` as UTF-8 and, if the tool
+environment's `python.exe` exists, runs
+`& $Python -m litman_harness.interfaces.cli uninstall --remove-workspace`
+(not the uv `litman.exe` launcher). That `litman uninstall --remove-workspace`
+call returns a `failed`
 list that includes the locked item; because `failed` is non-empty, `litman
 uninstall` prints an error envelope with code `uninstall_incomplete` and
 message *"No se pudieron eliminar algunos elementos. Cierre los programas que
