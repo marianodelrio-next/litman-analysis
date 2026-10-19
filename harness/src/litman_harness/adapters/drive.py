@@ -9,7 +9,8 @@ from ..errors import HarnessError
 
 _OPTIONS = {"supportsAllDrives": True}
 # Only the capabilities the harness checks: keeps responses small for chat agents.
-_CAPABILITIES = "capabilities(canListChildren,canAddChildren,canDownload,canEdit)"
+_CAPABILITIES = ("capabilities(canListChildren,canAddChildren,canDownload,canEdit,canMoveItemWithinDrive,"
+                 "canCopy)")
 _FIELDS = f"id,name,mimeType,version,size,driveId,parents,trashed,{_CAPABILITIES},webViewLink,appProperties,md5Checksum"
 
 
@@ -19,6 +20,8 @@ class DriveGateway(Protocol):
     def children(self, folder_id: str, drive_id: str | None) -> list[Resource]: ...
     def find_by_markers(self, parent_id: str, operation_id: str, action_id: str) -> list[Resource]: ...
     def create_folder(self, name: str, parent_id: str, operation_id: str, action_id: str) -> Resource: ...
+    def move(self, file_id: str, add_parent: str, remove_parents: tuple[str, ...]) -> Resource: ...
+    def copy(self, file_id: str, name: str, parent_id: str, operation_id: str, action_id: str) -> Resource: ...
     def download(self, file_id: str, destination: Path) -> None: ...
     def upload(self, name: str, parent_id: str, source: Path, mime_type: str, operation_id: str,
                action_id: str) -> Resource: ...
@@ -109,6 +112,19 @@ class GoogleDriveGateway:
         body = {"name": name, "mimeType": FOLDER_MIME, "parents": [parent_id],
                 "appProperties": _markers(operation_id, action_id)}
         return Resource.from_api(_execute(self.service.files().create(body=body, fields=_FIELDS, **_OPTIONS)))
+
+    def move(self, file_id: str, add_parent: str, remove_parents: tuple[str, ...]) -> Resource:
+        """Change the parents of a file; it keeps its ID."""
+        request = self.service.files().update(fileId=file_id, addParents=add_parent,
+                                              removeParents=",".join(remove_parents), body={}, fields=_FIELDS,
+                                              **_OPTIONS)
+        return Resource.from_api(_execute(request))
+
+    def copy(self, file_id: str, name: str, parent_id: str, operation_id: str, action_id: str) -> Resource:
+        """Copy a file into ``parent_id`` with the action markers; the source is untouched."""
+        body = {"name": name, "parents": [parent_id], "appProperties": _markers(operation_id, action_id)}
+        return Resource.from_api(_execute(self.service.files().copy(fileId=file_id, body=body, fields=_FIELDS,
+                                                                    **_OPTIONS)))
 
     def download(self, file_id: str, destination: Path) -> None:
         from googleapiclient.http import MediaIoBaseDownload

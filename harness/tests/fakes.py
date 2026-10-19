@@ -26,6 +26,8 @@ class FakeDrive:
         self.created: list[str] = []
         self.forbidden: set[str] = set()
         self.crash_on_create: set[int] = set()
+        self.move_denied: set[str] = set()  # file IDs whose move Drive rejects with 403
+        self.moved: list[str] = []
         self._counter = 0
 
     def add(self, resource: Resource, content: bytes | None = None) -> Resource:
@@ -60,6 +62,19 @@ class FakeDrive:
 
     def create_folder(self, name, parent_id, operation_id, action_id):
         return self._create(name, FOLDER_MIME, parent_id, operation_id, action_id, None)
+
+    def move(self, file_id, add_parent, remove_parents):
+        if file_id in self.move_denied:
+            raise HarnessError("insufficient_permission", "Drive rechazó el movimiento", details={"http_status": 403})
+        item = self.get(file_id)
+        parents = tuple(parent for parent in item.parents if parent not in remove_parents)
+        self.resources[file_id] = replace(item, parents=(*parents, add_parent))
+        self.moved.append(file_id)
+        return self.resources[file_id]
+
+    def copy(self, file_id, name, parent_id, operation_id, action_id):
+        source = self.get(file_id)
+        return self._create(name, source.mime_type, parent_id, operation_id, action_id, self.contents[file_id])
 
     def upload(self, name, parent_id, source, mime_type, operation_id, action_id):
         return self._create(name, mime_type, parent_id, operation_id, action_id, Path(source).read_bytes())

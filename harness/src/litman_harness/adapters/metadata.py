@@ -38,6 +38,12 @@ class MetadataGateway:
     def create_folder(self, *args):
         raise HarnessError("read_only_adapter", "El adaptador de metadatos no puede escribir")
 
+    def move(self, *args):
+        raise HarnessError("read_only_adapter", "El adaptador de metadatos no puede escribir")
+
+    def copy(self, *args):
+        raise HarnessError("read_only_adapter", "El adaptador de metadatos no puede escribir")
+
     def download(self, *args):
         raise HarnessError("read_only_adapter", "El adaptador de metadatos no puede descargar")
 
