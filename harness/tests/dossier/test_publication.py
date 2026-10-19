@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -13,6 +14,7 @@ from litman_harness.dossier.service import ExpedienteService
 from litman_harness.dossier.shared_state import UnavailableSharedState
 from litman_harness.errors import HarnessError
 from litman_harness.plans import PlanStore
+from litman_harness.plans.models import Plan, PlanAction
 
 
 class Setup:
@@ -53,21 +55,22 @@ def test_gate_closed_publication_writes_nothing_and_keeps_workspace(tmp_path: Pa
     assert setup.drive.created == created and Path(analysis["workspace"]).is_dir()
 
 
-def test_assessment_is_published_by_id_in_a_run_folder_and_cited_in_context(tmp_path: Path):
+def test_assessment_is_published_flat_in_the_phase_folder_and_cited_in_context(tmp_path: Path):
     setup = Setup(tmp_path)
     analysis = setup.analyse("assessment")
     plan = setup.publication.preview(analysis["operation_id"])
-    assert [a.kind for a in plan.actions] == ["create_run_folder", "upload_public_artifact", "set_phase",
-                                              "update_context", "update_manifest"]
+    assert [a.kind for a in plan.actions] == ["upload_public_artifact", "set_phase", "update_context",
+                                              "update_manifest"]
+    folders = [item.id for item in setup.drive.resources.values() if item.mime_type == FOLDER_MIME]
     result = setup.publication.apply(plan.id)
     manifest = setup.manifest()
-    run_folder = setup.drive.resources[result["run_folder_id"]]
-    assert run_folder.mime_type == FOLDER_MIME and run_folder.parents == (manifest.folders["initial"],)
-    assert run_folder.name == f"{analysis['completed_at'][:10]} pub-1"
+    assert [item.id for item in setup.drive.resources.values() if item.mime_type == FOLDER_MIME] == folders
+    assert result["folder_id"] == manifest.folders["initial"] and "run_folder_id" not in result
     uploaded = setup.drive.resources[result["artifacts"][0]["file_id"]]
-    assert uploaded.name == "ficha_oportunidad.pdf" and uploaded.parents == (run_folder.id,)
+    assert uploaded.name == "ficha_oportunidad.pdf" and uploaded.parents == (manifest.folders["initial"],)
     entry = manifest.analyses[0]
     assert entry["operation_id"] == analysis["operation_id"] and entry["status"] == "published"
+    assert entry["folder_id"] == manifest.folders["initial"]
     assert entry["source_originals"][0]["drive_version"] == "4" and manifest.originals[0]["sha256"]
     assert manifest.workflow_phase == "analisis_inicial" and manifest.live_offer is None
     context = setup.drive.contents[manifest.context_file_id].decode()
@@ -119,8 +122,56 @@ def test_partial_failure_resumes_without_duplicate_uploads(tmp_path: Path):
     setup.drive.crash_on_create = set()
     result = setup.publication.apply(plan.id)
     assert result["status"] == "succeeded"
-    names = [item.name for item in setup.drive.resources.values() if result["run_folder_id"] in item.parents]
+    names = [item.name for item in setup.drive.resources.values() if result["folder_id"] in item.parents]
     assert sorted(names) == sorted(set(names)) and len(names) == 4
+    assert result["folder_id"] == setup.manifest().folders["detailed"]
+
+
+def test_repeated_analysis_gets_date_suffixed_names_and_overwrites_nothing(tmp_path: Path):
+    setup = Setup(tmp_path)
+    first = setup.publish(setup.analyse("assessment"))
+    original = first["artifacts"][0]
+    content = setup.drive.contents[original["file_id"]]
+    analyses = [setup.analyse("assessment"), setup.analyse("assessment")]
+    plans = [setup.publication.preview(analyses[0]["operation_id"])]
+    assert plans[0].actions[0].name == f"ficha_oportunidad ({analyses[0]['completed_at'][:10]}).pdf"
+    assert plans[0].actions[0].metadata["artifact"] == "ficha_oportunidad.pdf"
+    second = setup.publication.apply(plans[0].id)
+    third = setup.publish(analyses[1])
+    day = analyses[1]["completed_at"][:10]
+    assert third["artifacts"][0]["name"] == f"ficha_oportunidad ({day}-2).pdf"
+    initial = setup.manifest().folders["initial"]
+    names = sorted(item.name for item in setup.drive.resources.values() if initial in item.parents)
+    assert names == sorted(["ficha_oportunidad.pdf", second["artifacts"][0]["name"],
+                            f"ficha_oportunidad ({day}-2).pdf"])
+    assert setup.drive.contents[original["file_id"]] == content
+    assert [item["folder_id"] for item in setup.manifest().analyses] == [initial] * 3
+    assert len({item["artifacts"][0]["file_id"] for item in setup.manifest().analyses}) == 3
+
+
+def test_publication_plan_stored_before_flat_layout_still_resumes(tmp_path: Path):
+    setup = Setup(tmp_path)
+    analysis = setup.analyse("assessment")
+    current = setup.publication.preview(analysis["operation_id"])
+    initial = setup.manifest().folders["initial"]
+    folder = PlanAction("create_run_folder", None, f"{analysis['completed_at'][:10]} pub-1", initial,
+                        metadata={"role": "run_folder"})
+    uploads = [replace(action, parent_id=None, metadata={k: v for k, v in action.metadata.items() if k != "artifact"})
+               for action in current.actions if action.kind == "upload_public_artifact"]
+    rest = [action for action in current.actions if action.kind != "upload_public_artifact"]
+    legacy = Plan("publication", current.root_folder_id, current.account_id, (folder, *uploads, *rest), {})
+    setup.store.save(legacy)
+    setup.drive.crash_on_create = {len(setup.drive.created) + 1}
+    with pytest.raises(HarnessError) as raised:
+        setup.publication.apply(legacy.id)
+    assert raised.value.code == "operation_interrupted"
+    setup.drive.crash_on_create = set()
+    result = setup.publication.apply(legacy.id)
+    run_folder = setup.drive.resources[result["folder_id"]]
+    assert run_folder.mime_type == FOLDER_MIME and run_folder.parents == (initial,)
+    assert [item.name for item in setup.drive.resources.values() if run_folder.id in item.parents] == [
+        "ficha_oportunidad.pdf"]
+    assert setup.manifest().analyses[0]["folder_id"] == run_folder.id
 
 
 def test_altered_local_artifact_is_rejected(tmp_path: Path):
@@ -185,7 +236,7 @@ def test_concurrent_manifest_write_is_recoverable_without_duplicate_uploads(tmp_
     created = list(setup.drive.created)
     result = setup.publication.apply(plan.id)
     assert result["status"] == "succeeded" and setup.drive.created == created
-    assert len([i for i in setup.drive.resources.values() if result["run_folder_id"] in i.parents]) == 1
+    assert len([i for i in setup.drive.resources.values() if result["folder_id"] in i.parents]) == 1
 
 
 def test_live_offer_registered_after_preview_skips_the_conversion(tmp_path: Path):
@@ -209,13 +260,12 @@ def test_only_the_closed_public_catalogue_reaches_drive(tmp_path: Path):
     (Path(analysis["local_path"]) / "validation.json").write_text("{}")  # stray local file
     result = setup.publish(analysis)
     uploaded = sorted(item.name for item in setup.drive.resources.values()
-                      if result["run_folder_id"] in item.parents)
+                      if result["folder_id"] in item.parents)
     assert uploaded == sorted(item["name"] for item in analysis["public_artifacts"])
     assert "validation.json" not in uploaded
 
 
 def test_publication_backfills_the_sha256_of_an_original_copied_after_the_analysis(tmp_path: Path):
-    from dataclasses import replace
     setup = Setup(tmp_path)
     analysis = setup.analyse("assessment")  # Core read the source ID
     resource = next(item for item in setup.drive.resources.values() if item.name == "manifest.json")
@@ -229,3 +279,18 @@ def test_publication_backfills_the_sha256_of_an_original_copied_after_the_analys
     original = setup.manifest().originals[0]
     assert original["file_id"] != "source" and original["sha256"]
     assert setup.manifest().analyses[0]["source_originals"][0]["file_id"] == "source"
+
+
+def test_phase_folder_changed_after_preview_blocks_the_uploads(tmp_path: Path):
+    setup = Setup(tmp_path)
+    analysis = setup.analyse("assessment")
+    plan = setup.publication.preview(analysis["operation_id"])
+    resource = next(item for item in setup.drive.resources.values() if item.name == "manifest.json")
+    manifest = setup.manifest()
+    setup.drive.add(Resource("other-initial", "Analisis inicial", FOLDER_MIME, "1", drive_id="shared",
+                             parents=("root",)))
+    manifest.folders["initial"] = "other-initial"
+    setup.drive.write_text(resource.id, manifest.serialize())
+    created = list(setup.drive.created)
+    result = setup.publication.apply(plan.id)
+    assert result["status"] == "conflict" and setup.drive.created == created
