@@ -13,6 +13,13 @@ Run `UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest -q` from `core/` for Cor
 
 Start with `AGENTS.md`, then use the [codebase map](docs/codebase-map.md) to locate relevant code. Read [architecture](docs/architecture.md) and the relevant package decisions only when needed; verify the actual code and expand exploration only as needed.
 
+## Releases
+
+LitMan is published as a single product version through tagged releases. When
+asked to release or publish a version, follow [docs/releasing.md](docs/releasing.md).
+Every user-visible change adds an entry under `## [Unreleased]` in
+[CHANGELOG.md](CHANGELOG.md), in the same pull request.
+
 ## Work modes
 
 Choose the mode from the user's explicit request.

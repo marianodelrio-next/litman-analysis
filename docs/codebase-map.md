@@ -6,6 +6,7 @@ before editing it.
 | Area | Paths | Ownership |
 | --- | --- | --- |
 | Repository documentation and development tooling | `README.md`, `AGENTS.md`, `docs/`, `.codex/`, `.agents/`, `.claude/`, `.factory/changes/` | Cross-package product documentation, contributor rules, and development workflow. These are not product runtime resources. |
+| Release flow | `scripts/release.py`, `CHANGELOG.md`, `docs/releasing.md`, `docs/decisions/0002-tagged-releases.md` | The single product version, the changelog, and the scripted `check` / `prepare` / `tag` release flow shared by both packages. |
 | Versioned CLI contract | `docs/contracts.md`, `docs/contracts/` | Public source of truth for `litman-core run` and `info`, including schemas, examples, and the minimal Harness configuration. |
 | Core distribution | `core/pyproject.toml`, `core/uv.lock`, `core/README.md` | Package metadata for `litman-core` and the Core documentation entry point. |
 | Core execution | `core/src/litman_core/cli.py`, `core/src/litman_core/errors.py`, `core/src/litman_core/execution/job_runner.py`, `core/src/litman_core/application/` | CLI behavior, closed error mapping, job loading, and local analysis orchestration. |
