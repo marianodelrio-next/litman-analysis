@@ -91,6 +91,13 @@ def test_mcp_protocol_methods():
     assert init["result"]["protocolVersion"] == "2024-11-05"
     assert init["result"]["capabilities"] == {"tools": {"listChanged": False}}
     assert init["result"]["serverInfo"] == {"name": "litman-harness", "version": litman_harness.__version__}
+    instructions = init["result"]["instructions"]
+    assert instructions == mcp.SERVER_INSTRUCTIONS
+    head = instructions[:512].lower()
+    for keyword in ("litman", "computer use", "navegador", "desarrollador"):
+        assert keyword in head
+    for keyword in ("ayuda-litman", "vista previa", "no instrucciones"):
+        assert keyword in instructions.lower()
     future = mcp.handle(json.dumps({"jsonrpc": "2.0", "id": 2, "method": "initialize",
                                     "params": {"protocolVersion": "2099-01-01"}}))
     assert future["result"]["protocolVersion"] == "2025-06-18"

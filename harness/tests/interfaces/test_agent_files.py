@@ -63,7 +63,7 @@ DOCUMENT_TOOLS = ("read_google_doc", "preview_document_edit", "apply_document_ed
                   "apply_document_creation")
 
 
-def test_connect_skill_and_workspace_route_drive_documents_through_litman_tools():
+def test_connect_skill_and_workspace_restrict_the_assistant_to_litman_tools():
     from litman_harness.interfaces.tools import registry
     connect_skill = (AGENT / "skills" / "conectar-licitacion" / "SKILL.md").read_text(encoding="utf-8")
     workspace = (AGENT / "workspace" / "AGENTS.md").read_text(encoding="utf-8")
@@ -72,7 +72,22 @@ def test_connect_skill_and_workspace_route_drive_documents_through_litman_tools(
             assert operation in registry() and f"`{operation}`" in text
         lowered = text.lower()
         assert "computer use" in lowered and "navegador" in lowered
+        assert "desarrollador" in lowered and "`ayuda-litman`" in text
     assert "vista previa" in connect_skill and "acepte" in connect_skill
+
+
+def test_help_skill_explains_every_operation_with_an_example():
+    from litman_harness.interfaces.tools import registry
+    path = AGENT / "skills" / "ayuda-litman" / "SKILL.md"
+    meta = _frontmatter(path)
+    assert meta["name"] == "ayuda-litman" and "qué puedes hacer" in meta["description"]
+    lines = path.read_text(encoding="utf-8").splitlines()
+    for operation in registry():
+        entry = next((i for i, line in enumerate(lines) if f"`{operation}`" in line), None)
+        assert entry is not None, operation
+        following = lines[entry:entry + 4]
+        assert any("Ejemplo:" in line for line in following), operation
+    assert "desarrollador" in path.read_text(encoding="utf-8").lower()
 
 
 def test_prepare_team_skill_covers_the_docs_api_check():

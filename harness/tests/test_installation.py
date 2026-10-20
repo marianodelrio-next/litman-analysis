@@ -188,6 +188,29 @@ def test_claude_install_registers_mcp_and_reinstall_removes_and_adds_again(
     assert "remove" in kinds and "add" in kinds
 
 
+@pytest.mark.parametrize("app", installation.APPS)
+def test_help_skill_is_installed_recorded_and_uninstalled(app: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    env = _env(tmp_path, monkeypatch)
+    home = tmp_path / "home"
+    _patch_scripts(monkeypatch, tmp_path / "scripts")
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    (bin_dir / "claude").write_text("#!/bin/sh\n")
+    (bin_dir / "claude").chmod(0o755)
+    monkeypatch.setenv("PATH", str(bin_dir))
+
+    installation.install(app=app, source=REPO, home=home, env=env, run=FakeClaudeRun())
+    skill = (home / ".claude" / "skills" if app == "claude" else home / ".agents" / "skills") / "ayuda-litman"
+    assert (skill / "SKILL.md").is_file()
+    manifest = json.loads(installation.manifest_path(env).read_text(encoding="utf-8"))
+    assert "ayuda-litman" in manifest["skills"]
+
+    result = installation.uninstall(home=home, env=env, run=FakeClaudeRun(foreign=True))
+    assert "skill:ayuda-litman" in result["removed"]
+    assert not skill.exists()
+
+
+
 def test_claude_install_creates_claude_md_with_agents_reference(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     env = _env(tmp_path, monkeypatch)
     home = tmp_path / "home"

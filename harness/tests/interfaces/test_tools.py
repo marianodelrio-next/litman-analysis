@@ -32,6 +32,25 @@ def test_registry_exposes_operations_with_schema_and_kind():
                                                                               "apply_document_creation"}
 
 
+DESTRUCTIVE = {"apply_document_edit", "apply_file_changes", "apply_sheet_edit", "apply_summary",
+               "apply_incorporation", "discard_analysis"}
+
+
+def test_tools_declare_mcp_annotations_derived_from_their_kind():
+    for descriptor in tool_descriptors():
+        tool = registry()[descriptor["name"]]
+        annotations = descriptor["annotations"]
+        assert annotations["readOnlyHint"] is (not tool.mutates)
+        assert annotations["destructiveHint"] is (tool.name in DESTRUCTIVE)
+        assert annotations["openWorldHint"] is False
+        if tool.mutates:
+            assert annotations["idempotentHint"] is True
+    for name in ("preview_document_edit", "preview_analysis", "preview_incorporation"):
+        assert registry()[name].descriptor()["annotations"]["readOnlyHint"] is True
+    assert DESTRUCTIVE & set(registry()) <= {tool.name for tool in registry().values() if tool.mutates}
+
+
+
 def test_invalid_arguments_are_invalid_request_before_building_services():
     def factory():
         raise AssertionError("services must not be built for invalid arguments")

@@ -22,9 +22,14 @@ class Tool:
     input_schema: dict[str, Any]
     handler: Callable[["Context", dict[str, Any]], Any]
     mutates: bool = False
+    destructive: bool = False
 
     def descriptor(self) -> dict[str, Any]:
-        return {"name": self.name, "description": self.description, "inputSchema": self.input_schema}
+        # preview_* tools only store a private local plan, so they count as read-only.
+        annotations = {"readOnlyHint": not self.mutates, "destructiveHint": self.destructive,
+                       "idempotentHint": True, "openWorldHint": False}
+        return {"name": self.name, "description": self.description, "inputSchema": self.input_schema,
+                "annotations": annotations}
 
 
 class Context:

@@ -25,5 +25,5 @@ TOOLS = (
                              "aceptar su operation_id; no toca Drive.",
          schema({"operation_id": {"type": "string"}}, ("operation_id",)),
          lambda ctx, args: ctx.services().analysis.discard(args["operation_id"]),
-         mutates=True),
+         mutates=True, destructive=True),
 )

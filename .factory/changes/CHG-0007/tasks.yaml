@@ -1,0 +1,169 @@
+change: CHG-0007
+design_digest: sha256:7cec8f72a033ad495b8f5164f2e1c3414cac1d41543f9fc749a4d7e00cb841be
+tasks:
+- id: CHG-0007-01
+  title: LitMan-only MCP instructions, tool annotations and the ayuda-litman help
+    skill
+  depends_on:
+  - CHG-0006-03
+  complexity: normal
+  review:
+  - quality
+  - conformance
+  scope:
+  - harness/src/litman_harness/interfaces/**
+  - harness/src/litman_harness/installation.py
+  - harness/agent/**
+  - harness/tests/**
+  - harness/docs/**
+  - harness/deployment/README.md
+  - docs/guia-litman-windows.md
+  - docs/windows-codex-validation.md
+  acceptance:
+    AC-01: bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q tests/interfaces/test_transports.py'
+    AC-02: bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q tests/interfaces/test_tools.py'
+    AC-03: bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q tests/interfaces/test_agent_files.py'
+    AC-04: bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q tests/test_installation.py'
+    AC-15: manual
+    AC-16: bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q'
+- id: CHG-0007-02
+  title: Dossier navigation, general file reading (Excel, Sheets, Slides, text) and
+    comment listing
+  depends_on:
+  - CHG-0007-01
+  complexity: complex
+  review:
+  - quality
+  - conformance
+  scope:
+  - harness/src/litman_harness/**
+  - harness/tests/**
+  - harness/agent/**
+  - harness/pyproject.toml
+  - harness/uv.lock
+  - harness/docs/**
+  - harness/deployment/README.md
+  - docs/guia-litman-windows.md
+  - docs/windows-codex-validation.md
+  acceptance:
+    AC-03: bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q tests/interfaces/test_agent_files.py'
+    AC-05: bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q tests/dossier/test_files.py'
+    AC-06: bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q tests/dossier/test_files.py tests/adapters/test_sheets_adapter.py tests/dossier/test_summary.py'
+    AC-07: bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q tests/dossier/test_files.py'
+    AC-15: manual
+    AC-16: bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q'
+- id: CHG-0007-03
+  title: Previewed file changes (folders, rename, move, copy, trash, export, convert)
+    with protections and permission reporting
+  depends_on:
+  - CHG-0007-02
+  complexity: complex
+  review:
+  - quality
+  - conformance
+  scope:
+  - harness/src/litman_harness/**
+  - harness/tests/**
+  - harness/agent/**
+  - harness/docs/**
+  - docs/guia-litman-windows.md
+  - docs/windows-codex-validation.md
+  acceptance:
+    AC-02: bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q tests/interfaces/test_tools.py'
+    AC-03: bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q tests/interfaces/test_agent_files.py'
+    AC-08: bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q tests/dossier/test_file_changes.py'
+    AC-09: bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q tests/dossier/test_file_changes.py tests/adapters/test_drive_adapter.py tests/dossier/test_publication.py'
+    AC-15: manual
+    AC-16: bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q'
+- id: CHG-0007-04
+  title: Google Docs formatting operations and document creation from Markdown
+  depends_on:
+  - CHG-0007-01
+  complexity: normal
+  review:
+  - quality
+  - conformance
+  scope:
+  - harness/src/litman_harness/**
+  - harness/tests/**
+  - harness/agent/**
+  - harness/docs/**
+  - docs/guia-litman-windows.md
+  - docs/windows-codex-validation.md
+  acceptance:
+    AC-03: bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q tests/interfaces/test_agent_files.py'
+    AC-10: bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q tests/dossier/test_documents.py tests/adapters/test_docs_adapter.py'
+    AC-11: bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q tests/dossier/test_documents.py tests/adapters/test_drive_adapter.py'
+    AC-15: manual
+    AC-16: bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q'
+- id: CHG-0007-05
+  title: Previewed Google Sheets edits (update range, append rows) and Sheets API
+    diagnosis
+  depends_on:
+  - CHG-0007-02
+  complexity: normal
+  review:
+  - quality
+  - conformance
+  scope:
+  - harness/src/litman_harness/**
+  - harness/tests/**
+  - harness/agent/**
+  - harness/docs/**
+  - harness/deployment/README.md
+  - docs/guia-litman-windows.md
+  - docs/windows-codex-validation.md
+  acceptance:
+    AC-02: bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q tests/interfaces/test_tools.py'
+    AC-03: bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q tests/interfaces/test_agent_files.py'
+    AC-12: bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q tests/dossier/test_sheets.py tests/adapters/test_sheets_adapter.py'
+    AC-13: bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q tests/adapters/test_sheets_adapter.py tests/interfaces'
+    AC-15: manual
+    AC-16: bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q'
+- id: CHG-0007-06
+  title: Previewed comment changes (add, reply, resolve) with duplicate-free resume
+  depends_on:
+  - CHG-0007-02
+  complexity: normal
+  review:
+  - quality
+  - conformance
+  scope:
+  - harness/src/litman_harness/**
+  - harness/tests/**
+  - harness/agent/**
+  - harness/docs/**
+  - docs/guia-litman-windows.md
+  - docs/windows-codex-validation.md
+  acceptance:
+    AC-03: bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q tests/interfaces/test_agent_files.py'
+    AC-14: bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q tests/dossier/test_comments.py tests/adapters/test_drive_adapter.py'
+    AC-15: manual
+    AC-16: bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q'
