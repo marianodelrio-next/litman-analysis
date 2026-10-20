@@ -11,10 +11,12 @@ from ..adapters import core
 from ..adapters.docs import DocsGateway, GoogleDocsGateway
 from ..adapters.drive import DriveGateway, GoogleDriveGateway
 from ..adapters.drive_state import DriveSharedState
-from ..adapters.metadata import MetadataDocsGateway, MetadataGateway
+from ..adapters.metadata import MetadataDocsGateway, MetadataGateway, MetadataSheetsGateway
 from ..adapters.oauth import DesktopOAuthProvider
+from ..adapters.sheets import GoogleSheetsGateway, SheetsGateway
 from ..analysis.service import AnalysisService
 from ..dossier.documents import DocumentService
+from ..dossier.files import FileService
 from ..dossier.publication import PublicationService
 from ..dossier.service import ExpedienteService
 from ..dossier.summary import SummaryService
@@ -39,6 +41,8 @@ class Services:
     summary: SummaryService
     docs: DocsGateway
     documents: DocumentService
+    sheets: SheetsGateway
+    files: FileService
 
 
 def adapter_kind(env: Mapping[str, str]) -> str:
@@ -71,18 +75,21 @@ def build_services(env: Mapping[str, str] | None = None, *, provider: DesktopOAu
     if kind == "metadata":
         drive: DriveGateway = MetadataGateway(Path(env[METADATA_ENV]))
         docs: DocsGateway = MetadataDocsGateway()
+        sheets: SheetsGateway = MetadataSheetsGateway()
         shared_state = UnavailableSharedState()
     else:
         provider = provider or oauth_provider(env)
         drive = GoogleDriveGateway(provider.drive_service())
         docs = GoogleDocsGateway(provider.docs_service())
+        sheets = GoogleSheetsGateway(provider.sheets_service())
         shared_state = DriveSharedState(session_factory(provider.authorized_credentials()), drive)
     expediente = ExpedienteService(drive, store, shared_state)
     publication = PublicationService(expediente, work)
     analysis = AnalysisService(drive, store, work_root=work, publication=publication,
                                settings=lambda: load_settings(env))
+    documents = DocumentService(expediente, docs)
     return Services(kind, drive, shared_state, expediente, analysis, publication, SummaryService(expediente), docs,
-                    DocumentService(expediente, docs))
+                    documents, sheets, FileService(expediente, documents, sheets))
 
 
 def docs_api_status(docs: DocsGateway) -> str:

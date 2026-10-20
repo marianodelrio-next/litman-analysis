@@ -131,6 +131,16 @@ A help skill with a test that covers the whole registry was preferred over a
 `help` tool, so the answer stays in business language without growing the MCP
 surface.
 
+## `read_file` is a general reader beside `read_document`
+
+`read_file` reads any file of the dossier tree (PDF, DOCX, text, XLSX, Google
+Docs, Sheets and Slides) with the same paging and content note, instead of
+widening `read_document`. `read_document` stays limited to registered originals
+and published artifacts because the summary's provenance depends on that
+restriction. Membership is proved with `belongs_to_root` and `in_litman`, as
+for the Google Docs tools, and Excel files are read with `openpyxl` in
+read-only mode so that a large workbook is never loaded whole.
+
 ## Product agents are separate from development agents
 
 Files under `harness/agent/` are installed product behavior. Repository skills

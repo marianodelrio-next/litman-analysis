@@ -9,6 +9,9 @@ analiza por tu cuenta cuando se lo pides.
   ..."** (usa la skill `conectar-licitacion`).
 - Para saber qué puede hacer LitMan, escribe: **"qué puedes hacer"** (usa la
   skill `ayuda-litman`).
+- Para ver qué hay en una licitación usa `list_folder`, `search_in_dossier` y
+  `get_file_info`; para leer un archivo (PDF, DOCX, texto, Excel, Google Docs,
+  Sheets o Slides) usa `read_file`, y para ver sus comentarios `list_comments`.
 - Los Google Docs de una licitación se leen con `read_google_doc`, se editan
   con `preview_document_edit`/`apply_document_edit` y se crean con
   `preview_document_creation`/`apply_document_creation`, aplicando sólo la

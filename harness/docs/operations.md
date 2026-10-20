@@ -62,6 +62,11 @@ enums, and rejection of extra properties; invalid input returns
 | `read_document` | query | Page through a registered PDF/DOCX original or published artifact. |
 | `preview_summary` | query | Validate and plan an ordered, sourced procurement summary. |
 | `apply_summary` | mutation | Store an accepted summary in the manifest and `contexto.md`. |
+| `list_folder` | query | List the children of the dossier root or of a folder of the tree (never `_LitMan`) with `kind`, `size`, `modified_time`, `web_view_link` and the manifest `role`. |
+| `search_in_dossier` | query | Find files by accent- and case-insensitive name over the tree walk, at most 50 with `path` and `truncated`. |
+| `get_file_info` | query | Metadata, `path` and the account's `can_edit`, `can_rename`, `can_move`, `can_trash`, `can_copy`, `can_download`, `can_comment` for one file of the tree. |
+| `read_file` | query | Page through the text of any dossier file: PDF, DOCX, text, Markdown, CSV, XLSX, Google Docs, Sheets or Slides. |
+| `list_comments` | query | List a file's comments with replies; resolved ones only with `include_resolved`. |
 | `read_google_doc` | query | Page through the body text of a Google Doc in the dossier tree, outside `_LitMan`, with its `revision_id`. |
 | `preview_document_edit` | query | Plan 1–20 closed text operations on a dossier Google Doc and show each matched span with context. |
 | `apply_document_edit` | mutation | Send the accepted edit as one batch guarded by the preview's revision. |

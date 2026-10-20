@@ -97,6 +97,14 @@ class DesktopOAuthProvider:
         from googleapiclient.discovery import build
         return build("docs", "v1", credentials=credentials, cache_discovery=False)
 
+    def sheets_service(self) -> Any:
+        """Sheets v4 with the same ``drive``-scope credentials; ``service_factory`` replaces it in tests too."""
+        credentials = self._credentials()
+        if self.service_factory:
+            return self.service_factory(credentials)
+        from googleapiclient.discovery import build
+        return build("sheets", "v4", credentials=credentials, cache_discovery=False)
+
     def authorized_credentials(self) -> Any:
         """Valid user credentials, refreshed and persisted when needed."""
         return self._credentials()

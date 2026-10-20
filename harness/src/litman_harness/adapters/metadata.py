@@ -50,6 +50,12 @@ class MetadataGateway:
     def download(self, *args):
         raise HarnessError("read_only_adapter", "El adaptador de metadatos no puede descargar")
 
+    def export(self, *args):
+        raise HarnessError("read_only_adapter", "El adaptador de metadatos no puede descargar")
+
+    def comments(self, *args):
+        raise HarnessError("read_only_adapter", "El adaptador de metadatos no puede leer comentarios")
+
     def upload(self, *args):
         raise HarnessError("read_only_adapter", "El adaptador de metadatos no puede escribir")
 
@@ -65,3 +71,13 @@ class MetadataDocsGateway:
 
     def batch_update(self, *args):
         raise HarnessError("read_only_adapter", "El adaptador de metadatos no puede escribir")
+
+
+class MetadataSheetsGateway:
+    """Sheets counterpart of the metadata adapter: it holds no spreadsheet content and never writes."""
+
+    def get(self, *args):
+        raise HarnessError("read_only_adapter", "El adaptador de metadatos no puede leer hojas de cálculo")
+
+    def values(self, *args, **kwargs):
+        raise HarnessError("read_only_adapter", "El adaptador de metadatos no puede leer hojas de cálculo")

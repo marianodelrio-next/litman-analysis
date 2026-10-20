@@ -28,6 +28,8 @@ class FakeDrive:
         self.crash_on_create: set[int] = set()
         self.move_denied: set[str] = set()  # file IDs whose move Drive rejects with 403
         self.moved: list[str] = []
+        self.exports: dict[tuple[str, str], bytes] = {}  # (file ID, MIME type) → exported bytes
+        self.comment_threads: dict[str, list[dict]] = {}  # file ID → comments as Drive returns them
         self.docs: FakeDocs | None = None  # when set, every created Google Doc also exists there, empty
         self._counter = 0
 
@@ -85,6 +87,12 @@ class FakeDrive:
 
     def upload_converted(self, name, parent_id, source, source_mime_type, operation_id, action_id):
         return self._create(name, GOOGLE_DOC_MIME, parent_id, operation_id, action_id, Path(source).read_bytes())
+
+    def export(self, file_id, mime_type, destination: Path):
+        destination.write_bytes(self.exports[(file_id, mime_type)])
+
+    def comments(self, file_id):
+        return list(self.comment_threads.get(file_id, []))
 
     def _create(self, name, mime, parent_id, operation_id, action_id, content):
         parent = self.get(parent_id)
@@ -197,6 +205,34 @@ def core_run(job_type: str = "assessment", *, technical: str = "memoria_tecnica.
             tamper(run_dir, payload)
         return subprocess.CompletedProcess(command, 0, json.dumps(payload), "")
     return run
+
+
+class FakeSheets:
+    """In-memory Sheets v4 read side: ``{title: rows}`` per spreadsheet, with the grid size of each sheet."""
+
+    def __init__(self):
+        self.spreadsheets: dict[str, dict[str, list[list]]] = {}
+        self.grids: dict[tuple[str, str], tuple[int, int]] = {}  # (spreadsheet, title) → (rows, columns)
+        self.reads: list[tuple[str, list[str], str]] = []
+
+    def add(self, spreadsheet_id: str, sheets: dict[str, list[list]]) -> None:
+        self.spreadsheets[spreadsheet_id] = sheets
+
+    def get(self, spreadsheet_id):
+        if spreadsheet_id not in self.spreadsheets:
+            raise HarnessError("not_found", "No existe la hoja de cálculo")
+        sheets = []
+        for number, (title, rows) in enumerate(self.spreadsheets[spreadsheet_id].items()):
+            height, width = self.grids.get((spreadsheet_id, title), (max(len(rows), 1000), 26))
+            sheets.append({"properties": {"sheetId": number, "title": title,
+                                          "gridProperties": {"rowCount": height, "columnCount": width}}})
+        return {"sheets": sheets}
+
+    def values(self, spreadsheet_id, ranges, render="FORMATTED_VALUE"):
+        self.reads.append((spreadsheet_id, list(ranges), render))
+        sheets = self.spreadsheets[spreadsheet_id]
+        by_range = {"'" + title.replace("'", "''") + "'": rows for title, rows in sheets.items()}
+        return [{"range": name, "values": by_range[name]} for name in ranges]
 
 
 class HttpResponse:

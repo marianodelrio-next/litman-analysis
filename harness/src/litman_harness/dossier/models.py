@@ -8,6 +8,9 @@ from ..errors import HarnessError
 
 FOLDER_MIME = "application/vnd.google-apps.folder"
 GOOGLE_DOC_MIME = "application/vnd.google-apps.document"
+GOOGLE_SHEET_MIME = "application/vnd.google-apps.spreadsheet"
+GOOGLE_SLIDES_MIME = "application/vnd.google-apps.presentation"
+XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 NATIVE_PREFIX = "application/vnd.google-apps."
 OPERATION_MARKER = "litman_operation_id"
 ACTION_MARKER = "litman_action_id"
@@ -30,6 +33,7 @@ class Resource:
     # Drive ``version`` also moves without content changes (opening a folder,
     # post-upload processing), so it is informative only.
     md5_checksum: str | None = None
+    modified_time: str | None = None
 
     @classmethod
     def from_api(cls, raw: dict[str, Any]) -> "Resource":
@@ -58,6 +62,7 @@ class Resource:
             link if isinstance(link, str) else None,
             {str(key): str(value) for key, value in props.items()},
             raw.get("md5Checksum") if isinstance(raw.get("md5Checksum"), str) else None,
+            raw.get("modifiedTime") if isinstance(raw.get("modifiedTime"), str) else None,
         )
 
     def has_markers(self, operation_id: str, action_id: str) -> bool:

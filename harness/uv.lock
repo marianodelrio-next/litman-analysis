@@ -534,6 +534,7 @@ dependencies = [
     { name = "google-auth" },
     { name = "google-auth-oauthlib" },
     { name = "litman-core" },
+    { name = "openpyxl" },
     { name = "pypdf" },
     { name = "python-docx" },
 ]
@@ -549,6 +550,7 @@ requires-dist = [
     { name = "google-auth", specifier = ">=2.0" },
     { name = "google-auth-oauthlib", specifier = ">=1.0" },
     { name = "litman-core", directory = "../core" },
+    { name = "openpyxl", specifier = ">=3.1" },
     { name = "pypdf", specifier = ">=5.0" },
     { name = "python-docx", specifier = ">=1.1" },
 ]
