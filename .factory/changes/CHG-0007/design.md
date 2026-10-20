@@ -575,6 +575,13 @@ Out of scope:
   step 7, and assert this in `test_agent_files.py`.
 
 ## Tasks
+Dependencies follow the code each task reuses:
+- CHG-0007-01 first, because it creates the help skill and its coverage test.
+- After it, CHG-0007-02 and CHG-0007-04 can run in parallel.
+- CHG-0007-02 adds the shared pieces (`in_litman`, the new Drive capabilities, the shared `_reasons`
+  helper, the Sheets adapter, comment listing, `DriveGateway.export`). After it, CHG-0007-03,
+  CHG-0007-05 and CHG-0007-06 can run in parallel.
+
 ```yaml
 - id: CHG-0007-01
   title: LitMan-only MCP instructions, tool annotations and the ayuda-litman help skill
@@ -617,7 +624,7 @@ Out of scope:
     AC-16: "bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest -q'"
 - id: CHG-0007-04
   title: Google Docs formatting operations and document creation from Markdown
-  depends_on: [CHG-0007-03]
+  depends_on: [CHG-0007-01]
   complexity: normal
   review: [quality, conformance]
   scope: ["harness/src/litman_harness/**", "harness/tests/**", "harness/agent/**", "harness/docs/**", "docs/guia-litman-windows.md", "docs/windows-codex-validation.md"]
@@ -629,7 +636,7 @@ Out of scope:
     AC-16: "bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest -q'"
 - id: CHG-0007-05
   title: Previewed Google Sheets edits (update range, append rows) and Sheets API diagnosis
-  depends_on: [CHG-0007-04]
+  depends_on: [CHG-0007-02]
   complexity: normal
   review: [quality, conformance]
   scope: ["harness/src/litman_harness/**", "harness/tests/**", "harness/agent/**", "harness/docs/**", "harness/deployment/README.md", "docs/guia-litman-windows.md", "docs/windows-codex-validation.md"]
@@ -642,7 +649,7 @@ Out of scope:
     AC-16: "bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest -q'"
 - id: CHG-0007-06
   title: Previewed comment changes (add, reply, resolve) with duplicate-free resume
-  depends_on: [CHG-0007-05]
+  depends_on: [CHG-0007-02]
   complexity: normal
   review: [quality, conformance]
   scope: ["harness/src/litman_harness/**", "harness/tests/**", "harness/agent/**", "harness/docs/**", "docs/guia-litman-windows.md", "docs/windows-codex-validation.md"]
@@ -669,5 +676,12 @@ Out of scope:
   action. The window is small, and the race is documented.
 - **Comment resume:** two identical comments written by the same person after the preview would be
   ambiguous and end as a conflict.
+- **Parallel tasks share files:**
+  - `interfaces/tools/__init__.py` (`registry()`), `tests/fakes.py`, `ayuda-litman/SKILL.md` and
+    the docs;
+  - CHG-0007-04 and CHG-0007-06 both edit the "quedan fuera" sentence of `conectar-licitacion`.
+  
+  The task merged second rebases and resolves these textual conflicts. A task must not remove
+  another task's help entries or `destructive` flags.
 - **Existing installations** must run `litman install` again (the update phrase) to get
   `ayuda-litman`.

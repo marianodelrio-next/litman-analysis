@@ -1,5 +1,5 @@
 change: CHG-0007
-design_digest: sha256:fc0a05227c47c4503ec94337e0e56facbbf27d3c7a2e1c17bfc5c6af5f293a0a
+design_digest: sha256:7cec8f72a033ad495b8f5164f2e1c3414cac1d41543f9fc749a4d7e00cb841be
 tasks:
 - id: CHG-0007-01
   title: LitMan-only MCP instructions, tool annotations and the ayuda-litman help
@@ -93,7 +93,7 @@ tasks:
 - id: CHG-0007-04
   title: Google Docs formatting operations and document creation from Markdown
   depends_on:
-  - CHG-0007-03
+  - CHG-0007-01
   complexity: normal
   review:
   - quality
@@ -119,7 +119,7 @@ tasks:
   title: Previewed Google Sheets edits (update range, append rows) and Sheets API
     diagnosis
   depends_on:
-  - CHG-0007-04
+  - CHG-0007-02
   complexity: normal
   review:
   - quality
@@ -147,7 +147,7 @@ tasks:
 - id: CHG-0007-06
   title: Previewed comment changes (add, reply, resolve) with duplicate-free resume
   depends_on:
-  - CHG-0007-05
+  - CHG-0007-02
   complexity: normal
   review:
   - quality
