@@ -90,7 +90,7 @@ def test_connect_skill_and_workspace_guide_navigation_and_reading_of_any_file():
 
 def test_connect_skill_no_longer_excludes_formatting_and_names_the_style_operations_and_markdown():
     connect_skill = (AGENT / "skills" / "conectar-licitacion" / "SKILL.md").read_text(encoding="utf-8")
-    step = connect_skill[connect_skill.index("7. **Documentos de Google Docs**"):connect_skill.index("8. ")]
+    step = connect_skill[connect_skill.index("**Documentos de Google Docs** de la licitación"):connect_skill.index("8. ")]
     flat = " ".join(step.split())
     for name in ("set_paragraph_style", "set_text_style", "set_list", "markdown"):
         assert f"`{name}`" in flat
