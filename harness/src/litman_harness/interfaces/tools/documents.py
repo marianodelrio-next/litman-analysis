@@ -46,7 +46,7 @@ TOOLS = (
          "documento cambió desde la vista previa devuelve conflict (document_changed) sin escribir." + _GATE,
          schema({"plan_id": _PLAN_ID}, ("plan_id",)),
          lambda ctx, args: ctx.services().documents.apply_edit(args["plan_id"]),
-         mutates=True),
+         mutates=True, destructive=True),
     Tool("preview_document_creation",
          "Consulta (no escribe en Drive): prepara un Google Doc nuevo llamado name en parent_folder_id (la carpeta de "
          "la licitación o una subcarpeta, nunca _LitMan), con el texto text o convirtiendo el DOCX source_file_id de "

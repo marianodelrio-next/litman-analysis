@@ -25,7 +25,7 @@ from .errors import HarnessError
 from .local_paths import client_path, config_dir, plan_store_root, settings_path, state_dir, token_path, work_root
 
 APPS = ("codex", "claude")
-SKILL_NAMES = ("conectar-licitacion", "resumir-licitacion", "preparar-equipo")
+SKILL_NAMES = ("conectar-licitacion", "resumir-licitacion", "preparar-equipo", "ayuda-litman")
 SUBAGENT_NAME = "lector-licitacion"
 CODEX_BLOCK_START = "# >>> litman (gestionado por `litman install`; no editar) >>>"
 CODEX_BLOCK_END = "# <<< litman <<<"

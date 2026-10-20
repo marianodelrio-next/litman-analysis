@@ -45,7 +45,7 @@ TOOLS = (
     Tool("apply_incorporation", "Mutación: aplica sólo el plan_id de incorporación guardado y aceptado." + _GATE,
          schema({"plan_id": _PLAN_ID}, ("plan_id",)),
          lambda ctx, args: ctx.services().expediente.apply_incorporation(args["plan_id"]),
-         mutates=True),
+         mutates=True, destructive=True),
     Tool("preview_publication", "Consulta (no escribe en Drive): recuperación; plan para publicar un análisis local "
                                 "validado que no se publicó (normalmente execute_analysis ya publica).",
          schema({"analysis_operation_id": {"type": "string"}}, ("analysis_operation_id",)),
@@ -83,7 +83,7 @@ TOOLS = (
                           "plan_id aceptado, con su procedencia." + _GATE,
          schema({"plan_id": _PLAN_ID}, ("plan_id",)),
          lambda ctx, args: ctx.services().summary.apply(args["plan_id"]),
-         mutates=True),
+         mutates=True, destructive=True),
     Tool("recover", "Consulta (no escribe): estado local registrado de una operación por operation_id.",
          schema({"operation_id": {"type": "string"}}, ("operation_id",)),
          lambda ctx, args: ctx.services().expediente.recover(args["operation_id"])),
