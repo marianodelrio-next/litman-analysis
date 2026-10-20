@@ -221,8 +221,13 @@ The installed product resources support this flow:
 - `conectar-licitacion` guides connection and asks once whether to prepare a
   summary after publication. It routes reading, editing, and creating dossier
   Google Docs through the document tools, applies only the preview the person
-  accepts, and forbids computer use or a browser for Drive documents; the
-  workspace `AGENTS.md` repeats that rule.
+  accepts, and restricts the assistant to LitMan tools for the dossier and its
+  Drive files (never computer use, a browser, other Drive connectors, scripts,
+  or Google APIs directly), suggesting asking the developer when no tool fits.
+  The workspace `AGENTS.md` and the MCP server `instructions` repeat that rule.
+- `ayuda-litman` answers "qué puedes hacer" by explaining every operation in
+  business terms with an example phrase; a test keeps it complete against the
+  registry.
 - `resumir-licitacion` defines what to read, the fixed keys, sources, and
   proposal format.
 - `preparar-equipo` guides diagnostics, OAuth, the Google Docs API check,

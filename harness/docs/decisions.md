@@ -114,6 +114,23 @@ unreliable and outside the acceptance model. Docs v1 uses the existing `drive`
 scope, so no new login is required, but the Google Docs API must be enabled in
 the OAuth client's Cloud project.
 
+## The assistant is restricted to LitMan tools by instructions, not client configuration
+
+The MCP server `instructions`, the workspace `AGENTS.md`, and
+`conectar-licitacion` tell the assistant to use only LitMan tools for dossiers
+and Drive files, never computer use, a browser, other Drive connectors, scripts,
+or Google APIs directly, and to say that LitMan has no tool for a request and
+suggest asking the developer when nothing fits. The rule leads the first 512
+characters of the instructions because clients may show only that much. Tool
+annotations derived from `Tool.mutates` and `Tool.destructive` let clients
+prompt for approval by risk. Writing Computer Use or permission settings into
+the person's global client configuration was rejected: Codex documents only an
+administrator switch, and the change would be global and invasive. Instructions
+are guidance, not enforcement, so real client behavior is checked manually.
+A help skill with a test that covers the whole registry was preferred over a
+`help` tool, so the answer stays in business language without growing the MCP
+surface.
+
 ## Product agents are separate from development agents
 
 Files under `harness/agent/` are installed product behavior. Repository skills

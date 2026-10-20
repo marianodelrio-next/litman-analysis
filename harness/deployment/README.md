@@ -15,7 +15,7 @@ same command also updates an existing installation.
 | LitMan folder opened in the app | `%USERPROFILE%\LitMan` | `~/LitMan` |
 | Hidden repository checkout, never opened in the app | `%LOCALAPPDATA%\LitMan\src` | `~/.local/share/litman/src` |
 | `litman`, `litman-mcp`, and `litman-core` | uv tool with uv-managed Python 3.11 | same |
-| Product skills | Codex: `~/.agents/skills`; Claude: `~/.claude/skills` | same |
+| Product skills (`conectar-licitacion`, `resumir-licitacion`, `preparar-equipo`, `ayuda-litman`) | Codex: `~/.agents/skills`; Claude: `~/.claude/skills` | same |
 | `lector-licitacion` reader agent | `~/.codex/agents/*.toml`; `~/.claude/agents/*.md` | same |
 | `litman` MCP registration | delimited block in `~/.codex/config.toml`; `~/.claude.json` with user scope | same |
 | OAuth client/token, settings, state, install manifest | `%LOCALAPPDATA%\litman-harness` | `~/.config` and `~/.local/state/litman-harness` |
@@ -73,6 +73,8 @@ setup with `litman install --oauth-client`, `litman login`, provider sign-in,
 ### Update, repair, or uninstall
 
 - Update by running the same guided installation command, then restart the app.
+  Existing installations need this update to get new product skills such as
+  `ayuda-litman`.
 - Repair by writing **“prepara mi equipo”** in the app. The skill runs
   diagnostics and addresses only missing setup.
 - Uninstall with the script for the current platform:

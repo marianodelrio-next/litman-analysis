@@ -77,6 +77,15 @@ envelope to stdout on success or stderr with exit status 2 on failure.
 for protocol versions `2025-06-18`, `2025-03-26`, and `2024-11-05`,
 notifications without responses, `ping`, `tools/list`, and `tools/call`.
 `tools/call` returns the envelope as text and sets `isError` when `ok` is false.
+`initialize` also returns Spanish server `instructions` (`SERVER_INSTRUCTIONS`
+in `interfaces/mcp.py`) whose first 512 characters restrict the assistant to
+LitMan tools for dossiers and Drive files and tell it to suggest asking the
+developer when no tool fits. Each `tools/list` entry carries MCP
+`annotations`: `readOnlyHint` is `not mutates` (so `preview_*` tools, which
+only store a private local plan, count as read-only), `destructiveHint` is the
+tool's `destructive` flag (`apply_incorporation`, `apply_summary`,
+`apply_document_edit`, and `discard_analysis`), `idempotentHint` is `true`, and
+`openWorldHint` is `false`.
 Protocol errors use `-32700`, `-32600`, `-32601`, and `-32602`. Services are
 assembled per call, so `tools/list` works without local configuration.
 

@@ -25,7 +25,7 @@ the text below.
 
 Confirm all of the following before starting:
 
-- The code for CHG-0003, CHG-0005, and CHG-0006 is merged into the remote `master`. The guided
+- The code for CHG-0003, CHG-0005, CHG-0006, and CHG-0007-01 is merged into the remote `master`. The guided
   install one-liner installs the latest `v*` tag if one exists, otherwise
   `origin/HEAD` (`harness/deployment/install.ps1`), so without a tag it
   installs whatever is on `master` at the time.
@@ -345,7 +345,32 @@ Docs API, the exact error payloads, and whether `revisionId` is returned.
   tender. Expected output: a converted Google Doc in the chosen folder, the
   DOCX unchanged.
 
-## 9. Repair
+## 9. LitMan-only guidance, help, and tool approval
+
+Run these steps after section 8, in a new conversation opened in the LitMan
+folder, so that the app reads the current MCP server `instructions` and the
+reinstalled skills. An installation made before CHG-0007 must first run the
+guided installation command again to get `ayuda-litman`.
+
+- **Help.** Type *"qué puedes hacer"*. Expected output: the `ayuda-litman`
+  skill answers with LitMan's capabilities grouped by purpose (prepare the
+  computer, connect and organize the tender, analysis, summary, reading,
+  Google Docs), each with an example phrase. **Observe and record** whether
+  the app loaded the skill or answered from the server `instructions`.
+- **No tool fits.** Ask for something LitMan has no tool for, for example
+  *"comparte la carpeta de la licitación con mi compañero"*. Expected output:
+  the assistant says that LitMan has no tool for it yet and suggests asking
+  LitMan's developer. At no point does it use computer use, a browser, another
+  Drive connector, or a script. **Observe and record** any attempt to do so.
+- **Approval prompts.** During section 8, and again here with a
+  `preview_document_edit` followed by `apply_document_edit`, **observe and
+  record** how Codex asks for approval of `preview_*` tools (annotated
+  `readOnlyHint: true`) and of `apply_*` tools (annotated `readOnlyHint:
+  false`, and `destructiveHint: true` for `apply_document_edit`). If Claude
+  Code is available on the same machine, record the same for it; otherwise
+  mark it not run.
+
+## 10. Repair
 
 Action: delete the token (`token.json`) under the harness state directory,
 then type **"prepara mi equipo"** in the app again.
@@ -354,7 +379,7 @@ Expected output: the skill's first step, `diagnose`, detects the missing
 session and the skill addresses only that failing step (OAuth/login), per
 `preparar-equipo`'s repair behavior, rather than repeating the whole setup.
 
-## 10. Uninstall
+## 11. Uninstall
 
 Action: open a file inside the LitMan workspace folder in another program,
 then run the uninstall script requesting workspace removal.
@@ -390,7 +415,7 @@ itself (`%USERPROFILE%\LitMan`) is removed only because
 `LITMAN_REMOVE_WORKSPACE=1` was requested; without it, uninstall keeps the
 folder, the OAuth client and token, and private data by default.
 
-## 11. Run both test suites natively
+## 12. Run both test suites natively
 
 Action: from a native PowerShell session (no WSL), run each package's tests.
 
@@ -403,7 +428,7 @@ cd ..\harness; uv run pytest -q
 
 Expected output: both suites pass. Record any skipped test and why.
 
-## 12. Results and reporting
+## 13. Results and reporting
 
 For each system, app, and provider combination exercised, record: system and
 version, step executed, result, non-sensitive local evidence, and whether a

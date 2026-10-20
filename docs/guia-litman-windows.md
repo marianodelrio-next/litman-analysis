@@ -138,13 +138,14 @@ En el día a día solo necesitas abrir Codex en la carpeta LitMan y escribir lo 
 | Descartar un análisis que no quiero publicar | `descarta el análisis` |
 | Leer o cambiar el texto de un Google Doc de la licitación (por ejemplo, la propuesta técnica en `Oferta`) | `en la propuesta técnica, cambia "<texto actual>" por "<texto nuevo>"` |
 | Crear un Google Doc nuevo en la licitación | `crea en la carpeta Oferta un documento "<nombre>" con este texto: ...` o `crea un Google Doc a partir del DOCX "<nombre>"` |
+| Saber qué puede hacer LitMan, con ejemplos | `qué puedes hacer` |
 | Arreglar algo que no funciona | `prepara mi equipo` |
 
-Tres reglas:
+Cuatro reglas:
 
 - **Nada se cambia en Drive sin tu sí.** El asistente siempre te enseña el plan antes. Léelo y contesta sí o no.
 - **No toques la carpeta `_LitMan`** ni el archivo `contexto.md` a mano. Si alguien los edita, LitMan no los sobrescribe y te avisará.
-- **Los documentos de Drive se cambian con LitMan, no con el navegador.** Para editar o crear un Google Doc, el asistente te enseña cada cambio con el texto de alrededor y solo lo aplica si dices que sí. Cambia solo texto: el formato, las tablas, las imágenes y los comentarios los cambias tú en Google Docs. Un DOCX no se edita directamente: primero se crea su Google Doc.
+- **Las licitaciones y los archivos de Drive se tocan solo con LitMan, nunca con el navegador ni manejando la pantalla.** Si pides algo que LitMan todavía no sabe hacer, el asistente te lo dirá y te sugerirá pedírselo al desarrollador de LitMan. Para editar o crear un Google Doc, el asistente te enseña cada cambio con el texto de alrededor y solo lo aplica si dices que sí. Cambia solo texto: el formato, las tablas, las imágenes y los comentarios los cambias tú en Google Docs. Un DOCX no se edita directamente: primero se crea su Google Doc.
 - **Antes de descartar un análisis, cierra** los archivos suyos que tengas abiertos (por ejemplo un PDF). Si no, el descarte falla y tendrás que repetirlo.
 
 ## Problemas frecuentes
@@ -212,6 +213,8 @@ Esta lista es para quien valida la guía en un Windows limpio. Apunta el resulta
 - [ ] Apuntado qué navegador se usa para el PDF (Edge o Chrome).
 - [ ] Pedir un cambio de texto en la propuesta técnica muestra la vista previa y, tras aceptarla, el cambio aparece en Google Docs; el asistente no abre el navegador.
 - [ ] Crear un Google Doc nuevo en la licitación funciona desde un texto y desde un DOCX.
+- [ ] "qué puedes hacer" muestra lo que hace LitMan, agrupado y con un ejemplo para cada cosa.
+- [ ] Pedir algo que LitMan no sabe hacer: el asistente dice que no tiene herramienta para eso, sugiere pedírselo al desarrollador y no usa el navegador ni maneja la pantalla.
 - [ ] Descartar con un archivo abierto falla con "Fallo inesperado del harness". Tras cerrarlo, el descarte funciona.
 - [ ] Tras borrar `token.json` en `%LOCALAPPDATA%\litman-harness`, "prepara mi equipo" solo repite el inicio de sesión en Google.
 
