@@ -74,6 +74,15 @@ como vista previa y sólo se aplica cuando la persona lo acepta.
 - `list_comments`: muestra los comentarios de un archivo y sus respuestas.
   Ejemplo: "¿qué comentarios hay en la memoria técnica?"
 
+## Cambios en archivos
+
+- `preview_file_changes`: prepara crear carpetas, renombrar, mover, copiar,
+  enviar a la papelera, exportar o convertir hasta 20 archivos o carpetas.
+  Ejemplo: "crea una carpeta Entregas y mueve ahí la oferta final"
+- `apply_file_changes`: aplica esos cambios cuando los aceptas; nunca borra
+  nada de forma permanente.
+  Ejemplo: "sí, hazlo"
+
 ## Leer documentos
 
 - `read_document`: lee los pliegos originales y los resultados del análisis

@@ -45,8 +45,22 @@ description: Conecta una licitación por el ID de su carpeta de Drive y guía a 
    `apply_document_edit`/`apply_document_creation` sólo el `plan_id` que la
    persona acepte. Ante `document_changed`, vuelve a leer y prepara un plan
    nuevo; ante `docs_api_disabled`, explica que el administrador debe
-   habilitar la Google Docs API.
-   Tablas, imágenes y comentarios quedan fuera: díselo a la persona.
+   habilitar la Google Docs API. Tablas, imágenes y comentarios quedan fuera:
+   díselo a la persona.
+
+   **Organizar archivos.** Para crear carpetas, renombrar, mover, copiar,
+   enviar a la papelera, exportar (PDF, Word, Markdown, texto, Excel, CSV o
+   PowerPoint) o convertir (a Google Doc o a Hoja de cálculo), prepara
+   `preview_file_changes` con hasta 20 operaciones, muestra la ruta de
+   origen y destino y el nombre resultante de cada una, y aplica sólo el
+   `plan_id` que la persona acepte con `apply_file_changes`. Un recurso
+   registrado en la licitación (originales, carpetas, manifest.json,
+   contexto.md) o cualquier cosa bajo `_LitMan` está protegido: no se puede
+   mover, renombrar ni enviar a la papelera. Ante `insufficient_capability`,
+   `protected_resource`, `name_exists` o `conflict`, explícalo a la persona
+   con la operación afectada y no lo intentes por otra vía: prepara un plan
+   nuevo sin esa operación si quiere seguir. `trash` usa la papelera de
+   Drive, nunca borra de forma permanente.
 8. Usa sólo las herramientas de LitMan para la licitación y sus archivos de
    Drive. Nunca uses computer use, el navegador, otros conectores de Drive,
    scripts ni las APIs de Google directamente. Si ninguna herramienta de
