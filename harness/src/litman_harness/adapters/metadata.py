@@ -47,6 +47,12 @@ class MetadataGateway:
     def copy(self, *args):
         raise HarnessError("read_only_adapter", "El adaptador de metadatos no puede escribir")
 
+    def rename(self, *args):
+        raise HarnessError("read_only_adapter", "El adaptador de metadatos no puede escribir")
+
+    def trash(self, *args):
+        raise HarnessError("read_only_adapter", "El adaptador de metadatos no puede escribir")
+
     def download(self, *args):
         raise HarnessError("read_only_adapter", "El adaptador de metadatos no puede descargar")
 
