@@ -1,12 +1,11 @@
 """Closed, protected Drive organizing operations for one dossier: create, rename, move, copy, trash,
 export and convert, previewed as one plan and applied with capability and protection checks.
 
-Manifest-managed resources (folders, originals, context, the manifest itself,
-and anything below ``_LitMan``) can never be moved, trashed or renamed away
-from being a stable reference; everything else in the connected tree can be
-organized freely once the account's Drive capabilities allow it.  Trash never
-calls ``files.delete``: the Harness rule is that an original is never removed,
-only ever reversibly trashed.
+The root, local LitMan state, and manifest/context files can never be changed;
+manifest-managed resources also cannot be moved or trashed away from their
+stable references. Everything else in the connected tree can be organized once
+the account's Drive capabilities allow it. Trash never calls ``files.delete``:
+the Harness rule is that an original is never removed, only reversibly trashed.
 """
 from __future__ import annotations
 
@@ -47,10 +46,6 @@ CONVERT_TARGETS = {DOCX_MIME: GOOGLE_DOC_MIME, MD_MIME: GOOGLE_DOC_MIME,
                    XLSX_MIME: GOOGLE_SHEET_MIME, CSV_MIME: GOOGLE_SHEET_MIME}
 _CONFLICT_CODES = {"insufficient_permission", "insufficient_capability", "protected_resource", "name_exists",
                    "export_too_large"}
-# Operations whose result is a new resource, created idempotently through ``ensure_marked``.
-_CREATING = ("create_folder", "copy", "export", "convert")
-
-
 def _invalid(message: str, **details: Any) -> HarnessError:
     return HarnessError("invalid_request", message, details=details)
 
