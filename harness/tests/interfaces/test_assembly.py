@@ -118,6 +118,7 @@ def _with_docs(monkeypatch, docs):
 
     services = Services()
     services.docs = docs
+    services.sheets = object()  # sheets_api_status() must tolerate this and report "unknown"
     monkeypatch.setattr(assembly, "build_services", lambda env=None: services)
 
 
@@ -158,3 +159,60 @@ def test_diagnose_reports_the_docs_api_unknown_without_services(unconfigured_env
 
 def test_diagnose_reports_the_docs_api_unknown_with_the_metadata_adapter(harness_env):
     assert assembly.diagnose()["docs_api"] == "unknown"
+
+
+class _Sheets:
+    def __init__(self, outcome):
+        self.outcome = outcome
+        self.calls = []
+
+    def get(self, spreadsheet_id):
+        self.calls.append(spreadsheet_id)
+        if isinstance(self.outcome, BaseException):
+            raise self.outcome
+        return self.outcome
+
+
+def _with_sheets(monkeypatch, sheets):
+    class Services:
+        class expediente:
+            @staticmethod
+            def identity():
+                return {"email": "persona@example.com"}
+
+    services = Services()
+    services.docs = _Docs({})
+    services.sheets = sheets
+    monkeypatch.setattr(assembly, "build_services", lambda env=None: services)
+
+
+def test_diagnose_reports_the_sheets_api_enabled_when_the_probe_is_not_found(unconfigured_env, monkeypatch):
+    from litman_harness.adapters.sheets import sheets_http_error
+    sheets = _Sheets(sheets_http_error(404))
+    _with_sheets(monkeypatch, sheets)
+    report = assembly.diagnose()
+    assert report["sheets_api"] == "enabled" and sheets.calls == [assembly.SHEETS_PROBE_ID]
+    assert not any(item["code"] == "not_found" for item in report["errors"])
+
+
+def test_diagnose_reports_the_sheets_api_disabled(unconfigured_env, monkeypatch):
+    from litman_harness.adapters.sheets import sheets_http_error
+    content = b'{"error": {"code": 403, "errors": [{"reason": "accessNotConfigured"}]}}'
+    _with_sheets(monkeypatch, _Sheets(sheets_http_error(403, content)))
+    report = assembly.diagnose()
+    assert report["sheets_api"] == "disabled"
+    assert not any(item["code"] == "sheets_api_disabled" for item in report["errors"])
+
+
+def test_diagnose_reports_the_sheets_api_unknown_and_never_fails_because_of_it(unconfigured_env, monkeypatch):
+    from litman_harness.adapters.sheets import sheets_http_error
+    from litman_harness.errors import HarnessError
+    for outcome in (sheets_http_error(401), sheets_http_error(500), HarnessError("read_only_adapter", "x"),
+                    RuntimeError("offline"), {"sheets": []}):
+        _with_sheets(monkeypatch, _Sheets(outcome))
+        report = assembly.diagnose()
+        assert report["sheets_api"] == ("enabled" if isinstance(outcome, dict) else "unknown")
+
+
+def test_diagnose_reports_the_sheets_api_unknown_with_the_metadata_adapter(harness_env):
+    assert assembly.diagnose()["sheets_api"] == "unknown"

@@ -5,6 +5,7 @@ from dataclasses import replace
 import hashlib
 import json
 from pathlib import Path
+import re
 import subprocess
 import tomllib
 
@@ -220,13 +221,30 @@ def core_run(job_type: str = "assessment", *, technical: str = "memoria_tecnica.
     return run
 
 
+_SHEET_RANGE = re.compile(r"^(?:'(?P<quoted>(?:[^']|'')*)'|(?P<bare>[^'!]+))"
+                          r"(?:!(?P<c1>[A-Z]+)(?P<r1>[0-9]+):(?P<c2>[A-Z]+)(?P<r2>[0-9]+))?$")
+
+
+def _sheet_col_index(letters: str) -> int:
+    value = 0
+    for char in letters:
+        value = value * 26 + (ord(char) - ord("A") + 1)
+    return value
+
+
 class FakeSheets:
-    """In-memory Sheets v4 read side: ``{title: rows}`` per spreadsheet, with the grid size of each sheet."""
+    """In-memory Sheets v4: ``{title: rows}`` per spreadsheet, with the grid size of each sheet.
+
+    ``values`` slices an explicit A1 range like the real API (and trims trailing empty rows/cells);
+    with no ``!A1:B2`` suffix it returns the whole sheet.  ``update`` writes an explicit range with
+    ``RAW`` semantics, growing the sheet as needed.
+    """
 
     def __init__(self):
         self.spreadsheets: dict[str, dict[str, list[list]]] = {}
         self.grids: dict[tuple[str, str], tuple[int, int]] = {}  # (spreadsheet, title) → (rows, columns)
         self.reads: list[tuple[str, list[str], str]] = []
+        self.updates: list[tuple[str, str, list[list]]] = []
 
     def add(self, spreadsheet_id: str, sheets: dict[str, list[list]]) -> None:
         self.spreadsheets[spreadsheet_id] = sheets
@@ -243,9 +261,40 @@ class FakeSheets:
 
     def values(self, spreadsheet_id, ranges, render="FORMATTED_VALUE"):
         self.reads.append((spreadsheet_id, list(ranges), render))
-        sheets = self.spreadsheets[spreadsheet_id]
-        by_range = {"'" + title.replace("'", "''") + "'": rows for title, rows in sheets.items()}
-        return [{"range": name, "values": by_range[name]} for name in ranges]
+        result = []
+        for name in ranges:
+            match = _SHEET_RANGE.match(name)
+            title = (match["quoted"] or match["bare"]).replace("''", "'")
+            rows = self.spreadsheets[spreadsheet_id][title]
+            if match["c1"]:
+                r1, r2 = int(match["r1"]), int(match["r2"])
+                c1, c2 = _sheet_col_index(match["c1"]), _sheet_col_index(match["c2"])
+                sliced = [[row[c - 1] if c - 1 < len(row) else None for c in range(c1, c2 + 1)]
+                          for row in rows[r1 - 1:r2]]
+            else:
+                sliced = [list(row) for row in rows]
+            while sliced and all(cell in (None, "") for cell in sliced[-1]):
+                sliced.pop()
+            result.append({"range": name, "values": sliced})
+        return result
+
+    def update(self, spreadsheet_id, range_, values):
+        self.updates.append((spreadsheet_id, range_, values))
+        match = _SHEET_RANGE.match(range_)
+        title = (match["quoted"] or match["bare"]).replace("''", "'")
+        r1, c1 = int(match["r1"]), _sheet_col_index(match["c1"])
+        rows = self.spreadsheets[spreadsheet_id][title]
+        for row_offset, row_values in enumerate(values):
+            row_index = r1 - 1 + row_offset
+            while len(rows) <= row_index:
+                rows.append([])
+            row = rows[row_index]
+            for col_offset, value in enumerate(row_values):
+                col_index = c1 - 1 + col_offset
+                while len(row) <= col_index:
+                    row.append(None)
+                row[col_index] = value
+        return {"updatedCells": sum(len(row) for row in values)}
 
 
 class HttpResponse:

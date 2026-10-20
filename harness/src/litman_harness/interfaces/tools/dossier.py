@@ -14,8 +14,8 @@ TOOLS = (
     Tool("identity", "Consulta (no escribe): cuenta activa del adaptador configurado.", schema(),
          lambda ctx, args: ctx.services().expediente.identity()),
     Tool("diagnose", "Consulta (no escribe): adaptador, scopes, litman-core (incluido su entorno), puerta de "
-                     "concurrencia, API de Google Docs (docs_api: enabled, disabled o unknown), rutas configuradas y "
-                     "estado de la instalación (`litman install`), sin tokens "
+                     "concurrencia, API de Google Docs (docs_api) y de Google Sheets (sheets_api): enabled, disabled "
+                     "o unknown, rutas configuradas y estado de la instalación (`litman install`), sin tokens "
                      "ni secretos ni rutas locales.", schema(),
          lambda ctx, args: diagnose()),
     Tool("inspect", "Consulta (no escribe): inventario de la carpeta de la licitación y next_actions justificadas.",

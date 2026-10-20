@@ -48,6 +48,16 @@ description: Conecta una licitación por el ID de su carpeta de Drive y guía a 
    habilitar la Google Docs API. Tablas, imágenes y comentarios quedan fuera:
    díselo a la persona.
 
+   **Hojas de cálculo de Google Sheets** de la licitación: para cambiar un
+   rango o añadir filas, prepara `preview_sheet_edit` con operaciones cerradas
+   (`update_range` con un rango explícito, o `append_rows` con el título de la
+   hoja). Muestra la vista previa (el rango resuelto de cada operación) y
+   aplica con `apply_sheet_edit` sólo el `plan_id` que la persona acepte. Ante
+   `sheet_changed`, explica qué rango cambió y prepara un plan nuevo para lo
+   que falte; ante `sheets_api_disabled`, explica que el administrador debe
+   habilitar la Google Sheets API. Un XLSX no se edita así: convertirlo
+   primero a Google Sheet.
+
    **Organizar archivos.** Para crear carpetas, renombrar, mover, copiar,
    enviar a la papelera, exportar (PDF, Word, Markdown, texto, Excel, CSV o
    PowerPoint) o convertir (a Google Doc o a Hoja de cálculo), prepara

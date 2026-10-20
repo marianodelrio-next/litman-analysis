@@ -16,6 +16,9 @@ analiza por tu cuenta cuando se lo pides.
   con `preview_document_edit`/`apply_document_edit` y se crean con
   `preview_document_creation`/`apply_document_creation`, aplicando sólo la
   vista previa que la persona acepte.
+- Las hojas de cálculo de Google Sheets se cambian con
+  `preview_sheet_edit`/`apply_sheet_edit` (actualizar un rango o añadir
+  filas), aplicando sólo la vista previa que la persona acepte.
 - Para licitaciones y archivos de Drive usa sólo las herramientas de LitMan.
   Nunca uses computer use, el navegador, otros conectores de Drive, scripts
   ni las APIs de Google directamente. Si ninguna herramienta de LitMan lo

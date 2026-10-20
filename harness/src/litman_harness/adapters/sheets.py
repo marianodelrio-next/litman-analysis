@@ -9,12 +9,16 @@ from .google_errors import reasons
 _FIELDS = "sheets(properties(sheetId,title,gridProperties(rowCount,columnCount)))"
 _DISABLED_REASONS = {"accessNotConfigured", "SERVICE_DISABLED"}
 FORMATTED_VALUE = "FORMATTED_VALUE"
+UNFORMATTED_VALUE = "UNFORMATTED_VALUE"
+FORMULA = "FORMULA"
+RAW = "RAW"
 
 
 class SheetsGateway(Protocol):
     def get(self, spreadsheet_id: str) -> dict[str, Any]: ...
     def values(self, spreadsheet_id: str, ranges: list[str],
                render: str = FORMATTED_VALUE) -> list[dict[str, Any]]: ...
+    def update(self, spreadsheet_id: str, range_: str, values: list[list[Any]]) -> dict[str, Any]: ...
 
 
 _HTTP_ERRORS = {
@@ -57,3 +61,8 @@ class GoogleSheetsGateway:
         response = _execute(self.service.spreadsheets().values().batchGet(
             spreadsheetId=spreadsheet_id, ranges=ranges, valueRenderOption=render))
         return [item for item in response.get("valueRanges", []) if isinstance(item, dict)]
+
+    def update(self, spreadsheet_id: str, range_: str, values: list[list[Any]]) -> dict[str, Any]:
+        body = {"range": range_, "values": values}
+        return _execute(self.service.spreadsheets().values().update(
+            spreadsheetId=spreadsheet_id, range=range_, valueInputOption=RAW, body=body))

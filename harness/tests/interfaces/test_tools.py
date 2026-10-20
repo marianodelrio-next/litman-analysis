@@ -12,7 +12,7 @@ OPERATIONS = {"identity", "diagnose", "inspect", "status", "preview_incorporatio
               "read_document", "preview_summary", "apply_summary", "recover", "setup", "read_google_doc",
               "preview_document_edit", "apply_document_edit", "preview_document_creation", "apply_document_creation",
               "list_folder", "search_in_dossier", "get_file_info", "read_file", "list_comments",
-              "preview_file_changes", "apply_file_changes"}
+              "preview_sheet_edit", "apply_sheet_edit", "preview_file_changes", "apply_file_changes"}
 
 
 def test_registry_exposes_operations_with_schema_and_kind():
@@ -32,6 +32,7 @@ def test_registry_exposes_operations_with_schema_and_kind():
                                                                               "apply_summary", "setup",
                                                                               "apply_document_edit",
                                                                               "apply_document_creation",
+                                                                              "apply_sheet_edit",
                                                                               "apply_file_changes"}
 
 
@@ -97,6 +98,46 @@ def test_document_tools_declare_closed_operations_and_reject_bad_arguments_befor
                                                       "markdown": 1}),
                        ("apply_document_creation", {})):
         assert invoke(name, args, factory)["error"]["code"] == "invalid_request"
+
+
+def test_sheet_tools_declare_closed_operations_and_reject_bad_arguments_before_services():
+    def factory():
+        raise AssertionError("services must not be built for invalid arguments")
+
+    operations = registry()["preview_sheet_edit"].input_schema["properties"]["operations"]
+    assert operations["maxItems"] == 20 and operations["items"]["additionalProperties"] is False
+    assert operations["items"]["properties"]["op"]["enum"] == ["update_range", "append_rows"]
+    assert registry()["preview_sheet_edit"].input_schema["required"] == ["folder_id", "spreadsheet_id", "operations"]
+    assert registry()["apply_sheet_edit"].input_schema["required"] == ["plan_id"]
+    valid_operations = [{"op": "update_range", "range": "'Hoja 1'!A1:A1", "values": [[1]]}]
+    for name, args in (("preview_sheet_edit", {"folder_id": "root", "spreadsheet_id": 1,
+                                               "operations": valid_operations}),
+                       ("preview_sheet_edit", {"folder_id": "root", "spreadsheet_id": "s", "operations": {}}),
+                       ("preview_sheet_edit", {"folder_id": "root", "spreadsheet_id": "s", "operations": ["x"]}),
+                       ("apply_sheet_edit", {})):
+        assert invoke(name, args, factory)["error"]["code"] == "invalid_request"
+
+
+def test_sheet_tools_call_the_sheet_service_with_their_arguments():
+    calls = []
+
+    class SheetEdits:
+        def preview_edit(self, *args):
+            calls.append(("preview_edit", args))
+            return {}
+
+        def apply_edit(self, *args):
+            calls.append(("apply_edit", args))
+            return {}
+
+    class Services:
+        sheet_edits = SheetEdits()
+
+    operations = [{"op": "update_range", "range": "'Hoja 1'!A1:A1", "values": [[1]]}]
+    assert invoke("preview_sheet_edit", {"folder_id": "r", "spreadsheet_id": "s", "operations": operations},
+                 Services)["ok"] is True
+    assert invoke("apply_sheet_edit", {"plan_id": "p"}, Services)["ok"] is True
+    assert calls == [("preview_edit", ("r", "s", operations)), ("apply_edit", ("p",))]
 
 
 def test_file_tools_are_read_only_queries_with_validated_arguments():

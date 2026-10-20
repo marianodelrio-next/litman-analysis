@@ -399,6 +399,20 @@ guided installation command again to get `ayuda-litman`.
   API (`sheets_api_disabled`). **Observe and record** the HTTP 403 reason
   Google returns, then enable the API and check that the `drive`-scope token is
   accepted by the Sheets API.
+- **Edit a Google Sheet.** With the Sheets API enabled, ask the app to put a
+  value in one cell of a Google Sheet of the tender (for example, a cost
+  figure) and, separately, to add one new row at the end. Expected output: the
+  assistant shows the `preview_sheet_edit` result with the resolved range of
+  each operation and waits for your answer; after you accept,
+  `apply_sheet_edit` returns `succeeded` and both changes appear in Drive, with
+  nothing else changed. At no point does the assistant use computer use or a
+  browser.
+- **Sheet conflict.** Ask for another range edit and stop at the preview.
+  Change any cell of that exact range by hand in Google Sheets, then accept
+  the preview. Expected output: `conflict` with code `sheet_changed` and
+  nothing written by LitMan for that range; the assistant offers to read the
+  sheet again. **Observe and record** whether the real Sheets API ever returns
+  a different shape for the read than the one the fakes model.
 - **Comments.** Add an open comment with a reply and a resolved comment to a
   Google Doc, then ask *"qué comentarios hay en la memoria técnica"*. Expected
   output: `list_comments` shows only the open comment with its reply and its
@@ -413,12 +427,13 @@ guided installation command again to get `ayuda-litman`.
   and record** the approval prompt and any permission or export-size error;
   the assistant must not use computer use, a browser, or another Drive route.
 - **Approval prompts.** During section 8, and again here with a
-  `preview_document_edit` followed by `apply_document_edit`, **observe and
+  `preview_document_edit` followed by `apply_document_edit` and a
+  `preview_sheet_edit` followed by `apply_sheet_edit`, **observe and
   record** how Codex asks for approval of the read tools of this section
   (`list_folder`, `read_file`, and the rest, annotated `readOnlyHint: true`),
   of `preview_*` tools (annotated `readOnlyHint: true`) and of `apply_*` tools
   (annotated `readOnlyHint: false`, and `destructiveHint: true` for
-  `apply_document_edit`). If Claude
+  `apply_document_edit` and `apply_sheet_edit`). If Claude
   Code is available on the same machine, record the same for it; otherwise
   mark it not run.
 

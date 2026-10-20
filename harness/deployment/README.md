@@ -65,9 +65,11 @@ again. Until it is enabled, reading, editing, and creating Google Docs return
 `docs_api_disabled`, `diagnose` reports `docs_api: "disabled"`, and the rest of
 LitMan keeps working.
 
-Reading Google Sheets needs the **Google Sheets API** enabled the same way. It
-also uses the existing `drive` scope. Until it is enabled, `read_file` on a
-Google Sheet returns `sheets_api_disabled`; other files are unaffected.
+Reading and editing Google Sheets needs the **Google Sheets API** enabled the
+same way. It also uses the existing `drive` scope. Until it is enabled,
+`read_file` on a Google Sheet and `preview_sheet_edit`/`apply_sheet_edit`
+return `sheets_api_disabled`, `diagnose` reports `sheets_api: "disabled"`,
+and other files are unaffected.
 
 When installation finishes, restart the app, open the `LitMan` folder, and
 write **“prepara mi equipo”**. The installed product skill guides OAuth client
