@@ -36,6 +36,13 @@ $env:LITMAN_APP='codex'; irm https://raw.githubusercontent.com/marianodelrio-nex
 
 Set `LITMAN_APP` to `claude` instead when installing for Claude.
 
+Installers use only published stable tags named `vX.Y.Z`. If no such tag
+exists, they stop without installing. Run `litman check-update` to check for a
+new version; the `actualizar-equipo` skill summarizes the changes and guides
+the update. Close and reopen the app after updating. Installations created
+before tagged updates were introduced need this install command once to save
+the repository location.
+
 The script clones or updates the repository, installs the tools with
 `uv tool install --python 3.11 harness --with core`, then runs
 `litman install --app <app> --source <repo>`. That command creates the LitMan

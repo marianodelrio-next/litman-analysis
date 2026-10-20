@@ -69,6 +69,8 @@ def test_install_codex_clean(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     assert parsed["mcp_servers"]["litman"]["tool_timeout_sec"] == 7200
     assert parsed["mcp_servers"]["litman"]["command"] == str(tmp_path / "scripts" / "litman-mcp")
     assert installation.manifest_path(env).is_file()
+    manifest = json.loads(installation.manifest_path(env).read_text(encoding="utf-8"))
+    assert manifest["source"] == str(REPO.resolve())
 
 
 def test_install_is_idempotent_and_updates_a_changed_skill(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):

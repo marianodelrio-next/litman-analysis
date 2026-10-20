@@ -1,6 +1,6 @@
 """``litman <operation> [--json '{...}']``: prints the shared operation envelope.
 
-``litman login``, ``litman install`` and ``litman uninstall`` are CLI-only:
+``litman login``, ``litman install``, ``litman uninstall`` and ``litman check-update`` are CLI-only:
 they are not MCP operations and never appear in ``registry()``/`tools/list``.
 """
 from __future__ import annotations
@@ -75,6 +75,16 @@ def uninstall(argv: list[str]) -> dict[str, Any]:
         return error_envelope(exc.code, str(exc), exc.details)
 
 
+def check_update(argv: list[str]) -> dict[str, Any]:
+    parser = argparse.ArgumentParser(prog="litman check-update", description="Comprueba si hay una versión nueva")
+    parser.parse_args(argv)
+    from ..updates import check_update as run_check
+    try:
+        return {"ok": True, "result": run_check()}
+    except HarnessError as exc:
+        return error_envelope(exc.code, str(exc), exc.details)
+
+
 def main(argv: list[str] | None = None) -> None:
     operations = {name.replace("_", "-"): name for name in registry()}
     argv = argv if argv is not None else sys.argv[1:]
@@ -96,9 +106,15 @@ def main(argv: list[str] | None = None) -> None:
         if not envelope["ok"]:
             raise SystemExit(2)
         return
+    if argv[:1] == ["check-update"]:
+        envelope = check_update(argv[1:])
+        emit(envelope, error=not envelope["ok"])
+        if not envelope["ok"]:
+            raise SystemExit(2)
+        return
     parser = argparse.ArgumentParser(
         prog="litman", description="Adaptador local JSON para expedientes LitMan "
-        "(además: `litman login`, `litman install`, `litman uninstall`, sólo CLI)")
+        "(además: `litman login`, `litman install`, `litman uninstall`, `litman check-update`, sólo CLI)")
     parser.add_argument("operation", choices=sorted(operations))
     parser.add_argument("--json", default="{}", help="Argumentos JSON; nunca incluya tokens ni secretos")
     args = parser.parse_args(argv)

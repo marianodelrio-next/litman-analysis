@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Callable, Mapping
 
 from .. import installation
+from .. import __version__
 from ..adapters import core
 from ..adapters.docs import DocsGateway, GoogleDocsGateway
 from ..adapters.drive import DriveGateway, GoogleDriveGateway
@@ -137,6 +138,7 @@ def diagnose(env: Mapping[str, str] | None = None) -> dict[str, Any]:
         settings_error = None
     info = core.core_info()
     report: dict[str, Any] = {
+        "version": __version__,
         "adapter": kind,
         "read_only": kind == "metadata",
         "token_exposed": False,

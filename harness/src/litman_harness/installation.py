@@ -281,6 +281,7 @@ def install(*, app: str, source: Path, home: Path, env: Mapping[str, str],
 
     new_manifest: dict[str, Any] = {
         "app": app,
+        "source": str(source.resolve()),
         "workspace_created": workspace_already_ours or workspace_created_now,
         "skills": list(SKILL_NAMES),
         "subagent": SUBAGENT_NAME,

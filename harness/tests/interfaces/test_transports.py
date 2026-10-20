@@ -84,6 +84,21 @@ def test_cli_json_is_optional_and_invalid_json_is_invalid_request(harness_env, c
     assert json.loads(capsys.readouterr().err)["error"]["code"] == "invalid_request"
 
 
+def test_check_update_is_cli_only_and_uses_envelope(monkeypatch, capsys):
+    from litman_harness.interfaces import tools
+    from litman_harness import updates
+
+    monkeypatch.setattr(updates, "check_update", lambda: {"installed": "0.1.0", "latest": None,
+                    "update_available": False, "changes": [], "command": None})
+    cli.main(["check-update"])
+    assert json.loads(capsys.readouterr().out) == {"ok": True, "result": {
+        "installed": "0.1.0", "latest": None, "update_available": False, "changes": [], "command": None}}
+    assert "check_update" not in tools.registry() and "check-update" not in tools.registry()
+    assert "check-update" not in {tool["name"] for tool in mcp.handle(
+        json.dumps({"jsonrpc": "2.0", "id": 1, "method": "tools/list"}))[
+            "result"]["tools"]}
+
+
 def test_mcp_protocol_methods():
     init = mcp.handle(json.dumps({"jsonrpc": "2.0", "id": 1, "method": "initialize",
                                   "params": {"protocolVersion": "2024-11-05", "capabilities": {},
