@@ -115,7 +115,7 @@ class CommentService:
         for action in run.plan.actions:
             if run.done(action):
                 continue
-            item = self._reresolve(root, action.resource_id)
+            item = self._resolve(root, action.resource_id)
             if not item.capabilities.get("canComment", False):
                 raise HarnessError("insufficient_capability", "La cuenta ya no puede comentar este archivo",
                                    details={"file_id": item.id})
@@ -175,15 +175,9 @@ class CommentService:
     # -- shared helpers ----------------------------------------------------------------------------
 
     def _resolve(self, root: Resource, file_id: str) -> Resource:
+        """A file inside the tree and not at or below ``_LitMan``, checked before reading or writing its comments."""
         item = self.drive.get(file_id)
         if item.id != root.id and (not belongs_to_root(self.drive, root, item) or in_litman(self.drive, root, item)):
             raise HarnessError("document_outside_tree", "El archivo no está dentro de la licitación conectada",
-                               details={"file_id": file_id})
-        return item
-
-    def _reresolve(self, root: Resource, file_id: str) -> Resource:
-        item = self.drive.get(file_id)
-        if item.id != root.id and (not belongs_to_root(self.drive, root, item) or in_litman(self.drive, root, item)):
-            raise HarnessError("document_outside_tree", "El archivo ya no está dentro de la licitación conectada",
                                details={"file_id": file_id})
         return item
