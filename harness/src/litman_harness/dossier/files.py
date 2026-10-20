@@ -215,7 +215,7 @@ class FileService:
         if item.size is not None and item.size > MAX_FILE_BYTES:
             raise _too_large("El archivo supera los 30 MB que LitMan puede leer", size=item.size)
         with tempfile.TemporaryDirectory(prefix="litman-file-") as directory:
-            path = Path(directory) / "file"
+            path = Path(directory) / ("file.xlsx" if kind == "xlsx" else "file")  # openpyxl checks the extension
             if kind == "google_slides":
                 self.drive.export(item.id, "text/plain", path)
             else:

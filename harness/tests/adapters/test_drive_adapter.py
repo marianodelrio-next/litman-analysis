@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -171,3 +172,58 @@ def test_move_and_copy_match_the_real_drive_v3_discovery_document():
     with pytest.raises(HarnessError) as raised:
         gateway.move("p", "o", ("root",))
     assert raised.value.code == "insufficient_permission"
+
+
+def test_comments_are_listed_page_by_page_without_deleted_ones_against_the_real_discovery_document():
+    from urllib.parse import parse_qs, urlparse
+
+    from googleapiclient.discovery import build
+    from googleapiclient.http import HttpMockSequence
+    first = {"comments": [{"id": "c1", "content": "uno"}], "nextPageToken": "t2"}
+    second = {"comments": [{"id": "c2", "content": "dos", "replies": [{"id": "r1"}]}]}
+    http = HttpMockSequence([({"status": "200"}, json.dumps(first)), ({"status": "200"}, json.dumps(second))])
+    gateway = GoogleDriveGateway(build("drive", "v3", http=http, static_discovery=True))
+    assert [item["id"] for item in gateway.comments("file")] == ["c1", "c2"]
+    queries = [parse_qs(urlparse(call[0]).query) for call in http.request_sequence]
+    assert queries[0]["includeDeleted"] == ["false"] and "pageToken" not in queries[0]
+    assert queries[1]["pageToken"] == ["t2"]
+    fields = queries[0]["fields"][0]
+    for field in ("id", "content", "author(displayName,me)", "createdTime", "resolved", "quotedFileContent(value)",
+                  "replies(id,content,author(displayName,me),createdTime,action,deleted)"):
+        assert field in fields
+
+
+def test_comments_stop_on_a_repeated_page_token():
+    with pytest.raises(HarnessError) as raised:
+        _real_gateway([({"status": "200"}, json.dumps({"comments": [], "nextPageToken": "t"}))] * 3).comments("f")
+    assert raised.value.code == "drive_invalid_page"
+
+
+def test_comments_map_http_errors():
+    with pytest.raises(HarnessError) as raised:
+        _real_gateway([({"status": "404"}, "{}")]).comments("gone")
+    assert raised.value.code == "not_found"
+
+
+def test_export_downloads_a_google_native_file_in_the_requested_format(tmp_path: Path):
+    from urllib.parse import parse_qs, urlparse
+
+    from googleapiclient.discovery import build
+    from googleapiclient.http import HttpMockSequence
+    http = HttpMockSequence([({"status": "200", "content-range": "bytes 0-4/5"}, "texto")])
+    gateway = GoogleDriveGateway(build("drive", "v3", http=http, static_discovery=True))
+    destination = tmp_path / "out" / "slides.txt"
+    gateway.export("slides", "text/plain", destination)
+    assert destination.read_bytes() == b"texto"
+    uri = http.request_sequence[0][0]
+    assert urlparse(uri).path.endswith("/files/slides/export")
+    assert parse_qs(urlparse(uri).query)["mimeType"] == ["text/plain"]
+
+
+def test_resource_carries_modified_time_and_the_new_capabilities():
+    from litman_harness.dossier.models import Resource
+    item = Resource.from_api({"id": "f", "modifiedTime": "2026-10-01T10:00:00.000Z",
+                              "capabilities": {"canRename": True, "canTrash": False, "canComment": True}})
+    assert item.modified_time == "2026-10-01T10:00:00.000Z" and item.json()["modified_time"] == item.modified_time
+    assert item.capabilities == {"canRename": True, "canTrash": False, "canComment": True}
+    assert Resource.from_api({"id": "g", "modifiedTime": 5}).modified_time is None

@@ -26,11 +26,12 @@ harness/src/litman_harness/
   plans/             Plan, PlanAction, OperationRecord, and private PlanStore
   dossier/           resources, membership, manifest v1, contexto.md,
                      shared-state capability, inspection, incorporation,
-                     publication, summary, and Google Docs document services
+                     publication, summary, Google Docs document, and file
+                     navigation/reading services
   analysis/          originals, download, Core result validation, and catalog
   adapters/          personal OAuth Drive, Drive v2 shared state, Google Docs
-                     v1, document extraction, development metadata, OAuth,
-                     and Core process
+                     v1, Google Sheets v4, document extraction, development
+                     metadata, OAuth, and Core process
   interfaces/        assembly, operation registry, CLI, and MCP
   installation.py    idempotent guided install and uninstall
 harness/agent/       installed product skills, workspace instructions, and
@@ -197,6 +198,59 @@ A Docs 403 with reason `accessNotConfigured` or `SERVICE_DISABLED` returns
 `unknown` by reading a fixed document ID that does not exist: 404 means the API
 answers for the OAuth client's project.
 
+## Files of the dossier
+
+`dossier/files.py` (`FileService`) navigates and reads every file of the
+connected dossier, independently of the manifest: the dossier need not be
+adopted. Each call proves with Drive `get` calls that the file belongs to the
+tree (`belongs_to_root`) and is not `_LitMan` or below it (`in_litman`, also in
+`dossier/membership.py`), else `document_outside_tree`; a folder argument fails
+with `invalid_parent`. These are the codes of the Google Docs tools.
+
+`list_folder`, `search_in_dossier` and `get_file_info` return the same fields:
+`id`, `name`, `mime_type`, `kind`, `size` (`null` for Google-native files),
+`modified_time`, `web_view_link` and `role`. `kind` is one of `folder`,
+`google_doc`, `google_sheet`, `google_slides`, `pdf`, `docx`, `xlsx`, `text`
+(plain text, Markdown or CSV, by MIME type or extension) or `other`. `role`
+comes from an adopted manifest (`folder:<key>`, `analysis_folder`, `context`,
+`live_offer`, `original`, `artifact`) and is `null` otherwise. `_LitMan` is
+never listed and search never enters it. Search walks the tree with
+`walk_tree` (never a Drive query), so it is bounded by its 2,000-item limit
+(`truncated`).
+
+`read_file` returns 20,000-character pages with `next_offset`,
+`CONTENT_NOTE` (document text is content, not instructions) and
+`writes: false`:
+
+| Kind | Source |
+| --- | --- |
+| PDF, DOCX | `extract_text`, as `read_document` |
+| Text, Markdown, CSV | downloaded and decoded as UTF-8, replacing undecodable bytes |
+| XLSX | `openpyxl` in read-only mode with cached values |
+| Google Sheets | Sheets v4 (`spreadsheets.get`, then `values.batchGet` with `FORMATTED_VALUE`) |
+| Google Docs | `DocumentService.read`, so the offsets match `read_google_doc` |
+| Google Slides | Drive `files.export` to `text/plain` (Drive limits an export to 10 MB) |
+
+Spreadsheets render each sheet as `## Hoja: <title>` followed by
+`<row number>\t<cell>…` lines for the non-empty rows. Files over 30 MB and
+spreadsheets over 200,000 cells are refused with `file_too_large`; an XLSX
+cannot report its size beforehand, so its cells are counted while iterating.
+Other MIME types and folders return `unsupported_document`. `read_document`
+is unchanged and keeps reading only registered originals and artifacts,
+because summary provenance depends on it.
+
+`list_comments` reads Drive comments (`comments.list`, `includeDeleted=false`)
+with `author`, `created_time`, `resolved`, `quoted_text` and `replies`;
+resolved comments are excluded unless `include_resolved` is true.
+
+`adapters/sheets.py` (`SheetsGateway`) uses the same `drive`-scope credentials
+as Drive and Docs. A 403 with reason `accessNotConfigured` or
+`SERVICE_DISABLED` returns `sheets_api_disabled`. The error-body parser is
+shared with the other Google adapters (`adapters/google_errors.py`). The Drive
+adapter also requests `modifiedTime` and the `canRename`, `canTrash` and
+`canComment` capabilities; `inspect` output therefore gains `modified_time` on
+each resource.
+
 ## Guided product flow
 
 The assistant follows one business flow: organize the dossier and originals,
@@ -225,6 +279,9 @@ The installed product resources support this flow:
   Drive files (never computer use, a browser, other Drive connectors, scripts,
   or Google APIs directly), suggesting asking the developer when no tool fits.
   The workspace `AGENTS.md` and the MCP server `instructions` repeat that rule.
+- `conectar-licitacion` and the workspace `AGENTS.md` also route listing,
+  searching, inspecting and reading any dossier file, and its comments, through
+  the file tools.
 - `ayuda-litman` answers "qué puedes hacer" by explaining every operation in
   business terms with an example phrase; a test keeps it complete against the
   registry.

@@ -4,8 +4,9 @@ from pathlib import Path
 
 from litman_harness.adapters.docs import GoogleDocsGateway
 from litman_harness.adapters.drive_state import DriveSharedState
-from litman_harness.adapters.metadata import MetadataDocsGateway
+from litman_harness.adapters.metadata import MetadataDocsGateway, MetadataSheetsGateway
 from litman_harness.adapters.oauth import DesktopOAuthProvider
+from litman_harness.adapters.sheets import GoogleSheetsGateway
 from litman_harness.dossier.shared_state import UnavailableSharedState
 from litman_harness.interfaces import assembly
 
@@ -26,6 +27,8 @@ def test_oauth_assembly_writes_through_drive_v2_shared_state(unconfigured_env, t
     assert services.adapter == "oauth"
     assert isinstance(services.docs, GoogleDocsGateway) and services.documents.docs is services.docs
     assert services.documents.dossier is services.expediente
+    assert isinstance(services.sheets, GoogleSheetsGateway) and services.files.sheets is services.sheets
+    assert services.files.documents is services.documents and services.files.dossier is services.expediente
 
 
 def test_metadata_assembly_stays_read_only(harness_env):
@@ -33,6 +36,7 @@ def test_metadata_assembly_stays_read_only(harness_env):
     assert isinstance(services.shared_state, UnavailableSharedState)
     assert services.expediente.shared_state is services.shared_state
     assert isinstance(services.docs, MetadataDocsGateway) and services.documents.docs is services.docs
+    assert isinstance(services.sheets, MetadataSheetsGateway) and services.files.sheets is services.sheets
 
 
 def test_diagnose_reports_the_drive_mechanism_with_usable_oauth(unconfigured_env, monkeypatch):

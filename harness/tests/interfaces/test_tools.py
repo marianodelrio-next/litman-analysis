@@ -89,6 +89,65 @@ def test_document_tools_declare_closed_operations_and_reject_bad_arguments_befor
         assert invoke(name, args, factory)["error"]["code"] == "invalid_request"
 
 
+def test_file_tools_are_read_only_queries_with_validated_arguments():
+    from litman_harness.dossier.files import KINDS
+
+    def factory():
+        raise AssertionError("services must not be built for invalid arguments")
+
+    for name in ("list_folder", "search_in_dossier", "get_file_info", "read_file", "list_comments"):
+        tool = registry()[name]
+        assert tool.mutates is False and tool.descriptor()["annotations"]["readOnlyHint"] is True
+        assert tool.description.startswith("Consulta (no escribe)")
+        assert invoke(name, {}, factory)["error"]["code"] == "invalid_request"
+    assert registry()["search_in_dossier"].input_schema["properties"]["kind"]["enum"] == list(KINDS)
+    for name, args in (("read_file", {"folder_id": "r", "file_id": "f", "offset": "0"}),
+                       ("list_comments", {"folder_id": "r", "file_id": "f", "include_resolved": "yes"}),
+                       ("search_in_dossier", {"folder_id": "r", "query": "x", "kind": "video"}),
+                       ("list_folder", {"folder_id": "r", "parent_folder_id": 3})):
+        assert invoke(name, args, factory)["error"]["code"] == "invalid_request", args
+
+
+def test_file_tools_call_the_file_service_with_their_arguments():
+    calls = []
+
+    class Files:
+        def list_folder(self, *args):
+            calls.append(("list_folder", args))
+            return {"ok": 1}
+
+        def search_in_dossier(self, *args):
+            calls.append(("search_in_dossier", args))
+            return {}
+
+        def get_file_info(self, *args):
+            calls.append(("get_file_info", args))
+            return {}
+
+        def read_file(self, *args):
+            calls.append(("read_file", args))
+            return {}
+
+        def list_comments(self, *args):
+            calls.append(("list_comments", args))
+            return {}
+
+    class Services:
+        files = Files()
+
+    for name, args in (("list_folder", {"folder_id": "r"}), ("list_folder", {"folder_id": "r", "parent_folder_id": "p"}),
+                       ("search_in_dossier", {"folder_id": "r", "query": "x", "kind": "pdf"}),
+                       ("get_file_info", {"folder_id": "r", "file_id": "f"}),
+                       ("read_file", {"folder_id": "r", "file_id": "f"}),
+                       ("read_file", {"folder_id": "r", "file_id": "f", "offset": 5}),
+                       ("list_comments", {"folder_id": "r", "file_id": "f", "include_resolved": True})):
+        assert invoke(name, args, Services)["ok"] is True
+    assert calls == [("list_folder", ("r", None)), ("list_folder", ("r", "p")),
+                     ("search_in_dossier", ("r", "x", "pdf")), ("get_file_info", ("r", "f")),
+                     ("read_file", ("r", "f", 0)), ("read_file", ("r", "f", 5)),
+                     ("list_comments", ("r", "f", True))]
+
+
 def test_preview_analysis_no_longer_accepts_a_provider_argument():
     def factory():
         raise AssertionError("services must not be built for invalid arguments")

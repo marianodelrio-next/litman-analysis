@@ -138,6 +138,9 @@ En el día a día solo necesitas abrir Codex en la carpeta LitMan y escribir lo 
 | Descartar un análisis que no quiero publicar | `descarta el análisis` |
 | Leer o cambiar el texto de un Google Doc de la licitación (por ejemplo, la propuesta técnica en `Oferta`) | `en la propuesta técnica, cambia "<texto actual>" por "<texto nuevo>"` |
 | Crear un Google Doc nuevo en la licitación | `crea en la carpeta Oferta un documento "<nombre>" con este texto: ...` o `crea un Google Doc a partir del DOCX "<nombre>"` |
+| Ver qué hay en una carpeta de la licitación o buscar un archivo | `qué hay en la carpeta Oferta` o `busca el archivo del presupuesto` |
+| Leer un archivo de la licitación (PDF, Word, Excel, Hojas de cálculo, Presentaciones, texto) | `lee el Excel de costes` |
+| Ver los comentarios de un archivo | `qué comentarios hay en la memoria técnica` |
 | Saber qué puede hacer LitMan, con ejemplos | `qué puedes hacer` |
 | Arreglar algo que no funciona | `prepara mi equipo` |
 
@@ -161,6 +164,8 @@ Para casi cualquier problema, lo primero es escribir **prepara mi equipo**: el a
 | Google dice "aplicación no verificada" | Para y avisa al equipo técnico: no debería pasar. |
 | Un mensaje dice que la ruta de trabajo es demasiado larga | Los documentos con nombres largos ya se acortan solos en tu equipo (en Drive no cambian), así que solo pasa si se ha configurado una carpeta de trabajo muy profunda. Avisa al equipo técnico: hay que configurar una carpeta de trabajo con un nombre más corto. |
 | El descarte de un análisis falla con "Fallo inesperado del harness" | Cierra los archivos de ese análisis que tengas abiertos y vuelve a descartarlo. |
+| Te avisa de que la API de Google Sheets no está habilitada | Avisa al equipo técnico: hay que habilitarla una vez en el proyecto de Google Cloud. Mientras tanto, el resto de LitMan funciona. |
+| Te dice que un archivo es demasiado grande para leerlo | LitMan lee archivos de hasta 30 MB y hojas de hasta 200.000 celdas. Pide solo la parte que necesitas o abre el archivo tú mismo. |
 | Te avisa de que la API de Google Docs no está habilitada | Avisa al equipo técnico: hay que habilitarla una vez en el proyecto de Google Cloud. Mientras tanto, el resto de LitMan funciona. |
 | Al aplicar un cambio en un documento, te avisa de que el documento cambió | No se ha escrito nada: alguien lo editó después de la vista previa. Pide al asistente que lo vuelva a leer y te prepare el cambio de nuevo. |
 | Te avisa de que alguien ha cambiado `contexto.md` | No es un error. El asistente te lo explica y no sobrescribe nada; solo se sustituye si tú se lo pides. |
@@ -213,6 +218,8 @@ Esta lista es para quien valida la guía en un Windows limpio. Apunta el resulta
 - [ ] Apuntado qué navegador se usa para el PDF (Edge o Chrome).
 - [ ] Pedir un cambio de texto en la propuesta técnica muestra la vista previa y, tras aceptarla, el cambio aparece en Google Docs; el asistente no abre el navegador.
 - [ ] Crear un Google Doc nuevo en la licitación funciona desde un texto y desde un DOCX.
+- [ ] Preguntar qué hay en una carpeta, buscar un archivo por su nombre y leer un PDF, un Excel, una hoja de cálculo de Google y una presentación funciona sin que el asistente use el navegador.
+- [ ] Pedir los comentarios de un documento muestra solo los abiertos, con sus respuestas.
 - [ ] "qué puedes hacer" muestra lo que hace LitMan, agrupado y con un ejemplo para cada cosa.
 - [ ] Pedir algo que LitMan no sabe hacer: el asistente dice que no tiene herramienta para eso, sugiere pedírselo al desarrollador y no usa el navegador ni maneja la pantalla.
 - [ ] Descartar con un archivo abierto falla con "Fallo inesperado del harness". Tras cerrarlo, el descarte funciona.

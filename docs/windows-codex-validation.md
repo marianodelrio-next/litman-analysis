@@ -362,11 +362,38 @@ guided installation command again to get `ayuda-litman`.
   the assistant says that LitMan has no tool for it yet and suggests asking
   LitMan's developer. At no point does it use computer use, a browser, another
   Drive connector, or a script. **Observe and record** any attempt to do so.
+- **Navigate and search.** Ask *"qué hay en la carpeta Oferta"*, then
+  *"busca el archivo del presupuesto"* and *"¿puedo editar el archivo de
+  solvencia?"*. Expected output: the assistant calls `list_folder`,
+  `search_in_dossier` and `get_file_info`; nothing from `_LitMan` is listed and
+  no tool writes. **Observe and record** whether `modified_time` and the
+  `can_*` permissions match what Drive shows.
+- **Read any file.** Ask the app to read, one by one: a PDF, a DOCX, a text or
+  CSV file, an XLSX, a Google Sheet and a Google Slides presentation of the
+  tender. Expected output: the assistant calls `read_file` each time and
+  summarizes the text, sheets appear as `## Hoja: <title>` with numbered rows,
+  and no browser or computer use is opened. **Observe and record** whether
+  Drive accepts the `text/plain` export of the presentation and which error
+  Drive returns for a presentation whose export exceeds 10 MB.
+- **Large file.** Ask for a file over 30 MB. Expected output: `file_too_large`
+  and the assistant explains the limit instead of trying another route.
+- **Disabled Sheets API.** With the Google Sheets API disabled in the OAuth
+  client's Cloud project, ask the app to read a Google Sheet. Expected output:
+  the assistant explains that the administrator must enable the Google Sheets
+  API (`sheets_api_disabled`). **Observe and record** the HTTP 403 reason
+  Google returns, then enable the API and check that the `drive`-scope token is
+  accepted by the Sheets API.
+- **Comments.** Add an open comment with a reply and a resolved comment to a
+  Google Doc, then ask *"qué comentarios hay en la memoria técnica"*. Expected
+  output: `list_comments` shows only the open comment with its reply and its
+  quoted text; asking for the resolved ones too shows both.
 - **Approval prompts.** During section 8, and again here with a
   `preview_document_edit` followed by `apply_document_edit`, **observe and
-  record** how Codex asks for approval of `preview_*` tools (annotated
-  `readOnlyHint: true`) and of `apply_*` tools (annotated `readOnlyHint:
-  false`, and `destructiveHint: true` for `apply_document_edit`). If Claude
+  record** how Codex asks for approval of the read tools of this section
+  (`list_folder`, `read_file`, and the rest, annotated `readOnlyHint: true`),
+  of `preview_*` tools (annotated `readOnlyHint: true`) and of `apply_*` tools
+  (annotated `readOnlyHint: false`, and `destructiveHint: true` for
+  `apply_document_edit`). If Claude
   Code is available on the same machine, record the same for it; otherwise
   mark it not run.
 

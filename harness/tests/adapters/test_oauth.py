@@ -131,3 +131,14 @@ def test_docs_service_uses_the_same_drive_scope_credentials(tmp_path: Path):
     injected = DesktopOAuthProvider(tmp_path / "token.json", credentials=credentials,
                                     service_factory=lambda creds: ("service", creds))
     assert injected.docs_service() == ("service", credentials)
+
+
+def test_sheets_service_uses_the_same_drive_scope_credentials(tmp_path: Path):
+    from google.oauth2.credentials import Credentials as GoogleCredentials
+    credentials = GoogleCredentials(token="access-secret", scopes=["https://www.googleapis.com/auth/drive"])
+    provider = DesktopOAuthProvider(tmp_path / "token.json", credentials=credentials)
+    service = provider.sheets_service()
+    assert service._baseUrl.startswith("https://sheets.googleapis.com/") and hasattr(service, "spreadsheets")
+    injected = DesktopOAuthProvider(tmp_path / "token.json", credentials=credentials,
+                                    service_factory=lambda creds: ("service", creds))
+    assert injected.sheets_service() == ("service", credentials)
