@@ -14,7 +14,7 @@ before editing it.
 | Core infrastructure | `core/src/litman_core/infrastructure/` | Document processing, storage, run metadata, and LLM providers. |
 | Core operations | `core/deployment/`, `core/tests/`, `core/docs/` | Core deployment, tests, internal run documentation, operations, and package decisions. |
 | Harness distribution | `harness/pyproject.toml`, `harness/uv.lock`, `harness/README.md` | Package metadata for `litman-harness` and the Harness documentation entry point. |
-| Harness interfaces and Core adapter | `harness/src/litman_harness/interfaces/`, `harness/src/litman_harness/adapters/core.py` | The `litman` and `litman-mcp` interfaces and execution of Core as a process. |
+| Harness interfaces and Core adapter | `harness/src/litman_harness/interfaces/`, `harness/src/litman_harness/adapters/core.py`, `harness/src/litman_harness/updates.py` | The `litman` and `litman-mcp` interfaces, execution of Core as a process, and tagged release checks. |
 | Dossier workflow | `harness/src/litman_harness/dossier/`, `harness/src/litman_harness/analysis/`, `harness/src/litman_harness/plans/`, `harness/src/litman_harness/adapters/` | Dossier state, local plans, personal OAuth Drive access, and publication. |
 | Harness product resources and operations | `harness/agent/`, `harness/src/litman_harness/installation.py`, `harness/deployment/`, `harness/tests/`, `harness/docs/` | Product-agent resources, guided and advanced installation, tests, and Harness-owned documentation. |
 

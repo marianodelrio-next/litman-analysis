@@ -48,6 +48,8 @@ def test_diagnose_reports_the_drive_mechanism_with_usable_oauth(unconfigured_env
     monkeypatch.setattr(assembly, "build_services", lambda env=None: (_ for _ in ()).throw(RuntimeError("offline")))
     report = assembly.diagnose()
     assert report["shared_state"] == {"available": True, "mechanism": "drive_v2_if_match"}
+    from litman_harness import __version__
+    assert report["version"] == __version__
 
 
 def test_diagnose_reports_setup_and_contract_without_configuration(unconfigured_env, monkeypatch):

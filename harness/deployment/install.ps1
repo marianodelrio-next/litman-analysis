@@ -47,12 +47,12 @@ if (Test-Path "$Src\.git") {
     git clone --quiet $Repo $Src
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 }
-$LatestTag = git -C $Src tag -l 'v*' --sort=-v:refname | Select-Object -First 1
-if ($LatestTag) {
-    git -C $Src checkout --quiet --detach $LatestTag
-} else {
-    git -C $Src checkout --quiet --detach origin/HEAD
+$LatestTag = git -C $Src tag -l 'v*' --sort=-v:refname | Where-Object { $_ -match '^v\d+\.\d+\.\d+$' } | Select-Object -First 1
+if (-not $LatestTag) {
+    Write-Error "No existe una versión publicada de LitMan para instalar."
+    exit 1
 }
+git -C $Src checkout --quiet --detach $LatestTag
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 uv tool install --force --python 3.11 "$Src\harness" --with "$Src\core"

@@ -26,9 +26,8 @@ the text below.
 Confirm all of the following before starting:
 
 - The code for CHG-0003, CHG-0005, CHG-0006, and CHG-0007-01 is merged into the remote `master`. The guided
-  install one-liner installs the latest `v*` tag if one exists, otherwise
-  `origin/HEAD` (`harness/deployment/install.ps1`), so without a tag it
-  installs whatever is on `master` at the time.
+  install one-liner installs the latest stable `vX.Y.Z` tag
+  (`harness/deployment/install.ps1`) and stops if none exists.
 - A Windows 10 or 11 machine.
 - The Codex app installed and signed in with a personal-plan test account.
 - Git and uv installed.
@@ -82,7 +81,7 @@ $env:LITMAN_APP='codex'; irm https://raw.githubusercontent.com/marianodelrio-nex
 ```
 
 Expected output: the script clones or updates the repository under
-`%LOCALAPPDATA%\LitMan\src`, checks out the latest `v*` tag or `origin/HEAD`,
+`%LOCALAPPDATA%\LitMan\src`, checks out the latest stable `vX.Y.Z` tag,
 runs `uv tool install --force --python 3.11` for `harness` with `core`, reads
 `uv tool dir` as UTF-8, runs the Harness CLI through the tool environment's
 interpreter (`& $Python -m litman_harness.interfaces.cli install --app codex

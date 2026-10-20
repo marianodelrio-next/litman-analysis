@@ -106,8 +106,14 @@ tool's `destructive` flag (`apply_incorporation`, `apply_summary`,
 Protocol errors use `-32700`, `-32600`, `-32601`, and `-32602`. Services are
 assembled per call, so `tools/list` works without local configuration.
 
-`install`, `uninstall`, and `login` are CLI-only and are not included in
-`tools/list`.
+`install`, `uninstall`, `login`, and `check-update` are CLI-only and are not
+included in `tools/list`. `litman check-update` reads the source checkout from
+the private install manifest, fetches tags, and reports the newest stable
+version and its changelog entries. `update_source_missing` means the existing
+installation must be reinstalled once with the current installer;
+`update_check_failed` means Git could not check the tags or changelog. The
+`diagnose` result also includes the installed Harness `version`, without
+revealing the local source path.
 
 ## Core setup and execution
 

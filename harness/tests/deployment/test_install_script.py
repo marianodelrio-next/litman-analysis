@@ -90,6 +90,7 @@ def committed_repo_copy(tmp_path: Path) -> Path:
     subprocess.run(["git", "config", "user.name", "Test"], cwd=bare_source, check=True)
     subprocess.run(["git", "add", "-A"], cwd=bare_source, check=True)
     subprocess.run(["git", "commit", "--quiet", "-m", "snapshot"], cwd=bare_source, check=True)
+    subprocess.run(["git", "tag", "v0.1.0"], cwd=bare_source, check=True)
     return bare_source
 
 
@@ -158,6 +159,7 @@ def test_install_and_uninstall_ps1_contain_the_official_links_and_no_elevation()
     assert "git-scm.com/downloads/win" in install_text
     assert "astral.sh/uv/install.ps1" in install_text
     assert "LITMAN_APP" in install_text
+    assert "origin/HEAD" not in install_text and "origin/HEAD" not in INSTALL_SH.read_text(encoding="utf-8")
     assert "ErrorActionPreference" in install_text and "ErrorActionPreference" in uninstall_text
     for text in (install_text, uninstall_text):
         for forbidden in ("winget", "choco", "-Verb RunAs", "Start-Process"):
@@ -176,6 +178,65 @@ def test_install_and_uninstall_ps1_contain_the_official_links_and_no_elevation()
              f"[System.Management.Automation.Language.Parser]::ParseFile('{script}', [ref]$null, [ref]$null)"],
             capture_output=True, text=True)
         assert parse.returncode == 0, parse.stderr
+
+
+def test_install_sh_requires_a_stable_version_tag_before_installing(tmp_path: Path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "init", "--quiet", str(repo)], check=True)
+    subprocess.run(["git", "config", "user.email", "test@example.test"], cwd=repo, check=True)
+    subprocess.run(["git", "config", "user.name", "Test"], cwd=repo, check=True)
+    (repo / "README").write_text("x")
+    subprocess.run(["git", "add", "README"], cwd=repo, check=True)
+    subprocess.run(["git", "commit", "--quiet", "-m", "snapshot"], cwd=repo, check=True)
+    subprocess.run(["git", "tag", "v0.9.0"], cwd=repo, check=True)
+    subprocess.run(["git", "tag", "v0.10.0"], cwd=repo, check=True)
+    subprocess.run(["git", "tag", "v1.0.0-rc1"], cwd=repo, check=True)
+    subprocess.run(["git", "tag", "vfoo"], cwd=repo, check=True)
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    codex = fake_bin / "codex"
+    codex.write_text("#!/bin/sh\nexit 0\n")
+    codex.chmod(0o755)
+    log = tmp_path / "calls"
+    fake_uv = fake_bin / "uv"
+    fake_uv.write_text("#!/bin/sh\nif [ \"$1\" = tool ] && [ \"$2\" = dir ]; then echo \"$UV_BIN\"; exit 0; fi\necho called >> \"$CALL_LOG\"\nexit 0\n")
+    fake_uv.chmod(0o755)
+    uv_bin = tmp_path / "uv-bin"
+    uv_bin.mkdir()
+    (uv_bin / "litman").write_text("#!/bin/sh\nexit 0\n")
+    (uv_bin / "litman").chmod(0o755)
+    env = {"PATH": f"{fake_bin}:/usr/bin:/bin", "HOME": str(tmp_path / "home"), "LITMAN_APP": "codex",
+           "LITMAN_REPO": str(repo), "LITMAN_SRC_DIR": str(repo), "CALL_LOG": str(log), "UV_BIN": str(uv_bin)}
+    result = _run(["/bin/sh", str(INSTALL_SH)], env=env)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "v0.10.0" in subprocess.run(["git", "-C", str(repo), "describe", "--tags", "--exact-match"],
+                                        capture_output=True, text=True, check=True).stdout
+    assert log.is_file()
+
+
+def test_install_sh_stops_without_a_stable_version_tag(tmp_path: Path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "init", "--quiet", str(repo)], check=True)
+    subprocess.run(["git", "config", "user.email", "test@example.test"], cwd=repo, check=True)
+    subprocess.run(["git", "config", "user.name", "Test"], cwd=repo, check=True)
+    (repo / "README").write_text("x")
+    subprocess.run(["git", "add", "README"], cwd=repo, check=True)
+    subprocess.run(["git", "commit", "--quiet", "-m", "snapshot"], cwd=repo, check=True)
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    for name in ("codex", "uv"):
+        path = fake_bin / name
+        path.write_text("#!/bin/sh\necho called >> \"$CALL_LOG\"\nexit 0\n")
+        path.chmod(0o755)
+    log = tmp_path / "calls"
+    env = {"PATH": f"{fake_bin}:/usr/bin:/bin", "HOME": str(tmp_path / "home"), "LITMAN_APP": "codex",
+           "LITMAN_REPO": str(repo), "LITMAN_SRC_DIR": str(repo), "CALL_LOG": str(log)}
+    result = _run(["/bin/sh", str(INSTALL_SH)], env=env)
+    assert result.returncode != 0
+    assert "No existe una versión publicada" in result.stdout + result.stderr
+    assert not log.exists()
 
 
 def test_without_provider_cli_stops_before_cloning_or_installing(tmp_path: Path):

@@ -51,12 +51,12 @@ else
     mkdir -p "$(dirname "$SRC")"
     git clone --quiet "$REPO" "$SRC"
 fi
-LATEST_TAG=$(git -C "$SRC" tag -l 'v*' --sort=-v:refname | head -n1)
-if [ -n "$LATEST_TAG" ]; then
-    git -C "$SRC" checkout --quiet --detach "$LATEST_TAG"
-else
-    git -C "$SRC" checkout --quiet --detach origin/HEAD
+LATEST_TAG=$(git -C "$SRC" tag -l 'v*' --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n1 || true)
+if [ -z "$LATEST_TAG" ]; then
+    echo "No existe una versión publicada de LitMan para instalar." >&2
+    exit 1
 fi
+git -C "$SRC" checkout --quiet --detach "$LATEST_TAG"
 
 uv tool install --force --python 3.11 "$SRC/harness" --with "$SRC/core"
 
