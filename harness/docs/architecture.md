@@ -282,6 +282,21 @@ carry operation markers for duplicate-free resume. Trash calls Drive
 conversions use temporary files. Conflicts retain earlier completed actions,
 while Drive rate limits remain recoverable by repeating the accepted plan.
 
+`dossier/comments.py` (`CommentService`) previews and applies comment
+changes on one file in one closed `comment_changes` plan. `preview_comment_changes`
+resolves 1–10 `add`, `reply`, or `resolve` operations, refusing a file without
+`canComment` (`insufficient_capability`) or an unknown or deleted `comment_id`
+(`comment_not_found`), and stores in each action's metadata the newest
+`createdTime` Drive showed among the file's comments and replies
+(`created_after`), or `null`. Comments carry no marker, so `apply_comment_changes`
+resumes by adopting an existing comment or reply from the active account
+(`author.me`) with the same content and a `createdTime` later than
+`created_after`, instead of creating a second one; more than one such
+candidate is an `OperationConflict`. A `resolve` action that finds its comment
+already resolved completes without a call; otherwise it creates a reply with
+`action: "resolve"`. Comments are unanchored: Drive comment anchors are not
+reliably rendered in Google Docs.
+
 `adapters/sheets.py` (`SheetsGateway`) uses the same `drive`-scope credentials
 as Drive and Docs. A 403 with reason `accessNotConfigured` or
 `SERVICE_DISABLED` returns `sheets_api_disabled`. The error-body parser is
