@@ -9,9 +9,12 @@ el resumen de una licitación.
 1. Ejecuta `litman check-update` y lee el resultado JSON.
    - Si `update_available` es `false`, di que LitMan ya está actualizado y
      termina.
-   - Si aparece `update_source_missing`, pide que pegue una vez el comando de
-     instalación de la app del [README de instalación](../../../deployment/README.md).
-     Después de instalar, debe cerrar y volver a abrir la aplicación.
+   - Si aparece `update_source_missing`, pide que pegue una vez en una terminal
+     el comando de instalación de esta app (Codex → `codex`, Claude →
+     `claude`); en Windows, que cierre antes la aplicación. Después de
+     instalar, debe cerrar y volver a abrir la aplicación.
+     - Linux: `LITMAN_APP=<app> bash -c "$(curl -fsSL https://raw.githubusercontent.com/marianodelrio-next/litman-analysis/master/harness/deployment/install.sh)"`
+     - Windows (PowerShell): `$env:LITMAN_APP='<app>'; irm https://raw.githubusercontent.com/marianodelrio-next/litman-analysis/master/harness/deployment/install.ps1 | iex`
    - Si aparece `update_check_failed`, explica en una frase que no se pudo
      comprobar la nueva versión (por ejemplo, por falta de conexión) y sugiere
      volver a intentarlo o contactar al desarrollador.
@@ -22,4 +25,5 @@ el resumen de una licitación.
 4. En Windows, no ejecutes `command`: pide que cierre la aplicación, pegue ese
    valor en PowerShell y vuelva a abrir la aplicación cuando termine.
 
+Sólo si se actualizó (paso 3 o 4), termina siempre con esta frase:
 Cierra y vuelve a abrir la aplicación.
