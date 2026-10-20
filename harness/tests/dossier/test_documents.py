@@ -430,13 +430,14 @@ def test_style_operations_on_different_properties_of_one_paragraph_are_allowed(t
     assert setup.docs.paragraph_style("offer-doc", "Fin") == ("HEADING_2", "bullets")
 
 
-def test_set_list_refuses_a_paragraph_that_starts_with_a_tab(tmp_path: Path):
+@pytest.mark.parametrize("kind", ["bullets", "numbered", "none"])
+def test_set_list_refuses_a_paragraph_that_starts_with_a_tab(tmp_path: Path, kind):
     setup = Setup(tmp_path)
     setup.docs.add("offer-doc", ["\tsangrado", "normal"])
-    assert error(lambda: setup.preview([{"op": "set_list", "anchor": "sangrado", "list": "bullets"}])
+    assert error(lambda: setup.preview([{"op": "set_list", "anchor": "sangrado", "list": kind}])
                  ).code == "unsupported_document"
     assert setup.plans() == []
-    assert setup.preview([{"op": "set_list", "anchor": "normal", "list": "bullets"}])
+    assert setup.preview([{"op": "set_list", "anchor": "normal", "list": kind}])
     assert setup.preview([{"op": "set_paragraph_style", "anchor": "sangrado", "style": "TITLE"}])
 
 

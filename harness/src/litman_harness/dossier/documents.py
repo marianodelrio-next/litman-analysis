@@ -304,6 +304,7 @@ class DocumentService:
             raise HarnessError("name_exists", "La carpeta de destino ya tiene un archivo con ese nombre",
                                details={"parent_folder_id": parent.id, "name": name, "file_ids": taken})
         source = None
+        body = text if text is not None else markdown
         if text is not None:
             actions = (PlanAction("create_document", None, name, parent.id),
                        PlanAction("write_initial_text", None, name, parent.id, metadata={"text": text}))
@@ -317,7 +318,7 @@ class DocumentService:
         plan = Plan("document_creation", root.id, account, actions, {})
         self.dossier.store().save(plan)
         return {**plan.json(), "parent_folder_id": parent.id, "name": name, "source": source,
-                "characters": len(text if markdown is None else markdown) if source_file_id is None else None}
+                "characters": None if body is None else len(body)}
 
     def apply_creation(self, accepted_plan_id: str) -> dict[str, Any]:
         return self.dossier.apply_plan(accepted_plan_id, "document_creation", self._run_creation)
@@ -577,12 +578,12 @@ def _paragraph_request(document: DocumentText, operation: dict[str, Any], offset
     if operation["op"] == "set_paragraph_style":
         return {"updateParagraphStyle": {"range": span, "paragraphStyle": {"namedStyleType": operation["style"]},
                                          "fields": "namedStyleType"}}, paragraph
-    if operation["list"] == "none":
-        return {"deleteParagraphBullets": {"range": span}}, paragraph
     if paragraph["tab"]:
         # Docs turns leading tabs into nesting levels and removes them, which would shift every later index.
         raise HarnessError("unsupported_document", "El párrafo empieza con un tabulador; Google Docs lo convertiría "
                            "en un nivel de lista", details={"operation": index})
+    if operation["list"] == "none":
+        return {"deleteParagraphBullets": {"range": span}}, paragraph
     return {"createParagraphBullets": {"range": span, "bulletPreset": LISTS[operation["list"]]}}, paragraph
 
 
