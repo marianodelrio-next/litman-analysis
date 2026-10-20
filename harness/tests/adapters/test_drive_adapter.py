@@ -75,6 +75,24 @@ def test_upload_converted_creates_google_doc_directly_in_destination(tmp_path: P
     assert created.app_properties == {"litman_operation_id": "op", "litman_action_id": "a"}
 
 
+def test_upload_converted_sends_markdown_converted_to_a_google_doc(tmp_path: Path):
+    source = tmp_path / "documento.md"
+    source.write_text("# Título\n\n- uno\n", encoding="utf-8")
+    service = Service()
+    GoogleDriveGateway(service).upload_converted("Notas", "offer", source, "text/markdown", "op", "a")
+    kwargs = service.files_api.calls[-1][1]
+    assert kwargs["body"]["mimeType"] == GOOGLE_DOC_MIME and kwargs["media_body"].mimetype() == "text/markdown"
+
+
+def test_markdown_upload_matches_the_real_drive_v3_discovery_document(tmp_path: Path):
+    source = tmp_path / "documento.md"
+    source.write_text("# Título\n", encoding="utf-8")
+    document = '{"id": "g", "mimeType": "application/vnd.google-apps.document", "parents": ["f"]}'
+    gateway = _real_gateway([({"status": "200"}, document)])
+    created = gateway.upload_converted("Notas", "f", source, "text/markdown", "op", "act")
+    assert created.id == "g" and created.mime_type == GOOGLE_DOC_MIME
+
+
 def test_create_document_creates_an_empty_google_doc_with_markers():
     service = Service()
     created = GoogleDriveGateway(service).create_document("Notas", "offer", "op", "a")

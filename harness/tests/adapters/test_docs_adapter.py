@@ -48,6 +48,28 @@ def _conforms(schemas: dict, name: str, value) -> None:
             assert isinstance(item, str)
 
 
+def test_style_requests_match_the_real_docs_v1_discovery_document():
+    span = {"startIndex": 5, "endIndex": 20}
+    requests = [
+        {"updateParagraphStyle": {"range": span, "paragraphStyle": {"namedStyleType": "HEADING_1"},
+                                  "fields": "namedStyleType"}},
+        {"updateTextStyle": {"range": span, "textStyle": {"bold": True, "italic": False}, "fields": "bold,italic"}},
+        {"createParagraphBullets": {"range": span, "bulletPreset": "BULLET_DISC_CIRCLE_SQUARE"}},
+        {"createParagraphBullets": {"range": span, "bulletPreset": "NUMBERED_DECIMAL_ALPHA_ROMAN"}},
+        {"deleteParagraphBullets": {"range": span}}]
+    gateway, _ = _gateway([({"status": "200"}, "echo_request_body")])
+    body = gateway.batch_update("doc-1", requests, "rev-1")
+    schemas = _discovery()["schemas"]
+    _conforms(schemas, "BatchUpdateDocumentRequest", body)
+    for request in requests:
+        (name, value), = request.items()
+        schema = schemas["Request"]["properties"][name]["$ref"]
+        _conforms(schemas, schema, value)
+    assert {"HEADING_1"} <= set(schemas["ParagraphStyle"]["properties"]["namedStyleType"]["enum"])
+    presets = set(schemas["CreateParagraphBulletsRequest"]["properties"]["bulletPreset"]["enum"])
+    assert {"BULLET_DISC_CIRCLE_SQUARE", "NUMBERED_DECIMAL_ALPHA_ROMAN"} <= presets
+
+
 def test_gateway_calls_match_the_real_docs_v1_discovery_document():
     """Build the real Docs v1 client offline: parameters are checked by the client, bodies against the schema."""
     requests = [{"deleteContentRange": {"range": {"startIndex": 5, "endIndex": 9}}},

@@ -86,12 +86,16 @@ como vista previa y sólo se aplica cuando la persona lo acepta.
 ## Documentos de Google Docs
 
 - `preview_document_edit`: prepara cambios de texto en un Google Doc
-  (sustituir, insertar después de un párrafo o añadir al final).
-  Ejemplo: "cambia el plazo de entrega a 30 días en la propuesta"
+  (sustituir, insertar después de un párrafo o añadir al final) o de formato
+  (estilo de párrafo como título o encabezado, negrita, cursiva, subrayado,
+  viñetas o lista numerada); texto y formato van en planes distintos.
+  Ejemplo: "cambia el plazo de entrega a 30 días en la propuesta" o "pon en
+  negrita los títulos de la propuesta"
 - `apply_document_edit`: aplica esos cambios cuando los aceptas.
   Ejemplo: "sí, aplica los cambios"
 - `preview_document_creation`: prepara un Google Doc nuevo a partir de un
-  texto o de un DOCX de la licitación.
+  texto, de un Markdown (con títulos, listas y negrita) o de un DOCX de la
+  licitación.
   Ejemplo: "crea un Google Doc con la memoria a partir del DOCX"
 - `apply_document_creation`: crea ese documento cuando lo aceptas.
   Ejemplo: "sí, créalo"

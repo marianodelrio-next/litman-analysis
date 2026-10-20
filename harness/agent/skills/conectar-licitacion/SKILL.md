@@ -33,15 +33,20 @@ description: Conecta una licitación por el ID de su carpeta de Drive y guía a 
    **Documentos de Google Docs** de la licitación (por ejemplo, la propuesta
    técnica en `Oferta`): léelos con `read_google_doc` (sigue `next_offset`).
    Para cambiar su texto, prepara `preview_document_edit` con operaciones
-   cerradas (`replace_text`, `insert_after`, `append`); para crear uno nuevo,
-   `preview_document_creation` con `text` o con el `source_file_id` de un DOCX
-   de la licitación (un DOCX se edita creando antes su Google Doc). Muestra la
-   vista previa (cada cambio con su contexto) y aplica con
+   cerradas (`replace_text`, `insert_after`, `append`); para dar formato,
+   con `set_paragraph_style` (título, subtítulo, encabezados 1 a 3 o texto
+   normal), `set_text_style` (negrita, cursiva, subrayado) o `set_list`
+   (viñetas, numerada o ninguna). Un plan lleva sólo operaciones de texto o
+   sólo de formato: no se mezclan. Para crear uno nuevo,
+   `preview_document_creation` con `text`, con `markdown` (títulos, listas,
+   negrita y cursiva pasan a formato de Google Docs) o con el `source_file_id`
+   de un DOCX de la licitación (un DOCX se edita creando antes su Google Doc).
+   Muestra la vista previa (cada cambio con su contexto) y aplica con
    `apply_document_edit`/`apply_document_creation` sólo el `plan_id` que la
    persona acepte. Ante `document_changed`, vuelve a leer y prepara un plan
    nuevo; ante `docs_api_disabled`, explica que el administrador debe
-   habilitar la Google Docs API. Formato, tablas, imágenes y comentarios
-   quedan fuera: díselo a la persona.
+   habilitar la Google Docs API.
+   Tablas, imágenes y comentarios quedan fuera: díselo a la persona.
 8. Usa sólo las herramientas de LitMan para la licitación y sus archivos de
    Drive. Nunca uses computer use, el navegador, otros conectores de Drive,
    scripts ni las APIs de Google directamente. Si ninguna herramienta de

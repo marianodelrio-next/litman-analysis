@@ -73,11 +73,14 @@ def test_document_tools_declare_closed_operations_and_reject_bad_arguments_befor
 
     operations = registry()["preview_document_edit"].input_schema["properties"]["operations"]
     assert operations["maxItems"] == 20 and operations["items"]["additionalProperties"] is False
-    assert operations["items"]["properties"]["op"]["enum"] == ["replace_text", "insert_after", "append"]
+    assert operations["items"]["properties"]["op"]["enum"] == [
+        "replace_text", "insert_after", "append", "set_paragraph_style", "set_text_style", "set_list"]
+    assert {"style", "list", "bold", "italic", "underline"} <= set(operations["items"]["properties"])
     assert registry()["read_google_doc"].input_schema["required"] == ["folder_id", "document_id"]
     creation = registry()["preview_document_creation"].input_schema
     assert creation["required"] == ["folder_id", "parent_folder_id", "name"]
-    assert {"text", "source_file_id"} <= set(creation["properties"])
+    assert {"text", "markdown", "source_file_id"} <= set(creation["properties"])
+    assert creation["properties"]["markdown"]["maxLength"] == 100_000
     for name, args in (("read_google_doc", {"folder_id": "root", "document_id": 1}),
                        ("preview_document_edit", {"folder_id": "root", "document_id": "d", "operations": {}}),
                        ("preview_document_edit", {"folder_id": "root", "document_id": "d", "operations": ["x"]}),
@@ -85,6 +88,8 @@ def test_document_tools_declare_closed_operations_and_reject_bad_arguments_befor
                        ("preview_document_creation", {"folder_id": "root", "parent_folder_id": "root"}),
                        ("preview_document_creation", {"folder_id": "root", "parent_folder_id": "root", "name": "n",
                                                       "text": 1}),
+                       ("preview_document_creation", {"folder_id": "root", "parent_folder_id": "root", "name": "n",
+                                                      "markdown": 1}),
                        ("apply_document_creation", {})):
         assert invoke(name, args, factory)["error"]["code"] == "invalid_request"
 

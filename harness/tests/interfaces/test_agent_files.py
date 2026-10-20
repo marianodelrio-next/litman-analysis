@@ -88,6 +88,16 @@ def test_connect_skill_and_workspace_guide_navigation_and_reading_of_any_file():
             assert operation in registry() and f"`{operation}`" in text
 
 
+def test_connect_skill_no_longer_excludes_formatting_and_names_the_style_operations_and_markdown():
+    connect_skill = (AGENT / "skills" / "conectar-licitacion" / "SKILL.md").read_text(encoding="utf-8")
+    step = connect_skill[connect_skill.index("7. **Documentos de Google Docs**"):connect_skill.index("8. ")]
+    flat = " ".join(step.split())
+    for name in ("set_paragraph_style", "set_text_style", "set_list", "markdown"):
+        assert f"`{name}`" in flat
+    assert "Formato, tablas" not in flat and "Tablas, imágenes y comentarios quedan fuera" in flat
+    assert "no se mezclan" in flat
+
+
 def test_help_skill_explains_every_operation_with_an_example():
     from litman_harness.interfaces.tools import registry
     path = AGENT / "skills" / "ayuda-litman" / "SKILL.md"

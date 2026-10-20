@@ -99,12 +99,18 @@ runtime and acceptance explicit.
 ## Document edits use closed index-based operations guarded by the Docs revision
 
 The assistant changes a dossier Google Doc only through closed operations
-(`replace_text`, `insert_after`, `append`) that the preview resolves to Docs
-indexes on the text it read and simulates into an expected text. The apply
+(`replace_text`, `insert_after`, `append`, and the style operations
+`set_paragraph_style`, `set_text_style`, `set_list`) that the preview resolves
+to Docs indexes on the text it read and simulates into an expected text. The apply
 sends one `documents.batchUpdate` of index-based `deleteContentRange` and
 `insertText` requests in descending index order, guarded by
 `writeControl.requiredRevisionId`; a lost answer is resolved by comparing the
-body with the expected text's hash. `replaceAllText` was rejected because it
+body with the expected text's hash. A plan holds text operations or style
+operations, never both. A style-only plan leaves the text unchanged, so the hash
+cannot prove that its batch was applied: on resume it is resent once with the
+current revision if the body text still equals the planned text, and ends as a
+`document_changed` conflict otherwise. This is safe because the style requests
+are absolute and move no index. `replaceAllText` was rejected because it
 matches case-insensitively by default, reaches every tab, header, and footer,
 and cannot be limited to the counted matches. Exporting to DOCX and re-uploading
 was rejected because it destroys formatting, comments, revision history, and the
