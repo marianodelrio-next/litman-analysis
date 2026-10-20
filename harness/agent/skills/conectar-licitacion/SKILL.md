@@ -14,6 +14,34 @@ description: Conecta una licitación por el ID de su carpeta de Drive y guía a 
    `apply_summary`, `discard_analysis`) sólo el `plan_id` u `operation_id` que la
    persona acepte. Cada respuesta trae la siguiente `recommended_action`:
    propónla y continúa.
+
+   **Incorporation preview and result.** For `preview_incorporation`, explain
+   the planned Drive dossier organization before asking for acceptance. Build
+   the explanation only from `plan.actions`: use each action's `name` as the
+   actual folder name and `metadata.role` for its purpose. Describe
+   `create_folder` as a folder LitMan plans to create and `register_folder` as
+   an existing folder LitMan plans to reuse; do not invent absent roles or
+   replace a custom name with a standard one. The usual purposes are: originals
+   as received; initial and detailed analysis results; the live offer and work
+   material; internal company material; delivered versions; and LitMan's
+   technical state. Do not present `manifest.json` as a folder or explain its
+   internal details unless asked; `_LitMan` covers LitMan's technical state.
+   Explain the dossier location and mention `contexto.md` as
+   the dossier map only when its creation or update is planned. Describe file
+   placement only when shown by the plan, preserving its move, copy, in-place,
+   or skipped strategy. This is a preview: speak in future tense and do not say
+   that folders or files have already been created, moved, or written. Ask for
+   acceptance only after this explanation.
+
+   After `apply_incorporation`, summarize created and reused folders, original
+   placement, and the `contexto.md` outcome only when confirmed by the result
+   (`manifest`, completed operation evidence, and any `context_conflict`). If
+   apply fails or is interrupted, report only confirmed effects and identify
+   incomplete work; do not claim full success. A `context_conflict` means the
+   context update was not applied: explain the conflict and follow the existing
+   conflict rule. If evidence is insufficient, say so and use `recover` when
+   useful; never retry through another route. Give this outcome before proposing
+   the next `recommended_action`.
 4. Sugerencias por nombre (`suggested_original_ids`, `suggested_folder_ids`)
    sólo se usan si la persona las confirma; nunca decidas por el nombre.
    `decide_detailed_analysis` es una pregunta de negocio: pregúntala.

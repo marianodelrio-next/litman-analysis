@@ -40,6 +40,12 @@ harness/deployment/  guided install and uninstall scripts
 harness/tests/       dossier, analysis, adapters, interfaces, plans, deployment
 ```
 
+The installed `conectar-licitacion` skill guides the chat through a dossier
+incorporation preview and acceptance. It explains only folders and file
+placement present in the plan, then reports confirmed incorporation outcomes
+before following the next recommendation. Product skills are separate from
+the repository's Factory development skills.
+
 `dossier/membership.py` is the single membership check. It follows parent IDs
 to the connected folder within the same Drive, without global searches.
 
