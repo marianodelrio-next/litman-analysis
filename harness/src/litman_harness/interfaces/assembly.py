@@ -24,7 +24,7 @@ from ..local_paths import CONFIGURABLE, METADATA_ENV, client_path, plan_store_ro
 from ..plans import PlanStore
 from ..settings import load_settings
 
-# A well-formed ID that no document has: a 404 proves the Docs API answers for this OAuth client.
+# An ID that no document has: a 404 proves the Docs API answers for this OAuth client.
 DOCS_PROBE_ID = "litman-docs-api-probe-0000000000000000000000"
 
 
