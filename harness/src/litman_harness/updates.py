@@ -38,6 +38,10 @@ def _changes(changelog: str, installed: str, latest: str) -> list[dict[str, str]
     return result
 
 
+def _powershell_quote(value: str) -> str:
+    return "'" + value.replace("'", "''") + "'"
+
+
 def check_update(*, env: Mapping[str, str] | None = None, run: Runner = subprocess.run,
                  which: Callable[[str], str | None] = shutil.which,
                  system: str | None = None) -> dict[str, object]:
@@ -79,11 +83,15 @@ def check_update(*, env: Mapping[str, str] | None = None, run: Runner = subproce
         if available:
             system = system or host_platform.system()
             if system == "Windows":
-                command = (f"$env:LITMAN_APP='{app}'; $env:LITMAN_SRC_DIR='{source}'; powershell "
-                           f"-NoProfile -ExecutionPolicy Bypass -File '{source}\\harness\\deployment\\install.ps1'")
+                app_arg = _powershell_quote(str(app))
+                source_arg = _powershell_quote(str(source))
+                script_arg = _powershell_quote(str(source) + r"\harness\deployment\install.ps1")
+                command = (f"$env:LITMAN_APP={app_arg}; $env:LITMAN_SRC_DIR={source_arg}; powershell "
+                           f"-NoProfile -ExecutionPolicy Bypass -File {script_arg}")
             elif system in {"Linux", "Darwin"}:
-                command = (f"LITMAN_APP={app} LITMAN_SRC_DIR=\"{source}\" sh "
-                           f"\"{source}/harness/deployment/install.sh\"")
+                import shlex
+                command = (f"LITMAN_APP={shlex.quote(str(app))} LITMAN_SRC_DIR={shlex.quote(str(source))} sh "
+                           f"{shlex.quote(str(source) + '/harness/deployment/install.sh')}")
             else:
                 raise OSError("unsupported platform")
         return {"installed": __version__, "latest": latest, "update_available": bool(available),
