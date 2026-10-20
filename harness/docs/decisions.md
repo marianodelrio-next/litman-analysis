@@ -179,3 +179,16 @@ Files under `harness/agent/` are installed product behavior. Repository skills
 and instructions under `.agents/`, `.claude/skills/`, and `AGENTS.md` govern
 development. Keeping these systems separate prevents Factory tooling from
 silently changing the user's LitMan assistant, or vice versa.
+
+## Comments are unanchored and resumed by author, content, and time
+
+`preview_comment_changes`/`apply_comment_changes` add, reply to, or resolve
+Drive comments without an anchor to a span of the document: Drive comment
+anchors are not reliably rendered back in Google Docs, so an anchored comment
+would be unverifiable from the harness side. Without a marker a resume could
+search for, a lost answer is instead resolved by adopting an existing comment
+or reply from the active account (`author.me`) with the same content and a
+`createdTime` later than the newest one the preview saw on that file, rather
+than creating a duplicate. Two identical comments written by the same person
+after the preview remain genuinely ambiguous and are reported as a conflict,
+not silently merged.

@@ -417,6 +417,15 @@ guided installation command again to get `ayuda-litman`.
   Google Doc, then ask *"qué comentarios hay en la memoria técnica"*. Expected
   output: `list_comments` shows only the open comment with its reply and its
   quoted text; asking for the resolved ones too shows both.
+- **Comment changes.** Ask the app to add a comment to a Google Doc, reply to
+  it, and then resolve it. Before acceptance, confirm `preview_comment_changes`
+  shows the plan; after accepting each one, confirm `apply_comment_changes`
+  created exactly one comment and one reply, and that the comment shows
+  resolved in Google Docs. Ask to reply to a comment ID that does not exist
+  and confirm the assistant reports `comment_not_found` instead of trying
+  another route. **Observe and record** whether Google Docs renders the new
+  comment and reply as coming from the connected account, and that the
+  assistant never opens the browser or computer use for this.
 - **File changes.** In a disposable test subfolder, ask to create a folder,
   rename a non-registered file, move or copy it, then export a Google-native
   file or convert an XLSX/CSV to a Google Sheet. Before acceptance, confirm

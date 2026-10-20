@@ -108,6 +108,23 @@ class FakeDrive:
     def comments(self, file_id):
         return list(self.comment_threads.get(file_id, []))
 
+    def create_comment(self, file_id, content):
+        self._counter += 1
+        comment = {"id": f"comment-{self._counter}", "content": content, "author": {"me": True},
+                  "createdTime": f"2026-01-01T00:00:{self._counter:02d}Z", "resolved": False, "replies": []}
+        self.comment_threads.setdefault(file_id, []).append(comment)
+        return comment
+
+    def create_reply(self, file_id, comment_id, content, action=None):
+        self._counter += 1
+        comment = next(c for c in self.comment_threads[file_id] if c["id"] == comment_id)
+        reply = {"id": f"reply-{self._counter}", "content": content, "author": {"me": True},
+                "createdTime": f"2026-01-01T00:00:{self._counter:02d}Z", "action": action, "deleted": False}
+        comment.setdefault("replies", []).append(reply)
+        if action == "resolve":
+            comment["resolved"] = True
+        return reply
+
     def _create(self, name, mime, parent_id, operation_id, action_id, content):
         parent = self.get(parent_id)
         self._counter += 1

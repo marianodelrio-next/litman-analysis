@@ -54,3 +54,15 @@ it does not replace or repeat those instructions.
 - `openpyxl.load_workbook` rejects a path without an `.xlsx` extension, so
   downloaded workbooks must be saved as `file.xlsx`, not extensionless
   temporary files. (2026-10-20, CHG-0007-02)
+- `action_id()` (`harness/src/litman_harness/dossier/service.py`) hashes only
+  `kind`, `resource_id`, `parent_id` and `name`, never `metadata`. A plan whose
+  actions can legitimately share all four (for example two operations of the
+  same kind on the same file with identical content, as two `add` comments
+  can be) collapses them onto the same `action_id`, so `OperationRun` treats
+  the second action as already done and replays the first one's output,
+  silently dropping it. When a new plan kind's actions are not already
+  disambiguated by validation (as `file_changes`' per-destination
+  `name_exists` check disambiguates renames and copies), give each action a
+  plan-local nonce in one of those four hashed fields — `comment_changes`
+  uses the action's index as `parent_id`, keeping the real target ID in
+  `metadata`. (2026-10-20, CHG-0007-06, quality review)

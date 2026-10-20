@@ -74,6 +74,8 @@ enums, and rejection of extra properties; invalid input returns
 | `list_comments` | query | List a file's comments with replies; resolved ones only with `include_resolved`. |
 | `preview_file_changes` | query | Resolve 1–20 protected folder/file operations (create folder, rename, move, copy, trash, export, convert) and store the accepted plan. |
 | `apply_file_changes` | mutation | Apply or resume the accepted file-change plan; Drive trash is reversible and no action calls `files.delete`. |
+| `preview_comment_changes` | query | Resolve 1–10 comment operations on one file (`add`, `reply`, `resolve`) and store the accepted plan. |
+| `apply_comment_changes` | mutation | Apply or resume the accepted comment-change plan, adopting a matching comment or reply from the active account instead of duplicating it. |
 | `read_google_doc` | query | Page through the body text of a Google Doc in the dossier tree, outside `_LitMan`, with its `revision_id`. |
 | `preview_document_edit` | query | Plan 1–20 closed operations on a dossier Google Doc (text edits, or paragraph, text and list styles; never both in one plan) and show each matched span with context. |
 | `apply_document_edit` | mutation | Send the accepted edit as one batch guarded by the preview's revision. |

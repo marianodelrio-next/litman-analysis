@@ -30,6 +30,8 @@ class DriveGateway(Protocol):
     def download(self, file_id: str, destination: Path) -> None: ...
     def export(self, file_id: str, mime_type: str, destination: Path) -> None: ...
     def comments(self, file_id: str) -> list[dict[str, Any]]: ...
+    def create_comment(self, file_id: str, content: str) -> dict[str, Any]: ...
+    def create_reply(self, file_id: str, comment_id: str, content: str, action: str | None = None) -> dict[str, Any]: ...
     def upload(self, name: str, parent_id: str, source: Path, mime_type: str, operation_id: str,
                action_id: str) -> Resource: ...
     def upload_converted(self, name: str, parent_id: str, source: Path, source_mime_type: str, operation_id: str,
@@ -39,6 +41,8 @@ class DriveGateway(Protocol):
 _COMMENT_AUTHOR = "author(displayName,me)"
 _COMMENT_FIELDS = (f"nextPageToken,comments(id,content,{_COMMENT_AUTHOR},createdTime,resolved,"
                    f"quotedFileContent(value),replies(id,content,{_COMMENT_AUTHOR},createdTime,action,deleted))")
+_COMMENT_CREATE_FIELDS = f"id,content,{_COMMENT_AUTHOR},createdTime,resolved"
+_REPLY_CREATE_FIELDS = f"id,content,{_COMMENT_AUTHOR},createdTime,action,deleted"
 
 _HTTP_ERRORS = {
     401: ("oauth_login_required", "La sesión de Google no es válida; ejecute `litman login`"),
@@ -199,6 +203,19 @@ class GoogleDriveGateway:
             if not isinstance(token, str) or token in seen:
                 raise HarnessError("drive_invalid_page", "Paginación de Drive inválida")
             seen.add(token)
+
+    def create_comment(self, file_id: str, content: str) -> dict[str, Any]:
+        """Create an unanchored comment on the file."""
+        return _execute(self.service.comments().create(fileId=file_id, body={"content": content},
+                                                        fields=_COMMENT_CREATE_FIELDS))
+
+    def create_reply(self, file_id: str, comment_id: str, content: str, action: str | None = None) -> dict[str, Any]:
+        """Create a reply to a comment; ``action="resolve"`` also resolves it."""
+        body: dict[str, Any] = {"content": content}
+        if action:
+            body["action"] = action
+        return _execute(self.service.replies().create(fileId=file_id, commentId=comment_id, body=body,
+                                                       fields=_REPLY_CREATE_FIELDS))
 
     def upload(self, name: str, parent_id: str, source: Path, mime_type: str, operation_id: str,
                action_id: str) -> Resource:

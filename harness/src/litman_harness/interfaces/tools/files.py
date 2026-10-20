@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 from . import Tool, schema
+from ...dossier.comments import MAX_CONTENT_CHARS, MAX_OPERATIONS as MAX_COMMENT_OPERATIONS
+from ...dossier.comments import OPERATIONS as COMMENT_OPERATIONS
 from ...dossier.file_changes import MAX_OPERATIONS as MAX_FILE_CHANGE_OPERATIONS
 from ...dossier.file_changes import OPERATIONS as FILE_CHANGE_OPERATIONS
 from ...dossier.files import KINDS
@@ -15,6 +17,15 @@ _FILE_CHANGE_FIELDS = {
 }
 _FILE_CHANGE_OPERATION = {"type": "object", "properties": _FILE_CHANGE_FIELDS, "additionalProperties": False,
                           "required": ["op"]}
+_COMMENT_ID = {"type": "string", "description": "ID de un comentario existente del archivo."}
+_COMMENT_OPERATION = {
+    "type": "object", "required": ["op"], "additionalProperties": False,
+    "properties": {
+        "op": {"type": "string", "enum": list(COMMENT_OPERATIONS)},
+        "comment_id": _COMMENT_ID,
+        "content": {"type": "string", "minLength": 1, "maxLength": MAX_CONTENT_CHARS,
+                    "description": "add/reply: texto del comentario o de la respuesta. resolve: texto opcional de "
+                                   "la respuesta que lo resuelve."}}}
 
 TOOLS = (
     Tool("list_folder",
@@ -78,4 +89,23 @@ TOOLS = (
                 ("folder_id", "file_id")),
          lambda ctx, args: ctx.services().files.list_comments(args["folder_id"], args["file_id"],
                                                               args.get("include_resolved", False))),
+    Tool("preview_comment_changes",
+         "Consulta (no escribe en Drive): resuelve hasta "
+         f"{MAX_COMMENT_OPERATIONS} operaciones sobre los comentarios de un archivo de la licitación "
+         "(add: comentario nuevo; reply: respuesta a un comentario; resolve: respuesta que además lo resuelve) y "
+         "guarda localmente un plan que la persona debe aceptar. Rechaza un comment_id inexistente o eliminado "
+         "(comment_not_found) y un archivo sin permiso para comentar (insufficient_capability). Los comentarios no "
+         "llevan anclaje a un fragmento del documento.",
+         schema({"folder_id": _FOLDER_ID, "file_id": _FILE_ID,
+                 "operations": {"type": "array", "minItems": 1, "maxItems": MAX_COMMENT_OPERATIONS,
+                                "items": _COMMENT_OPERATION}},
+                ("folder_id", "file_id", "operations")),
+         lambda ctx, args: ctx.services().comments.preview(args["folder_id"], args["file_id"], args["operations"])),
+    Tool("apply_comment_changes",
+         "Mutación: aplica sólo el plan_id de cambios de comentarios guardado y aceptado; cada acción se reanuda "
+         "adoptando el comentario o respuesta ya creados por la misma cuenta con el mismo texto, sin duplicarlos." +
+         _GATE,
+         schema({"plan_id": _PLAN_ID}, ("plan_id",)),
+         lambda ctx, args: ctx.services().comments.apply(args["plan_id"]),
+         mutates=True),
 )
