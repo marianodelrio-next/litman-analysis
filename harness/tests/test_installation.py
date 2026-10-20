@@ -90,6 +90,28 @@ def test_install_is_idempotent_and_updates_a_changed_skill(tmp_path: Path, monke
     assert (skill_dir / "SKILL.md").read_text(encoding="utf-8") != "modificado"
 
 
+@pytest.mark.parametrize("app", installation.APPS)
+def test_install_copies_current_conectar_licitacion_skill_for_each_app(
+    app: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+):
+    env = _env(tmp_path, monkeypatch)
+    home = tmp_path / "home"
+    _patch_scripts(monkeypatch, tmp_path / "scripts")
+    if app == "claude":
+        bin_dir = tmp_path / "bin"
+        bin_dir.mkdir()
+        (bin_dir / "claude").write_text("#!/bin/sh\n")
+        (bin_dir / "claude").chmod(0o755)
+        monkeypatch.setenv("PATH", str(bin_dir))
+
+    installation.install(app=app, source=REPO, home=home, env=env, run=FakeClaudeRun())
+
+    skill_root = home / (".claude/skills" if app == "claude" else ".agents/skills")
+    installed = skill_root / "conectar-licitacion" / "SKILL.md"
+    source = REPO / "harness/agent/skills/conectar-licitacion/SKILL.md"
+    assert installed.read_bytes() == source.read_bytes()
+
+
 def test_config_toml_with_foreign_content_is_preserved_and_windows_path_reread(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ):

@@ -10,6 +10,11 @@ LitMan is published as a single product version, shared by Core and Harness; see
 
 ## [Unreleased]
 
+### Changed
+
+- Explain planned dossier folders before incorporation and summarize confirmed
+  folder and context outcomes after it.
+
 ## [0.1.0] - 2026-10-20
 ### Added
 
