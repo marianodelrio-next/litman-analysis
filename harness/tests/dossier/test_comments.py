@@ -191,6 +191,27 @@ def test_resume_matches_reply_and_resolve_candidates_independently(tmp_path: Pat
     assert len(plain) == 1 and len(resolve) == 1
 
 
+def test_two_actions_with_identical_content_each_get_their_own_comment(tmp_path: Path):
+    setup = Setup(tmp_path)
+    plan = setup.preview("doc", [{"op": "add", "content": "Mismo texto"}, {"op": "add", "content": "Mismo texto"}])
+    result = setup.apply(plan["plan_id"])
+    assert result["status"] == "succeeded"
+    matching = [c for c in setup.drive.comment_threads["doc"] if c["content"] == "Mismo texto"]
+    assert len(matching) == 2
+    assert result["results"][0]["comment_id"] != result["results"][1]["comment_id"]
+
+
+def test_two_replies_to_the_same_comment_with_identical_content_each_get_created(tmp_path: Path):
+    setup = Setup(tmp_path)
+    plan = setup.preview("doc", [{"op": "reply", "comment_id": "c1", "content": "+1"},
+                                 {"op": "reply", "comment_id": "c1", "content": "+1"}])
+    result = setup.apply(plan["plan_id"])
+    assert result["status"] == "succeeded"
+    replies = [r for r in setup.drive.comment_threads["doc"][0]["replies"] if r["content"] == "+1"]
+    assert len(replies) == 2
+    assert result["results"][0]["reply_id"] != result["results"][1]["reply_id"]
+
+
 def test_file_losing_comment_permission_is_rechecked_on_apply(tmp_path: Path):
     setup = Setup(tmp_path)
     plan = setup.preview("doc", [{"op": "add", "content": "x"}])

@@ -97,8 +97,13 @@ class CommentService:
             if comment_id is not None and comment_id not in by_id:
                 raise HarnessError("comment_not_found", "El comentario no existe o está eliminado",
                                    details={"operation": index, "comment_id": comment_id})
-            actions.append(PlanAction(entry["op"], item.id, entry.get("content") or "", comment_id,
-                                      metadata={"index": index, "created_after": created_after}))
+            # ``parent_id`` carries the plan-local index, not the comment_id: two operations can share
+            # kind, file and content (e.g. two identical "add"), and action_id() (dossier/service.py)
+            # hashes kind/resource_id/parent_id/name only, so a shared comment_id there would collapse
+            # them into the same action. The real comment_id, if any, lives in metadata instead.
+            actions.append(PlanAction(entry["op"], item.id, entry.get("content") or "", str(index),
+                                      metadata={"index": index, "created_after": created_after,
+                                                "comment_id": comment_id}))
         plan = Plan("comment_changes", root.id, account, tuple(actions), {})
         self.dossier.store().save(plan)
         previews = [{"op": entry["op"], "comment_id": entry.get("comment_id"),
@@ -112,6 +117,11 @@ class CommentService:
     # -- apply -----------------------------------------------------------------------------------
 
     def _run(self, run: OperationRun, root: Resource) -> dict[str, Any]:
+        # Every comment/reply ID a prior action of this same plan already claimed (completed now or
+        # before an interruption): excluded from resume matching so one of them never satisfies two
+        # actions with identical content.
+        claimed = {identifier for action in run.plan.actions if run.done(action)
+                  for identifier in run.output(action).values() if isinstance(identifier, str)}
         for action in run.plan.actions:
             if run.done(action):
                 continue
@@ -120,38 +130,42 @@ class CommentService:
                 raise HarnessError("insufficient_capability", "La cuenta ya no puede comentar este archivo",
                                    details={"file_id": item.id})
             handler = getattr(self, f"_apply_{action.kind}")
-            run.complete(action, handler(run, item, action))
+            output = handler(run, item, action, claimed)
+            run.complete(action, output)
+            claimed.update(value for value in output.values() if isinstance(value, str))
         return run.envelope("succeeded", writes=True, results=[run.output(a) for a in run.plan.actions])
 
-    def _apply_add(self, run: OperationRun, item: Resource, action: Any) -> dict[str, Any]:
+    def _apply_add(self, run: OperationRun, item: Resource, action: Any, claimed: set[str]) -> dict[str, Any]:
         current = [comment for comment in self.drive.comments(item.id) if isinstance(comment, dict)]
-        match = self._resume_match(run, action, current)
+        match = self._resume_match(run, action, current, claimed)
         if match is not None:
             return {"comment_id": match["id"]}
         created = self.drive.create_comment(item.id, action.name)
         return {"comment_id": created["id"]}
 
-    def _apply_reply(self, run: OperationRun, item: Resource, action: Any) -> dict[str, Any]:
-        comment = self._find_comment(item, action.parent_id)
+    def _apply_reply(self, run: OperationRun, item: Resource, action: Any, claimed: set[str]) -> dict[str, Any]:
+        comment_id = action.metadata["comment_id"]
+        comment = self._find_comment(item, comment_id)
         replies = [reply for reply in (comment.get("replies") or []) if not reply.get("deleted")
                   and not reply.get("action")]
-        match = self._resume_match(run, action, replies)
+        match = self._resume_match(run, action, replies, claimed)
         if match is not None:
-            return {"comment_id": action.parent_id, "reply_id": match["id"]}
-        created = self.drive.create_reply(item.id, action.parent_id, action.name)
-        return {"comment_id": action.parent_id, "reply_id": created["id"]}
+            return {"comment_id": comment_id, "reply_id": match["id"]}
+        created = self.drive.create_reply(item.id, comment_id, action.name)
+        return {"comment_id": comment_id, "reply_id": created["id"]}
 
-    def _apply_resolve(self, run: OperationRun, item: Resource, action: Any) -> dict[str, Any]:
-        comment = self._find_comment(item, action.parent_id)
+    def _apply_resolve(self, run: OperationRun, item: Resource, action: Any, claimed: set[str]) -> dict[str, Any]:
+        comment_id = action.metadata["comment_id"]
+        comment = self._find_comment(item, comment_id)
         if comment.get("resolved"):
-            return {"comment_id": action.parent_id, "reply_id": None}
+            return {"comment_id": comment_id, "reply_id": None}
         replies = [reply for reply in (comment.get("replies") or []) if not reply.get("deleted")
                   and reply.get("action") == "resolve"]
-        match = self._resume_match(run, action, replies)
+        match = self._resume_match(run, action, replies, claimed)
         if match is not None:
-            return {"comment_id": action.parent_id, "reply_id": match["id"]}
-        created = self.drive.create_reply(item.id, action.parent_id, action.name, action="resolve")
-        return {"comment_id": action.parent_id, "reply_id": created["id"]}
+            return {"comment_id": comment_id, "reply_id": match["id"]}
+        created = self.drive.create_reply(item.id, comment_id, action.name, action="resolve")
+        return {"comment_id": comment_id, "reply_id": created["id"]}
 
     def _find_comment(self, item: Resource, comment_id: str) -> dict[str, Any]:
         comment = next((comment for comment in self.drive.comments(item.id) if comment.get("id") == comment_id),
@@ -160,12 +174,12 @@ class CommentService:
             raise HarnessError("comment_not_found", "El comentario ya no existe", details={"comment_id": comment_id})
         return comment
 
-    def _resume_match(self, run: OperationRun, action: Any, candidates: list[dict[str, Any]]
-                      ) -> dict[str, Any] | None:
+    def _resume_match(self, run: OperationRun, action: Any, candidates: list[dict[str, Any]],
+                      claimed: set[str]) -> dict[str, Any] | None:
         created_after = action.metadata.get("created_after")
         matches = [candidate for candidate in candidates
-                  if _is_mine(candidate) and candidate.get("content", "") == action.name
-                  and isinstance(candidate.get("createdTime"), str)
+                  if candidate.get("id") not in claimed and _is_mine(candidate)
+                  and candidate.get("content", "") == action.name and isinstance(candidate.get("createdTime"), str)
                   and (created_after is None or candidate["createdTime"] > created_after)]
         if len(matches) > 1:
             raise OperationConflict("Hay más de un candidato para reanudar esta acción sin duplicarla",
