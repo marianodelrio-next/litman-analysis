@@ -57,3 +57,25 @@ def test_prepare_team_skill_references_real_operations_and_installation_commands
 def test_workspace_template_mentions_the_litman_binary_placeholder():
     template = (AGENT / "workspace" / "AGENTS.md").read_text(encoding="utf-8")
     assert "{{LITMAN_BIN}}" in template
+
+
+DOCUMENT_TOOLS = ("read_google_doc", "preview_document_edit", "apply_document_edit", "preview_document_creation",
+                  "apply_document_creation")
+
+
+def test_connect_skill_and_workspace_route_drive_documents_through_litman_tools():
+    from litman_harness.interfaces.tools import registry
+    connect_skill = (AGENT / "skills" / "conectar-licitacion" / "SKILL.md").read_text(encoding="utf-8")
+    workspace = (AGENT / "workspace" / "AGENTS.md").read_text(encoding="utf-8")
+    for text in (connect_skill, workspace):
+        for operation in DOCUMENT_TOOLS:
+            assert operation in registry() and f"`{operation}`" in text
+        lowered = text.lower()
+        assert "computer use" in lowered and "navegador" in lowered
+    assert "vista previa" in connect_skill and "acepte" in connect_skill
+
+
+def test_prepare_team_skill_covers_the_docs_api_check():
+    prepare_skill = (AGENT / "skills" / "preparar-equipo" / "SKILL.md").read_text(encoding="utf-8")
+    assert "`docs_api`" in prepare_skill and "Google Docs API" in prepare_skill
+    assert "disabled" in prepare_skill and "unknown" in prepare_skill
