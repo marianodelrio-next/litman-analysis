@@ -1,0 +1,20 @@
+change: CHG-0009
+design_digest: sha256:b563c4f8657e0c396b7ac3ce4b896de27089165d91118e0abc70ee7b157a383a
+tasks:
+- id: CHG-0009-01
+  title: Explain planned dossier folders and confirm incorporation outcomes
+  depends_on: []
+  complexity: normal
+  review:
+  - quality
+  - conformance
+  scope:
+  - harness/agent/skills/conectar-licitacion/SKILL.md
+  - harness/docs/architecture.md
+  - harness/docs/validation/CHG-0009.md
+  - harness/tests/test_installation.py
+  - CHANGELOG.md
+  acceptance:
+    AC-01: manual
+    AC-02: manual
+    AC-03: manual
