@@ -266,8 +266,9 @@ the range's size) and `append_rows` (`sheet`, a title, and `values`). A range
 without both explicit row and column bounds is rejected
 (`invalid_request`); there is no open-ended or whole-row/column form.
 `append_rows` resolves the first empty row after the last non-empty row of the
-named sheet (by reading the whole sheet with `UNFORMATTED_VALUE`) into an
-explicit range, and several `append_rows` into the same sheet within one plan
+named sheet (by reading the whole sheet with `FORMULA`, so a formula cell that
+evaluates to an empty value still reserves its row) into an explicit range,
+and several `append_rows` into the same sheet within one plan
 stack without overlapping. The preview rejects more than 5,000 cells in total,
 overlapping resolved ranges (`overlapping_operations`), and an unknown sheet
 title (`invalid_request`).
@@ -280,8 +281,10 @@ plan (`sheet_edit`) stores, per operation, the resolved range, the expected
 values, and the current (`before_sha256`) and expected (`after_sha256`)
 hashes.
 
-`apply_sheet_edit` re-checks membership and `canEdit` once for the sheet, then
-for each action reads its range again: if it already equals the expected
+`apply_sheet_edit` re-checks membership and `canEdit` before each action (not
+once for the whole plan), so a sheet that leaves the dossier tree or loses
+edit access between two actions stops the plan instead of writing past that
+point; then for each action it reads its range again: if it already equals the expected
 values the action completes without writing (a lost answer is resumed safely,
 because `RAW` writes are idempotent); if it still equals the `before_sha256`
 values it is written with `values.update`; otherwise the action stops as a

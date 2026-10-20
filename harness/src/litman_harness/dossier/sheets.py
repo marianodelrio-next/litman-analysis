@@ -193,11 +193,13 @@ class SheetsService:
 
     def _run_edit(self, run: OperationRun, root: Resource) -> dict[str, Any]:
         item = self._resolve(root, run.plan.actions[0].resource_id)
-        if not item.capabilities.get("canEdit"):
-            raise HarnessError("insufficient_capability", "La cuenta ya no puede editar esta hoja de cálculo",
-                               details={"spreadsheet_id": item.id})
         for action in run.plan.actions:
             if not run.done(action):
+                item = self._resolve(root, item.id)
+                if not item.capabilities.get("canEdit"):
+                    raise HarnessError("insufficient_capability",
+                                       "La cuenta ya no puede editar esta hoja de cálculo",
+                                       details={"spreadsheet_id": item.id})
                 run.complete(action, self._write_range(item.id, action))
         return run.envelope("succeeded", writes=True, spreadsheet_id=item.id, name=item.name,
                             web_view_link=item.web_view_link)

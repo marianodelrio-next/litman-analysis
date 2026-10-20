@@ -274,6 +274,24 @@ def test_apply_rejects_when_the_account_can_no_longer_edit(tmp_path: Path):
     assert error(lambda: setup.apply(plan["plan_id"])).code == "insufficient_capability"
 
 
+def test_apply_rechecks_can_edit_before_each_action_of_a_multi_operation_plan(tmp_path: Path):
+    setup = Setup(tmp_path)
+    plan = setup.preview([{"op": "update_range", "range": "'Hoja 1'!B2:B2", "values": [[1500]]},
+                          {"op": "update_range", "range": "'Hoja 1'!B3:B3", "values": [[400]]}])
+    original_update = setup.sheets.update
+
+    def update(spreadsheet_id, a1_range, values):
+        original_update(spreadsheet_id, a1_range, values)
+        setup.drive.add(Resource("sheet", "Presupuesto", GOOGLE_SHEET_MIME, "1", drive_id="shared",
+                                 parents=("root",), capabilities={"canEdit": False}))
+
+    setup.sheets.update = update
+    exc = error(lambda: setup.apply(plan["plan_id"]))
+    assert exc.code == "insufficient_capability"
+    assert setup.sheets.updates == [("sheet", "'Hoja 1'!B2:B2", [[1500]])]
+    assert setup.sheets.spreadsheets["sheet"]["Hoja 1"][2][1] != 400
+
+
 def test_apply_replays_a_succeeded_plan_without_writing_again(tmp_path: Path):
     setup = Setup(tmp_path)
     plan = setup.preview([{"op": "update_range", "range": "'Hoja 1'!B2:B2", "values": [[1500]]}])
