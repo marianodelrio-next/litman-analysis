@@ -81,3 +81,6 @@ class MetadataSheetsGateway:
 
     def values(self, *args, **kwargs):
         raise HarnessError("read_only_adapter", "El adaptador de metadatos no puede leer hojas de cálculo")
+
+    def update(self, *args, **kwargs):
+        raise HarnessError("read_only_adapter", "El adaptador de metadatos no puede escribir")

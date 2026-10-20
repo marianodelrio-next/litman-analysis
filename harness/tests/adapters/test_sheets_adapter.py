@@ -55,6 +55,16 @@ def test_gateway_sends_the_given_render_option():
     assert parse_qs(urlparse(http.request_sequence[0][0]).query)["valueRenderOption"] == ["UNFORMATTED_VALUE"]
 
 
+def test_gateway_update_sends_raw_values_to_the_given_range():
+    gateway, http = _gateway([({"status": "200"}, json.dumps({"spreadsheetId": "s", "updatedCells": 2}))])
+    response = gateway.update("s", "'Hoja 1'!A1:B1", [["a", 1]])
+    assert response == {"spreadsheetId": "s", "updatedCells": 2}
+    (uri, method, body, _), = http.request_sequence
+    assert method == "PUT" and "/spreadsheets/s/values/" in urlparse(uri).path
+    assert parse_qs(urlparse(uri).query)["valueInputOption"] == ["RAW"]
+    assert json.loads(body) == {"range": "'Hoja 1'!A1:B1", "values": [["a", 1]]}
+
+
 def test_gateway_ignores_malformed_value_ranges():
     gateway, _ = _gateway([({"status": "200"}, json.dumps({"valueRanges": [{"values": [["a"]]}, "x", None]}))])
     assert gateway.values("s", ["'A'"]) == [{"values": [["a"]]}]

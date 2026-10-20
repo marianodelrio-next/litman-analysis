@@ -38,6 +38,11 @@ every Docs call returns `docs_api_disabled` and `diagnose` reports
 token, the metadata adapter, or another error); `diagnose` never fails because
 of it.
 
+The Google Sheets tools (reading and `preview_sheet_edit`/`apply_sheet_edit`)
+use the same token with Sheets API v4, checked the same way: a disabled API
+returns `sheets_api_disabled` and `diagnose` reports `sheets_api: "disabled"`;
+`unknown` means the check could not run.
+
 ## Operations
 
 CLI and MCP return the same envelope: `{"ok": true, "result": ...}` or
@@ -49,7 +54,7 @@ enums, and rejection of extra properties; invalid input returns
 | Operation | Kind | Responsibility |
 | --- | --- | --- |
 | `identity` | query | Report the active account. |
-| `diagnose` | query | Report adapters, identity, scopes, Core contract/environment/provider, shared-state mechanism, Google Docs API state (`docs_api`), guided-install state, and whether configured paths exist, never tokens or paths. |
+| `diagnose` | query | Report adapters, identity, scopes, Core contract/environment/provider, shared-state mechanism, Google Docs and Sheets API state (`docs_api`, `sheets_api`), guided-install state, and whether configured paths exist, never tokens or paths. |
 | `inspect` | query | Inventory the connected folder tree, candidates, suggestions, and next actions. |
 | `status` | query | Combine inspection with manifest status, pending local publications, and `recommended_action`. |
 | `preview_incorporation` | query | Plan only missing folders, originals, live offer, context, and manifest work. |
@@ -72,6 +77,8 @@ enums, and rejection of extra properties; invalid input returns
 | `apply_document_edit` | mutation | Send the accepted edit as one batch guarded by the preview's revision. |
 | `preview_document_creation` | query | Plan a new Google Doc in a dossier folder from text or a dossier DOCX. |
 | `apply_document_creation` | mutation | Create the accepted Google Doc and return `document_id` and `web_view_link`. |
+| `preview_sheet_edit` | query | Plan 1–20 closed range operations (`update_range`, `append_rows`) on a dossier Google Sheet, with the before/after hash of each resolved range. |
+| `apply_sheet_edit` | mutation | Write each accepted range only if its current values still match the preview's hash; otherwise return `conflict` (`sheet_changed`) for that range. |
 | `recover` | query | Report local operation state. |
 | `setup` | local mutation | Validate Core and save `codex` or `claude-code`, plus an optional model. |
 
@@ -89,8 +96,8 @@ developer when no tool fits. Each `tools/list` entry carries MCP
 `annotations`: `readOnlyHint` is `not mutates` (so `preview_*` tools, which
 only store a private local plan, count as read-only), `destructiveHint` is the
 tool's `destructive` flag (`apply_incorporation`, `apply_summary`,
-`apply_document_edit`, and `discard_analysis`), `idempotentHint` is `true`, and
-`openWorldHint` is `false`.
+`apply_document_edit`, `apply_sheet_edit`, and `discard_analysis`),
+`idempotentHint` is `true`, and `openWorldHint` is `false`.
 Protocol errors use `-32700`, `-32600`, `-32601`, and `-32602`. Services are
 assembled per call, so `tools/list` works without local configuration.
 
@@ -169,6 +176,16 @@ the document changed after the preview, or the preview's revision expired
 prepare a new preview. An interrupted edit or creation is resumed by repeating
 the same acceptance; it never sends a second edit batch or writes a new
 document's text twice.
+
+A sheet edit action that returns `conflict` with `sheet_changed` wrote nothing
+for that range: its current values no longer match either the preview's
+values or its expected result. Earlier actions of the same plan stay written;
+read the sheet again and prepare a new preview for the remaining ranges.
+Repeating an accepted plan after an interruption resumes action by action and
+never writes an already-written range twice: a range whose current values
+already match the expected result completes without a second write (a lost
+answer). Sheets has no revision control, so a narrow race remains between an
+action's read and its write; this is a known, accepted gap.
 
 ## Authorized validation status
 

@@ -21,12 +21,13 @@ explicas.
    CLI del proveedor (Codex o Claude Code) no tiene sesión, dale el comando
    de login de esa CLI para que lo ejecute ella misma; no lo ejecutes tú
    salvo que lo pida explícitamente en ese turno.
-5. **Google Docs.** Si `diagnose` devuelve `docs_api` igual a `disabled`, explica
-   que el administrador del proyecto de Google Cloud del cliente OAuth debe
-   habilitar una vez la Google Docs API; hasta entonces no se pueden leer,
-   editar ni crear Google Docs, pero el resto de LitMan funciona. Con
-   `unknown` (sin sesión de Drive o sin conexión), repite la comprobación tras
-   `litman login`; no bloquees por ello.
+5. **Google Docs y Google Sheets.** Si `diagnose` devuelve `docs_api` igual a
+   `disabled`, explica que el administrador del proyecto de Google Cloud del
+   cliente OAuth debe habilitar una vez la Google Docs API; si devuelve
+   `sheets_api` igual a `disabled`, debe habilitar la Google Sheets API. Hasta
+   entonces no se pueden leer ni editar esos archivos, pero el resto de
+   LitMan funciona. Con `unknown` (sin sesión de Drive o sin conexión), repite
+   la comprobación tras `litman login`; no bloquees por ello.
 6. Ejecuta `setup` con el proveedor por defecto de esta app (Codex →
    `codex`, Claude → `claude-code`) y el modelo si la persona lo pide.
 7. Vuelve a llamar a `diagnose`. Si todo está en verde salvo pasos humanos

@@ -141,6 +141,23 @@ restriction. Membership is proved with `belongs_to_root` and `in_litman`, as
 for the Google Docs tools, and Excel files are read with `openpyxl` in
 read-only mode so that a large workbook is never loaded whole.
 
+## Google Sheets writes are closed, hash-guarded ranges with RAW values
+
+The assistant changes a dossier Google Sheet only through closed operations
+(`update_range`, `append_rows`) resolved to explicit A1 ranges; `append_rows`
+resolves the first empty row so a lost answer never appends twice. Each range
+is written with `values.update` and `valueInputOption: RAW`, so no formula or
+external data ever reaches a sheet this way. Sheets v4 has no revision
+control like Docs, so the apply re-reads each range and compares its SHA-256
+against the preview's expected and current values instead: equal to the
+expected values completes without writing (a lost answer), equal to the
+preview's current values is written, and anything else is a `sheet_changed`
+conflict. This leaves a narrow, documented race between an action's read and
+its write, accepted because Sheets offers no optimistic-concurrency primitive
+to close it. Sheets API v4 uses the existing `drive` scope, so no new login is
+required, but the Google Sheets API must be enabled in the OAuth client's
+Cloud project.
+
 ## Product agents are separate from development agents
 
 Files under `harness/agent/` are installed product behavior. Repository skills

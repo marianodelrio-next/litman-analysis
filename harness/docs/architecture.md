@@ -251,6 +251,44 @@ adapter also requests `modifiedTime` and the `canRename`, `canTrash` and
 `canComment` capabilities; `inspect` output therefore gains `modified_time` on
 each resource.
 
+## Google Sheets edit
+
+`dossier/sheets.py` (`SheetsService`) lets the assistant change explicit
+ranges of a dossier Google Sheet through `SheetsGateway.update` (`values.update`
+with `valueInputOption=RAW`, so no formula or external data ever reaches a
+sheet this way). It proves membership and `GOOGLE_SHEET_MIME` the same way as
+the document tools (`document_outside_tree`, `unsupported_document` saying to
+convert first), and that the account can edit the sheet (`insufficient_capability`).
+
+`preview_sheet_edit` accepts 1–20 closed operations: `update_range` (`range`,
+an explicit `'Hoja'!A1:B2` range, and `values`, a rectangular matrix of exactly
+the range's size) and `append_rows` (`sheet`, a title, and `values`). A range
+without both explicit row and column bounds is rejected
+(`invalid_request`); there is no open-ended or whole-row/column form.
+`append_rows` resolves the first empty row after the last non-empty row of the
+named sheet (by reading the whole sheet with `UNFORMATTED_VALUE`) into an
+explicit range, and several `append_rows` into the same sheet within one plan
+stack without overlapping. The preview rejects more than 5,000 cells in total,
+overlapping resolved ranges (`overlapping_operations`), and an unknown sheet
+title (`invalid_request`).
+
+Each resolved range is read once with `UNFORMATTED_VALUE` and both its current
+and its expected values are normalized the same way before hashing (SHA-256 of
+canonical JSON): values are padded to the range's size, a missing value,
+`null`, and `""` all become `""`, and an integral float becomes an int. The
+plan (`sheet_edit`) stores, per operation, the resolved range, the expected
+values, and the current (`before_sha256`) and expected (`after_sha256`)
+hashes.
+
+`apply_sheet_edit` re-checks membership and `canEdit` once for the sheet, then
+for each action reads its range again: if it already equals the expected
+values the action completes without writing (a lost answer is resumed safely,
+because `RAW` writes are idempotent); if it still equals the `before_sha256`
+values it is written with `values.update`; otherwise the action stops as a
+`conflict` with code `sheet_changed`, leaving earlier actions of the plan
+written. Sheets has no revision control, so a narrow race remains between an
+action's read and its write; this is documented, not closed.
+
 ## Guided product flow
 
 The assistant follows one business flow: organize the dossier and originals,
@@ -282,6 +320,9 @@ The installed product resources support this flow:
 - `conectar-licitacion` and the workspace `AGENTS.md` also route listing,
   searching, inspecting and reading any dossier file, and its comments, through
   the file tools.
+- `conectar-licitacion` also routes changing a dossier Google Sheet through
+  `preview_sheet_edit`/`apply_sheet_edit`, applying only the preview the
+  person accepts.
 - `ayuda-litman` answers "qué puedes hacer" by explaining every operation in
   business terms with an example phrase; a test keeps it complete against the
   registry.

@@ -19,6 +19,7 @@ from ..dossier.documents import DocumentService
 from ..dossier.files import FileService
 from ..dossier.publication import PublicationService
 from ..dossier.service import ExpedienteService
+from ..dossier.sheets import SheetsService
 from ..dossier.summary import SummaryService
 from ..dossier.shared_state import SharedStateCapability, UnavailableSharedState
 from ..errors import HarnessError, safe_exception_message
@@ -28,6 +29,8 @@ from ..settings import load_settings
 
 # An ID that no document has: a 404 proves the Docs API answers for this OAuth client.
 DOCS_PROBE_ID = "litman-docs-api-probe-0000000000000000000000"
+# An ID that no spreadsheet has: a 404 proves the Sheets API answers for this OAuth client.
+SHEETS_PROBE_ID = "litman-sheets-api-probe-0000000000000000000000"
 
 
 @dataclass(frozen=True)
@@ -42,6 +45,7 @@ class Services:
     docs: DocsGateway
     documents: DocumentService
     sheets: SheetsGateway
+    sheet_edits: SheetsService
     files: FileService
 
 
@@ -89,7 +93,7 @@ def build_services(env: Mapping[str, str] | None = None, *, provider: DesktopOAu
                                settings=lambda: load_settings(env))
     documents = DocumentService(expediente, docs)
     return Services(kind, drive, shared_state, expediente, analysis, publication, SummaryService(expediente), docs,
-                    documents, sheets, FileService(expediente, documents, sheets))
+                    documents, sheets, SheetsService(expediente, sheets), FileService(expediente, documents, sheets))
 
 
 def docs_api_status(docs: DocsGateway) -> str:
@@ -98,6 +102,17 @@ def docs_api_status(docs: DocsGateway) -> str:
         docs.get(DOCS_PROBE_ID)
     except HarnessError as exc:
         return {"not_found": "enabled", "docs_api_disabled": "disabled"}.get(exc.code, "unknown")
+    except Exception:  # noqa: BLE001 - diagnostics must report, not crash
+        return "unknown"
+    return "enabled"
+
+
+def sheets_api_status(sheets: SheetsGateway) -> str:
+    """``enabled``, ``disabled`` or ``unknown`` from one read of a spreadsheet that does not exist."""
+    try:
+        sheets.get(SHEETS_PROBE_ID)
+    except HarnessError as exc:
+        return {"not_found": "enabled", "sheets_api_disabled": "disabled"}.get(exc.code, "unknown")
     except Exception:  # noqa: BLE001 - diagnostics must report, not crash
         return "unknown"
     return "enabled"
@@ -124,6 +139,7 @@ def diagnose(env: Mapping[str, str] | None = None) -> dict[str, Any]:
         "core_executable_found": core.core_executable() is not None,
         "shared_state": {"available": False, "mechanism": "unavailable"},
         "docs_api": "unknown",
+        "sheets_api": "unknown",
         "paths_configured": {name: bool(env.get(name)) for name in CONFIGURABLE},
         "setup": {"configured": settings is not None,
                   "provider": settings.get("provider") if settings else None,
@@ -158,4 +174,5 @@ def diagnose(env: Mapping[str, str] | None = None) -> dict[str, Any]:
         report["errors"].append({"code": "identity_unavailable", "message": safe_exception_message(exc)})
     if services is not None:
         report["docs_api"] = docs_api_status(services.docs)
+        report["sheets_api"] = sheets_api_status(services.sheets)
     return report

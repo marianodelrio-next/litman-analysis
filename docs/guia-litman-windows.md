@@ -138,6 +138,7 @@ En el día a día solo necesitas abrir Codex en la carpeta LitMan y escribir lo 
 | Descartar un análisis que no quiero publicar | `descarta el análisis` |
 | Leer o cambiar el texto de un Google Doc de la licitación (por ejemplo, la propuesta técnica en `Oferta`) | `en la propuesta técnica, cambia "<texto actual>" por "<texto nuevo>"` |
 | Crear un Google Doc nuevo en la licitación | `crea en la carpeta Oferta un documento "<nombre>" con este texto: ...` o `crea un Google Doc a partir del DOCX "<nombre>"` |
+| Cambiar una celda o añadir filas en una hoja de cálculo Google Sheets de la licitación | `pon 1.500 € en la celda B2 del presupuesto` o `añade una fila con estos gastos al presupuesto` |
 | Ver qué hay en una carpeta de la licitación o buscar un archivo | `qué hay en la carpeta Oferta` o `busca el archivo del presupuesto` |
 | Leer un archivo de la licitación (PDF, Word, Excel, Hojas de cálculo, Presentaciones, texto) | `lee el Excel de costes` |
 | Ver los comentarios de un archivo | `qué comentarios hay en la memoria técnica` |
@@ -148,7 +149,7 @@ Cuatro reglas:
 
 - **Nada se cambia en Drive sin tu sí.** El asistente siempre te enseña el plan antes. Léelo y contesta sí o no.
 - **No toques la carpeta `_LitMan`** ni el archivo `contexto.md` a mano. Si alguien los edita, LitMan no los sobrescribe y te avisará.
-- **Las licitaciones y los archivos de Drive se tocan solo con LitMan, nunca con el navegador ni manejando la pantalla.** Si pides algo que LitMan todavía no sabe hacer, el asistente te lo dirá y te sugerirá pedírselo al desarrollador de LitMan. Para editar o crear un Google Doc, el asistente te enseña cada cambio con el texto de alrededor y solo lo aplica si dices que sí. Cambia solo texto: el formato, las tablas, las imágenes y los comentarios los cambias tú en Google Docs. Un DOCX no se edita directamente: primero se crea su Google Doc.
+- **Las licitaciones y los archivos de Drive se tocan solo con LitMan, nunca con el navegador ni manejando la pantalla.** Si pides algo que LitMan todavía no sabe hacer, el asistente te lo dirá y te sugerirá pedírselo al desarrollador de LitMan. Para editar o crear un Google Doc, el asistente te enseña cada cambio con el texto de alrededor y solo lo aplica si dices que sí. Cambia solo texto: el formato, las tablas, las imágenes y los comentarios los cambias tú en Google Docs. Un DOCX no se edita directamente: primero se crea su Google Doc. Para cambiar una hoja de cálculo Google Sheets, el asistente también te enseña el cambio antes de aplicarlo; un Excel (XLSX) tampoco se edita directamente: conviértelo primero a Google Sheet.
 - **Antes de descartar un análisis, cierra** los archivos suyos que tengas abiertos (por ejemplo un PDF). Si no, el descarte falla y tendrás que repetirlo.
 
 ## Problemas frecuentes
@@ -168,6 +169,7 @@ Para casi cualquier problema, lo primero es escribir **prepara mi equipo**: el a
 | Te dice que un archivo es demasiado grande para leerlo | LitMan lee archivos de hasta 30 MB y hojas de hasta 200.000 celdas. Pide solo la parte que necesitas o abre el archivo tú mismo. |
 | Te avisa de que la API de Google Docs no está habilitada | Avisa al equipo técnico: hay que habilitarla una vez en el proyecto de Google Cloud. Mientras tanto, el resto de LitMan funciona. |
 | Al aplicar un cambio en un documento, te avisa de que el documento cambió | No se ha escrito nada: alguien lo editó después de la vista previa. Pide al asistente que lo vuelva a leer y te prepare el cambio de nuevo. |
+| Al aplicar un cambio en una hoja de cálculo, te avisa de que el rango cambió | No se ha escrito ese rango: alguien lo editó después de la vista previa. Pide al asistente que lo prepare de nuevo. |
 | Te avisa de que alguien ha cambiado `contexto.md` | No es un error. El asistente te lo explica y no sobrescribe nada; solo se sustituye si tú se lo pides. |
 
 Si avisas al equipo técnico, copia el mensaje de error tal cual. No envíes capturas con documentos de licitaciones ni el archivo `client_secret.json`.
@@ -218,6 +220,7 @@ Esta lista es para quien valida la guía en un Windows limpio. Apunta el resulta
 - [ ] Apuntado qué navegador se usa para el PDF (Edge o Chrome).
 - [ ] Pedir un cambio de texto en la propuesta técnica muestra la vista previa y, tras aceptarla, el cambio aparece en Google Docs; el asistente no abre el navegador.
 - [ ] Crear un Google Doc nuevo en la licitación funciona desde un texto y desde un DOCX.
+- [ ] Pedir un cambio en una celda y añadir filas en una hoja de cálculo Google Sheets muestra la vista previa y, tras aceptarla, el cambio aparece en Drive; el asistente no abre el navegador.
 - [ ] Preguntar qué hay en una carpeta, buscar un archivo por su nombre y leer un PDF, un Excel, una hoja de cálculo de Google y una presentación funciona sin que el asistente use el navegador.
 - [ ] Pedir los comentarios de un documento muestra solo los abiertos, con sus respuestas.
 - [ ] "qué puedes hacer" muestra lo que hace LitMan, agrupado y con un ejemplo para cada cosa.

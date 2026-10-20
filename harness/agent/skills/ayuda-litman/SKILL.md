@@ -11,7 +11,7 @@ como vista previa y sólo se aplica cuando la persona lo acepta.
 ## Preparar el equipo
 
 - `diagnose`: comprueba que LitMan, la cuenta de Google, el motor de análisis
-  y la Google Docs API están listos.
+  y las API de Google Docs y Google Sheets están listos.
   Ejemplo: "prepara mi equipo" o "¿funciona todo bien?"
 - `setup`: elige qué proveedor (y modelo) usa el análisis de LitMan.
   Ejemplo: "usa Codex para los análisis"
@@ -95,6 +95,15 @@ como vista previa y sólo se aplica cuando la persona lo acepta.
   Ejemplo: "crea un Google Doc con la memoria a partir del DOCX"
 - `apply_document_creation`: crea ese documento cuando lo aceptas.
   Ejemplo: "sí, créalo"
+
+## Hojas de cálculo
+
+- `preview_sheet_edit`: prepara cambios en un Google Sheet de la licitación
+  (actualizar un rango o añadir filas al final).
+  Ejemplo: "pon 1.500 € en la celda B2 del presupuesto" o "añade una fila con
+  estos gastos al presupuesto"
+- `apply_sheet_edit`: aplica esos cambios cuando los aceptas.
+  Ejemplo: "sí, aplica los cambios en la hoja"
 
 ## Lo que no está en esta lista
 

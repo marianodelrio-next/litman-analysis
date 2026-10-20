@@ -42,6 +42,16 @@ description: Conecta una licitación por el ID de su carpeta de Drive y guía a 
    nuevo; ante `docs_api_disabled`, explica que el administrador debe
    habilitar la Google Docs API. Formato, tablas, imágenes y comentarios
    quedan fuera: díselo a la persona.
+
+   **Hojas de cálculo de Google Sheets** de la licitación: para cambiar un
+   rango o añadir filas, prepara `preview_sheet_edit` con operaciones cerradas
+   (`update_range` con un rango explícito, o `append_rows` con el título de la
+   hoja). Muestra la vista previa (el rango resuelto de cada operación) y
+   aplica con `apply_sheet_edit` sólo el `plan_id` que la persona acepte. Ante
+   `sheet_changed`, explica qué rango cambió y prepara un plan nuevo para lo
+   que falte; ante `sheets_api_disabled`, explica que el administrador debe
+   habilitar la Google Sheets API. Un XLSX no se edita así: convertirlo
+   primero a Google Sheet.
 8. Usa sólo las herramientas de LitMan para la licitación y sus archivos de
    Drive. Nunca uses computer use, el navegador, otros conectores de Drive,
    scripts ni las APIs de Google directamente. Si ninguna herramienta de
