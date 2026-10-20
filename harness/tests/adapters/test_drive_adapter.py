@@ -287,6 +287,16 @@ def test_comments_map_http_errors():
     assert raised.value.code == "not_found"
 
 
+def test_create_comment_and_reply_match_the_real_drive_v3_discovery_document():
+    comment = {"id": "c1", "content": "Nuevo", "author": {"displayName": "Yo", "me": True},
+              "createdTime": "2026-01-01T00:00:00Z", "resolved": False}
+    reply = {"id": "r1", "content": "Hecho", "author": {"displayName": "Yo", "me": True},
+            "createdTime": "2026-01-01T00:01:00Z", "action": "resolve", "deleted": False}
+    gateway = _real_gateway([({"status": "200"}, json.dumps(comment)), ({"status": "200"}, json.dumps(reply))])
+    assert gateway.create_comment("file", "Nuevo") == comment
+    assert gateway.create_reply("file", "c1", "Hecho", action="resolve") == reply
+
+
 def test_export_downloads_a_google_native_file_in_the_requested_format(tmp_path: Path):
     from urllib.parse import parse_qs, urlparse
 

@@ -115,6 +115,14 @@ como vista previa y sólo se aplica cuando la persona lo acepta.
 - `apply_sheet_edit`: aplica esos cambios cuando los aceptas.
   Ejemplo: "sí, aplica los cambios en la hoja"
 
+## Comentarios
+
+- `preview_comment_changes`: prepara añadir un comentario, responder a uno
+  existente o resolverlo, hasta 10 a la vez.
+  Ejemplo: "responde al comentario de Ana diciendo que ya está corregido"
+- `apply_comment_changes`: aplica esos comentarios cuando los aceptas.
+  Ejemplo: "sí, hazlo"
+
 ## Lo que no está en esta lista
 
 Si la persona pide algo que no aparece aquí, dile que LitMan todavía no puede

@@ -62,6 +62,12 @@ class MetadataGateway:
     def comments(self, *args):
         raise HarnessError("read_only_adapter", "El adaptador de metadatos no puede leer comentarios")
 
+    def create_comment(self, *args):
+        raise HarnessError("read_only_adapter", "El adaptador de metadatos no puede escribir")
+
+    def create_reply(self, *args, **kwargs):
+        raise HarnessError("read_only_adapter", "El adaptador de metadatos no puede escribir")
+
     def upload(self, *args):
         raise HarnessError("read_only_adapter", "El adaptador de metadatos no puede escribir")
 

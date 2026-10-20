@@ -12,7 +12,8 @@ OPERATIONS = {"identity", "diagnose", "inspect", "status", "preview_incorporatio
               "read_document", "preview_summary", "apply_summary", "recover", "setup", "read_google_doc",
               "preview_document_edit", "apply_document_edit", "preview_document_creation", "apply_document_creation",
               "list_folder", "search_in_dossier", "get_file_info", "read_file", "list_comments",
-              "preview_sheet_edit", "apply_sheet_edit", "preview_file_changes", "apply_file_changes"}
+              "preview_sheet_edit", "apply_sheet_edit", "preview_file_changes", "apply_file_changes",
+              "preview_comment_changes", "apply_comment_changes"}
 
 
 def test_registry_exposes_operations_with_schema_and_kind():
@@ -33,7 +34,8 @@ def test_registry_exposes_operations_with_schema_and_kind():
                                                                               "apply_document_edit",
                                                                               "apply_document_creation",
                                                                               "apply_sheet_edit",
-                                                                              "apply_file_changes"}
+                                                                              "apply_file_changes",
+                                                                              "apply_comment_changes"}
 
 
 DESTRUCTIVE = {"apply_document_edit", "apply_file_changes", "apply_sheet_edit", "apply_summary",

@@ -15,6 +15,7 @@ from ..adapters.metadata import MetadataDocsGateway, MetadataGateway, MetadataSh
 from ..adapters.oauth import DesktopOAuthProvider
 from ..adapters.sheets import GoogleSheetsGateway, SheetsGateway
 from ..analysis.service import AnalysisService
+from ..dossier.comments import CommentService
 from ..dossier.documents import DocumentService
 from ..dossier.file_changes import FileChangeService
 from ..dossier.files import FileService
@@ -49,6 +50,7 @@ class Services:
     sheet_edits: SheetsService
     files: FileService
     file_changes: FileChangeService
+    comments: CommentService
 
 
 def adapter_kind(env: Mapping[str, str]) -> str:
@@ -96,7 +98,8 @@ def build_services(env: Mapping[str, str] | None = None, *, provider: DesktopOAu
     documents = DocumentService(expediente, docs)
     return Services(kind, drive, shared_state, expediente, analysis, publication, SummaryService(expediente), docs,
                     documents, sheets, SheetsService(expediente, sheets),
-                    FileService(expediente, documents, sheets), FileChangeService(expediente))
+                    FileService(expediente, documents, sheets), FileChangeService(expediente),
+                    CommentService(expediente))
 
 
 def docs_api_status(docs: DocsGateway) -> str:

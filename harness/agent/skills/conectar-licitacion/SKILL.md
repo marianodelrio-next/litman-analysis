@@ -45,8 +45,15 @@ description: Conecta una licitación por el ID de su carpeta de Drive y guía a 
    `apply_document_edit`/`apply_document_creation` sólo el `plan_id` que la
    persona acepte. Ante `document_changed`, vuelve a leer y prepara un plan
    nuevo; ante `docs_api_disabled`, explica que el administrador debe
-   habilitar la Google Docs API. Tablas, imágenes y comentarios quedan fuera:
-   díselo a la persona.
+   habilitar la Google Docs API. Tablas e imágenes quedan fuera: díselo a la
+   persona.
+
+   **Comentarios.** Para añadir un comentario, responder a uno existente o
+   resolverlo, prepara `preview_comment_changes` con hasta 10 operaciones
+   (`add`, `reply`, `resolve`) y aplica sólo el `plan_id` que la persona
+   acepte con `apply_comment_changes`. Los comentarios no se anclan a un
+   fragmento del documento. Ante `comment_not_found`, el comentario ya no
+   existe: vuelve a listar con `list_comments`.
 
    **Hojas de cálculo de Google Sheets** de la licitación: para cambiar un
    rango o añadir filas, prepara `preview_sheet_edit` con operaciones cerradas

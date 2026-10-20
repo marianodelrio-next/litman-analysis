@@ -94,8 +94,20 @@ def test_connect_skill_no_longer_excludes_formatting_and_names_the_style_operati
     flat = " ".join(step.split())
     for name in ("set_paragraph_style", "set_text_style", "set_list", "markdown"):
         assert f"`{name}`" in flat
-    assert "Formato, tablas" not in flat and "Tablas, imágenes y comentarios quedan fuera" in flat
+    assert "Formato, tablas" not in flat and "Tablas, imágenes y comentarios quedan fuera" not in flat
+    assert "Tablas e imágenes quedan fuera" in flat
     assert "no se mezclan" in flat
+
+
+def test_connect_skill_no_longer_excludes_comments_and_names_the_comment_operations():
+    connect_skill = (AGENT / "skills" / "conectar-licitacion" / "SKILL.md").read_text(encoding="utf-8")
+    step = connect_skill[connect_skill.index("**Documentos de Google Docs** de la licitación"):connect_skill.index("8. ")]
+    flat = " ".join(step.split())
+    for operation in ("preview_comment_changes", "apply_comment_changes"):
+        assert f"`{operation}`" in flat
+    for name in ("add", "reply", "resolve"):
+        assert f"`{name}`" in flat
+    assert "comment_not_found" in flat
 
 
 def test_help_skill_explains_every_operation_with_an_example():
