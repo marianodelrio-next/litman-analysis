@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from litman_harness.adapters.docs import GoogleDocsGateway
 from litman_harness.adapters.drive_state import DriveSharedState
+from litman_harness.adapters.metadata import MetadataDocsGateway
 from litman_harness.adapters.oauth import DesktopOAuthProvider
 from litman_harness.dossier.shared_state import UnavailableSharedState
 from litman_harness.interfaces import assembly
@@ -22,12 +24,15 @@ def test_oauth_assembly_writes_through_drive_v2_shared_state(unconfigured_env, t
     assert isinstance(services.shared_state, DriveSharedState) and services.shared_state.session == "session"
     assert services.expediente.shared_state is services.shared_state and len(sessions) == 1
     assert services.adapter == "oauth"
+    assert isinstance(services.docs, GoogleDocsGateway) and services.documents.docs is services.docs
+    assert services.documents.dossier is services.expediente
 
 
 def test_metadata_assembly_stays_read_only(harness_env):
     services = assembly.build_services()
     assert isinstance(services.shared_state, UnavailableSharedState)
     assert services.expediente.shared_state is services.shared_state
+    assert isinstance(services.docs, MetadataDocsGateway) and services.documents.docs is services.docs
 
 
 def test_diagnose_reports_the_drive_mechanism_with_usable_oauth(unconfigured_env, monkeypatch):

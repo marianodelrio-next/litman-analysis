@@ -269,3 +269,183 @@ def minimal_docx(paragraph: str, cells: tuple[str, str]) -> bytes:
     buffer = io.BytesIO()
     document.save(buffer)
     return buffer.getvalue()
+
+
+OBJECT = object()  # an inline object (image) inside a paragraph: one index, no text
+
+
+class FakeDocs:
+    """In-memory Docs v1: a flat token list per document, rendered as the real structural JSON.
+
+    Each token takes its UTF-16 width in index space: the section break, table,
+    row and cell markers and inline objects take one index; text characters take
+    one or two.  Only ``insertText`` and ``deleteContentRange`` by index are
+    implemented, and every write changes ``revisionId``.
+    """
+
+    def __init__(self):
+        self.documents: dict[str, dict] = {}
+        self.gets: list[str] = []
+        self.batches: list[tuple[str, list[dict], str]] = []
+        self.lose_answer: set[str] = set()  # document IDs whose next batch "times out" after being applied
+
+    def add(self, document_id: str, blocks: list, *, tabs: int = 1, child_tabs: int = 0,
+            revision: str | None = "rev-1") -> None:
+        """``blocks``: a str is a paragraph; a list is a paragraph of segments (str, ``OBJECT``,
+        ``("text", "insert" | "delete")``); ``{"table": [[cell, ...], ...]}`` is a table of one-paragraph cells."""
+        tokens = [("section",)]
+        for block in blocks:
+            if isinstance(block, dict):
+                tokens.append(("table_start",))
+                for row in block["table"]:
+                    tokens.append(("row",))
+                    for cell in row:
+                        tokens.append(("cell",))
+                        tokens.extend(_chars(cell + "\n"))
+                tokens.append(("table_end",))
+            else:
+                for segment in ([block] if isinstance(block, str) else block):
+                    if segment is OBJECT:
+                        tokens.append(("object",))
+                    elif isinstance(segment, tuple):
+                        tokens.extend(_chars(segment[0], segment[1]))
+                    else:
+                        tokens.extend(_chars(segment))
+                tokens.extend(_chars("\n"))
+        self.documents[document_id] = {"tokens": tokens, "revision": revision, "tabs": tabs,
+                                       "child_tabs": child_tabs, "version": 1}
+
+    def get(self, document_id):
+        self.gets.append(document_id)
+        if document_id not in self.documents:
+            raise HarnessError("not_found", "No existe el documento")
+        document = self.documents[document_id]
+        tab = {"tabProperties": {"tabId": "t.0"}, "documentTab": {"body": {"content": _render(document["tokens"])}}}
+        if document["child_tabs"]:
+            tab["childTabs"] = [{"tabProperties": {"tabId": f"t.c{n}"}} for n in range(document["child_tabs"])]
+        tabs = [tab, *({"tabProperties": {"tabId": f"t.{n}"}} for n in range(1, document["tabs"]))]
+        raw = {"tabs": tabs, "suggestionsViewMode": "SUGGESTIONS_INLINE"}
+        if document["revision"] is not None:
+            raw["revisionId"] = document["revision"]
+        return raw
+
+    def batch_update(self, document_id, requests, required_revision_id):
+        self.batches.append((document_id, requests, required_revision_id))
+        document = self.documents[document_id]
+        if required_revision_id != document["revision"]:
+            raise HarnessError("document_changed", "El documento cambió", details={"http_status": 400})
+        tokens = list(document["tokens"])
+        for request in requests:
+            (kind, body), = request.items()
+            if kind == "insertText":
+                position = _position(tokens, body["location"]["index"])
+                assert tokens[position][0] in ("char", "object"), "insertText fuera de un párrafo"
+                tokens[position:position] = _chars(body["text"])
+            elif kind == "deleteContentRange":
+                begin = _position(tokens, body["range"]["startIndex"])
+                end = _position(tokens, body["range"]["endIndex"])
+                assert begin < end and all(token[0] == "char" for token in tokens[begin:end])
+                assert end < len(tokens), "no se puede borrar el salto final del cuerpo"
+                del tokens[begin:end]
+            else:
+                raise AssertionError(f"petición no admitida: {kind}")
+        self._write(document_id, tokens)
+        if document_id in self.lose_answer:
+            self.lose_answer.discard(document_id)
+            raise RuntimeError("timeout simulado tras escribir el documento")
+        return {"documentId": document_id, "replies": [{} for _ in requests],
+                "writeControl": {"requiredRevisionId": self.documents[document_id]["revision"]}}
+
+    def edit_outside(self, document_id: str, index: int, text: str) -> None:
+        """Simulate a person typing in the document after the preview."""
+        tokens = list(self.documents[document_id]["tokens"])
+        position = _position(tokens, index)
+        tokens[position:position] = _chars(text)
+        self._write(document_id, tokens)
+
+    def plain_text(self, document_id: str) -> str:
+        """Every character not carrying a suggested insertion, in token order."""
+        return "".join(token[1] for token in self.documents[document_id]["tokens"]
+                       if token[0] == "char" and token[2] != "insert")
+
+    def _write(self, document_id: str, tokens: list) -> None:
+        document = self.documents[document_id]
+        document["version"] += 1
+        document.update(tokens=tokens, revision=f"rev-{document['version']}")
+
+
+def _chars(text: str, suggestion: str | None = None) -> list:
+    return [("char", char, suggestion) for char in text]
+
+
+def _width(token) -> int:
+    return 2 if token[0] == "char" and ord(token[1]) > 0xFFFF else 1
+
+
+def _position(tokens: list, index: int) -> int:
+    """Token position that starts at a Docs index; never inside a surrogate pair."""
+    at = 0
+    for position, token in enumerate(tokens):
+        if at == index:
+            return position
+        assert at < index, f"el índice {index} parte un par sustituto"
+        at += _width(token)
+    assert at == index, f"índice fuera del documento: {index}"
+    return len(tokens)
+
+
+def _render(tokens: list) -> list:
+    """Structural elements with ``startIndex``/``endIndex`` computed from token widths."""
+    starts, at = [], 0
+    for token in tokens:
+        starts.append(at)
+        at += _width(token)
+    content, position = [], 0
+
+    def paragraph(position: int) -> tuple[dict, int]:
+        elements, first = [], position
+        while True:
+            token = tokens[position]
+            if token[0] == "object":
+                elements.append({"startIndex": starts[position], "endIndex": starts[position] + 1,
+                                 "inlineObjectElement": {"inlineObjectId": "kix.obj"}})
+                position += 1
+                continue
+            begin, suggestion = position, token[2]
+            while (position < len(tokens) and tokens[position][0] == "char" and tokens[position][2] == suggestion
+                   and (position == begin or tokens[position - 1][1] != "\n")):
+                position += 1
+            run = {"content": "".join(t[1] for t in tokens[begin:position])}
+            if suggestion == "insert":
+                run["suggestedInsertionIds"] = ["suggest.1"]
+            elif suggestion == "delete":
+                run["suggestedDeletionIds"] = ["suggest.2"]
+            end = starts[position] if position < len(tokens) else at
+            elements.append({"startIndex": starts[begin], "endIndex": end, "textRun": run})
+            if tokens[position - 1][1] == "\n":
+                end = starts[position] if position < len(tokens) else at
+                return {"startIndex": starts[first], "endIndex": end, "paragraph": {"elements": elements}}, position
+
+    while position < len(tokens):
+        kind = tokens[position][0]
+        if kind == "section":
+            content.append({"endIndex": 1, "sectionBreak": {}})
+            position += 1
+        elif kind == "table_start":
+            first, rows = position, []
+            position += 1
+            while tokens[position][0] == "row":
+                row_start, cells = position, []
+                position += 1
+                while tokens[position][0] == "cell":
+                    cell_start = position
+                    item, position = paragraph(position + 1)
+                    cells.append({"startIndex": starts[cell_start], "endIndex": item["endIndex"], "content": [item]})
+                rows.append({"startIndex": starts[row_start], "endIndex": cells[-1]["endIndex"], "tableCells": cells})
+            position += 1  # table_end
+            content.append({"startIndex": starts[first], "endIndex": starts[position - 1] + 1,
+                            "table": {"rows": len(rows), "tableRows": rows}})
+        else:
+            item, position = paragraph(position)
+            content.append(item)
+    return content
