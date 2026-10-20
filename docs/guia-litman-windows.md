@@ -136,12 +136,15 @@ En el día a día solo necesitas abrir Codex en la carpeta LitMan y escribir lo 
 | Seguir con una licitación ya conectada | `¿cómo va la licitación con ID <ID>?` |
 | Actualizar el resumen tras añadir documentos | `actualiza el resumen de la licitación con ID <ID>` |
 | Descartar un análisis que no quiero publicar | `descarta el análisis` |
+| Leer o cambiar el texto de un Google Doc de la licitación (por ejemplo, la propuesta técnica en `Oferta`) | `en la propuesta técnica, cambia "<texto actual>" por "<texto nuevo>"` |
+| Crear un Google Doc nuevo en la licitación | `crea en la carpeta Oferta un documento "<nombre>" con este texto: ...` o `crea un Google Doc a partir del DOCX "<nombre>"` |
 | Arreglar algo que no funciona | `prepara mi equipo` |
 
 Tres reglas:
 
 - **Nada se cambia en Drive sin tu sí.** El asistente siempre te enseña el plan antes. Léelo y contesta sí o no.
 - **No toques la carpeta `_LitMan`** ni el archivo `contexto.md` a mano. Si alguien los edita, LitMan no los sobrescribe y te avisará.
+- **Los documentos de Drive se cambian con LitMan, no con el navegador.** Para editar o crear un Google Doc, el asistente te enseña cada cambio con el texto de alrededor y solo lo aplica si dices que sí. Cambia solo texto: el formato, las tablas, las imágenes y los comentarios los cambias tú en Google Docs. Un DOCX no se edita directamente: primero se crea su Google Doc.
 - **Antes de descartar un análisis, cierra** los archivos suyos que tengas abiertos (por ejemplo un PDF). Si no, el descarte falla y tendrás que repetirlo.
 
 ## Problemas frecuentes
@@ -157,6 +160,8 @@ Para casi cualquier problema, lo primero es escribir **prepara mi equipo**: el a
 | Google dice "aplicación no verificada" | Para y avisa al equipo técnico: no debería pasar. |
 | Un mensaje dice que la ruta de trabajo es demasiado larga | Los documentos con nombres largos ya se acortan solos en tu equipo (en Drive no cambian), así que solo pasa si se ha configurado una carpeta de trabajo muy profunda. Avisa al equipo técnico: hay que configurar una carpeta de trabajo con un nombre más corto. |
 | El descarte de un análisis falla con "Fallo inesperado del harness" | Cierra los archivos de ese análisis que tengas abiertos y vuelve a descartarlo. |
+| Te avisa de que la API de Google Docs no está habilitada | Avisa al equipo técnico: hay que habilitarla una vez en el proyecto de Google Cloud. Mientras tanto, el resto de LitMan funciona. |
+| Al aplicar un cambio en un documento, te avisa de que el documento cambió | No se ha escrito nada: alguien lo editó después de la vista previa. Pide al asistente que lo vuelva a leer y te prepare el cambio de nuevo. |
 | Te avisa de que alguien ha cambiado `contexto.md` | No es un error. El asistente te lo explica y no sobrescribe nada; solo se sustituye si tú se lo pides. |
 
 Si avisas al equipo técnico, copia el mensaje de error tal cual. No envíes capturas con documentos de licitaciones ni el archivo `client_secret.json`.
@@ -205,6 +210,8 @@ Esta lista es para quien valida la guía en un Windows limpio. Apunta el resulta
 - [ ] Los nombres con tildes, ñ y símbolos como € se ven bien en Drive y en el PDF.
 - [ ] Dos documentos con el mismo nombre visible se tratan como distintos.
 - [ ] Apuntado qué navegador se usa para el PDF (Edge o Chrome).
+- [ ] Pedir un cambio de texto en la propuesta técnica muestra la vista previa y, tras aceptarla, el cambio aparece en Google Docs; el asistente no abre el navegador.
+- [ ] Crear un Google Doc nuevo en la licitación funciona desde un texto y desde un DOCX.
 - [ ] Descartar con un archivo abierto falla con "Fallo inesperado del harness". Tras cerrarlo, el descarte funciona.
 - [ ] Tras borrar `token.json` en `%LOCALAPPDATA%\litman-harness`, "prepara mi equipo" solo repite el inicio de sesión en Google.
 

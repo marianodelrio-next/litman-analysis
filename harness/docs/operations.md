@@ -31,6 +31,13 @@ returns `oauth_scope_missing`. An expired token with a refresh token is
 refreshed and persisted; a missing or unrefreshable token returns
 `oauth_login_required`.
 
+The Google Docs tools use the same token with Docs API v1. The API must be
+enabled once in the Google Cloud project that owns the OAuth client; until then
+every Docs call returns `docs_api_disabled` and `diagnose` reports
+`docs_api: "disabled"`. `unknown` means the check could not run (no usable
+token, the metadata adapter, or another error); `diagnose` never fails because
+of it.
+
 ## Operations
 
 CLI and MCP return the same envelope: `{"ok": true, "result": ...}` or
@@ -42,7 +49,7 @@ enums, and rejection of extra properties; invalid input returns
 | Operation | Kind | Responsibility |
 | --- | --- | --- |
 | `identity` | query | Report the active account. |
-| `diagnose` | query | Report adapters, identity, scopes, Core contract/environment/provider, shared-state mechanism, guided-install state, and whether configured paths exist, never tokens or paths. |
+| `diagnose` | query | Report adapters, identity, scopes, Core contract/environment/provider, shared-state mechanism, Google Docs API state (`docs_api`), guided-install state, and whether configured paths exist, never tokens or paths. |
 | `inspect` | query | Inventory the connected folder tree, candidates, suggestions, and next actions. |
 | `status` | query | Combine inspection with manifest status, pending local publications, and `recommended_action`. |
 | `preview_incorporation` | query | Plan only missing folders, originals, live offer, context, and manifest work. |
@@ -55,6 +62,11 @@ enums, and rejection of extra properties; invalid input returns
 | `read_document` | query | Page through a registered PDF/DOCX original or published artifact. |
 | `preview_summary` | query | Validate and plan an ordered, sourced procurement summary. |
 | `apply_summary` | mutation | Store an accepted summary in the manifest and `contexto.md`. |
+| `read_google_doc` | query | Page through the body text of a Google Doc in the dossier tree, outside `_LitMan`, with its `revision_id`. |
+| `preview_document_edit` | query | Plan 1–20 closed text operations on a dossier Google Doc and show each matched span with context. |
+| `apply_document_edit` | mutation | Send the accepted edit as one batch guarded by the preview's revision. |
+| `preview_document_creation` | query | Plan a new Google Doc in a dossier folder from text or a dossier DOCX. |
+| `apply_document_creation` | mutation | Create the accepted Google Doc and return `document_id` and `web_view_link`. |
 | `recover` | query | Report local operation state. |
 | `setup` | local mutation | Validate Core and save `codex` or `claude-code`, plus an optional model. |
 
@@ -137,6 +149,13 @@ resume without rerunning Core or repeating completed uploads. Incorporation is
 stricter: a manifest changed since preview returns `conflict` and requires a
 new preview. `recover` exposes local operation state.
 
+A document edit that returns `conflict` with `document_changed` wrote nothing:
+the document changed after the preview, or the preview's revision expired
+(Docs revision IDs are valid for about 24 hours). Read the document again and
+prepare a new preview. An interrupted edit or creation is resumed by repeating
+the same acceptance; it never sends a second edit batch or writes a new
+document's text twice.
+
 ## Authorized validation status
 
 Real-account checks require explicit authorization, a test folder, and actual
@@ -155,6 +174,11 @@ Still pending:
    reader agent proposes a summary using only MCP reads.
 3. Confirm that the configured two-hour MCP tool timeout permits a synchronous
    analysis in each real client.
+4. With the Google Docs API enabled in the OAuth client's project, confirm that
+   the existing `drive`-scope token can read, edit, and create dossier Google
+   Docs, that `revisionId` is returned to an editor, the exact payloads of a
+   disabled API and of a stale revision, and that `diagnose` reports
+   `docs_api` correctly before and after enabling the API.
 
 The [Windows Codex app validation guide](../../docs/windows-codex-validation.md)
 owns the detailed checklist, including the long-MCP-call timeout check. It is

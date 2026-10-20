@@ -58,6 +58,13 @@ The installer never installs Git, uv, the provider CLI, or a browser by itself.
 If one is missing, it stops with an official link or one-step command for the
 person to run before repeating the installation command.
 
+The administrator of the Google Cloud project that owns the OAuth client
+(`client_secret.json`) must enable the **Google Docs API** once, in APIs &
+Services > Library. It uses the existing `drive` scope, so nobody has to log in
+again. Until it is enabled, reading, editing, and creating Google Docs return
+`docs_api_disabled`, `diagnose` reports `docs_api: "disabled"`, and the rest of
+LitMan keeps working.
+
 When installation finishes, restart the app, open the `LitMan` folder, and
 write **“prepara mi equipo”**. The installed product skill guides OAuth client
 setup with `litman install --oauth-client`, `litman login`, provider sign-in,

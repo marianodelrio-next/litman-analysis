@@ -26,10 +26,11 @@ harness/src/litman_harness/
   plans/             Plan, PlanAction, OperationRecord, and private PlanStore
   dossier/           resources, membership, manifest v1, contexto.md,
                      shared-state capability, inspection, incorporation,
-                     publication, and summary services
+                     publication, summary, and Google Docs document services
   analysis/          originals, download, Core result validation, and catalog
-  adapters/          personal OAuth Drive, Drive v2 shared state, document
-                     extraction, development metadata, OAuth, and Core process
+  adapters/          personal OAuth Drive, Drive v2 shared state, Google Docs
+                     v1, document extraction, development metadata, OAuth,
+                     and Core process
   interfaces/        assembly, operation registry, CLI, and MCP
   installation.py    idempotent guided install and uninstall
 harness/agent/       installed product skills, workspace instructions, and
@@ -146,6 +147,56 @@ immediately after phase and dossier, one linked source per line. Status and
 successful publication recommend `propose_summary` or `refresh_summary` when
 the accepted summary does not cover the current analyses.
 
+## Google Docs of the dossier
+
+`dossier/documents.py` (`DocumentService`) lets the assistant read, edit, and
+create native Google Docs anywhere in the connected dossier through the Docs v1
+adapter (`adapters/docs.py`), using the same `drive`-scope OAuth credentials.
+It is independent of `read_document`, the manifest, and `contexto.md`: created
+documents are not registered, and the dossier need not be adopted. Every call
+first proves with one Drive `get` that the file belongs to the tree, has no
+`_LitMan` ancestor, and is a Google Doc (`document_outside_tree` or
+`unsupported_document` otherwise), before any Docs call.
+
+`read_google_doc` returns the first tab's visible body text in pages of 20,000
+characters with `revision_id`, `CONTENT_NOTE`, and `writes: false`. The text is
+read with suggestions inline so that indexes match the document; pending
+suggested insertions are not shown. Tables contribute their cells' text; section
+breaks, tables of contents, and inline objects contribute nothing.
+
+`preview_document_edit` accepts 1–20 closed operations: `replace_text`
+(`find`, `replace`, exact `occurrences`), `insert_after` (`anchor`, `text`),
+and `append` (`text`, before the body's final newline). Each `find` or
+`anchor` must fall within one paragraph. The preview resolves every span to Docs
+indexes counted in UTF-16 code units, refuses overlapping spans, spans touching
+suggestions, documents with more than one tab, and documents the account cannot
+edit, then simulates the requests in descending index order and stores a
+`document_edit` plan with the request list, the preview's revision, and the
+expected text's SHA-256 and length. The preview shows each matched span with up
+to 80 characters of context. `apply_document_edit` re-checks membership, MIME
+type, and `canEdit`, then sends exactly one `documents.batchUpdate` of
+`deleteContentRange`/`insertText` requests with
+`writeControl.requiredRevisionId`. A changed document is rejected by Docs and
+recorded as a `conflict` with code `document_changed`. If an earlier attempt
+sent the batch and lost the answer, the resumed apply completes without a
+second batch when the body's hash equals the expected one. Formatting, tables,
+images, comments, suggestions, headers, and footers are out of scope; inserted
+text takes the style of the paragraph where it lands.
+
+`preview_document_creation` plans a new Google Doc named `name` in a dossier
+folder that is not `_LitMan`, from `text` or by converting a dossier DOCX
+(`source_file_id`), never both. A name already used in that folder returns
+`name_exists`, and it is checked again at apply. Text documents are created
+empty with markers and then filled with one revision-guarded insert; a DOCX is
+downloaded to a temporary directory and uploaded converted, as publication does
+for the live offer. A resumed creation adopts the marked document and never
+writes its text twice.
+
+A Docs 403 with reason `accessNotConfigured` or `SERVICE_DISABLED` returns
+`docs_api_disabled`. `diagnose` reports `docs_api` as `enabled`, `disabled`, or
+`unknown` by reading a fixed document ID that does not exist: 404 means the API
+answers for the OAuth client's project.
+
 ## Guided product flow
 
 The assistant follows one business flow: organize the dossier and originals,
@@ -168,11 +219,14 @@ recommendation. Each recommendation identifies its reason, tool, and arguments.
 The installed product resources support this flow:
 
 - `conectar-licitacion` guides connection and asks once whether to prepare a
-  summary after publication.
+  summary after publication. It routes reading, editing, and creating dossier
+  Google Docs through the document tools, applies only the preview the person
+  accepts, and forbids computer use or a browser for Drive documents; the
+  workspace `AGENTS.md` repeats that rule.
 - `resumir-licitacion` defines what to read, the fixed keys, sources, and
   proposal format.
-- `preparar-equipo` guides diagnostics, OAuth, provider session, setup,
-  repair, update, and uninstall without independently running Git, uv, a
+- `preparar-equipo` guides diagnostics, OAuth, the Google Docs API check,
+  provider session, setup, repair, update, and uninstall without independently running Git, uv, a
   provider CLI, or a browser.
 - `lector-licitacion` is read-only. Claude uses Haiku with only the `status`
   and `read_document` MCP tools; Codex uses `gpt-5.6-luna`, low reasoning, and
