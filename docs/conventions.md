@@ -51,3 +51,6 @@ it does not replace or repeat those instructions.
   `tests/adapters/test_documents.py` and `tests/dossier/test_documents.py`)
   fail collection; give each test module a unique name. (2026-10-19,
   CHG-0006-01)
+- `openpyxl.load_workbook` rejects a path without an `.xlsx` extension, so
+  downloaded workbooks must be saved as `file.xlsx`, not extensionless
+  temporary files. (2026-10-20, CHG-0007-02)
