@@ -10,6 +10,7 @@ _FIELDS = "sheets(properties(sheetId,title,gridProperties(rowCount,columnCount))
 _DISABLED_REASONS = {"accessNotConfigured", "SERVICE_DISABLED"}
 FORMATTED_VALUE = "FORMATTED_VALUE"
 UNFORMATTED_VALUE = "UNFORMATTED_VALUE"
+FORMULA = "FORMULA"
 RAW = "RAW"
 
 

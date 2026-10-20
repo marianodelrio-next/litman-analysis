@@ -14,7 +14,7 @@ import json
 import re
 from typing import Any
 
-from ..adapters.sheets import SheetsGateway, UNFORMATTED_VALUE
+from ..adapters.sheets import FORMULA, SheetsGateway, UNFORMATTED_VALUE
 from ..errors import HarnessError
 from ..plans.models import Plan, PlanAction
 from .membership import belongs_to_root, in_litman
@@ -256,16 +256,23 @@ class SheetsService:
         return {str((entry.get("properties") or {}).get("title") or "") for entry in sheets}
 
     def _first_empty_row(self, spreadsheet_id: str, title: str) -> int:
-        rows = self.sheets.values(spreadsheet_id, [quoted_title(title)], UNFORMATTED_VALUE)[0].get("values") or []
+        rows = self.sheets.values(spreadsheet_id, [quoted_title(title)], FORMULA)[0].get("values") or []
         for index in range(len(rows) - 1, -1, -1):
             if any(cell not in (None, "") for cell in rows[index]):
                 return index + 2
         return 1
 
     def _current_values(self, spreadsheet_id: str, ranges: list[str]) -> list[list[list[Any]]]:
-        by_range = {entry.get("range"): entry.get("values") or []
-                    for entry in self.sheets.values(spreadsheet_id, ranges, UNFORMATTED_VALUE)}
-        return [by_range.get(a1, []) for a1 in ranges]
+        by_range = {}
+        for entry in self.sheets.values(spreadsheet_id, ranges, UNFORMATTED_VALUE):
+            value_range = entry.get("range")
+            if isinstance(value_range, str):
+                try:
+                    value_range = parse_range(value_range).a1
+                except HarnessError:
+                    pass
+            by_range[value_range] = entry.get("values") or []
+        return [by_range.get(parse_range(a1).a1, []) for a1 in ranges]
 
     # -- shared helpers ------------------------------------------------------------------------------
 

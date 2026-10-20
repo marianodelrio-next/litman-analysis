@@ -30,7 +30,7 @@ class Setup:
                      capabilities={"canEdit": True}))
         self.sheets = FakeSheets()
         self.sheets.add("sheet", {"Hoja 1": [["Concepto", "Importe"], ["Grúas", 1200], ["Camiones", 300]],
-                                  "Vacía": []})
+                                  "Vacía": [], "Simple": [["antes"]]})
         self.sheets.add("litman-sheet", {"Hoja 1": [["x"]]})
         self.store = PlanStore(tmp_path / "plans")
         self.state = AtomicSharedState(self.drive)
@@ -125,6 +125,21 @@ def test_preview_resolves_append_rows_into_an_empty_sheet_at_row_one(tmp_path: P
     assert action.metadata["range"] == "'Vacía'!A1:A1"
 
 
+def test_preview_appends_after_a_formula_that_evaluates_to_empty(tmp_path: Path):
+    setup = Setup(tmp_path)
+    original_values = setup.sheets.values
+
+    def values(spreadsheet_id, ranges, render):
+        if ranges == ["'Vacía'"] and render == "FORMULA":
+            return [{"range": "'Vacía'", "values": [["=IF(FALSE, 1, \"\")"]]}]
+        return original_values(spreadsheet_id, ranges, render)
+
+    setup.sheets.values = values
+    result = setup.preview([{"op": "append_rows", "sheet": "Vacía", "values": [["a"]]}])
+    action = setup.store.load(setup.dossier.account_id(), result["plan_id"]).actions[0]
+    assert action.metadata["range"] == "'Vacía'!A2:A2"
+
+
 def test_preview_stacks_two_appends_into_the_same_sheet_without_overlap(tmp_path: Path):
     setup = Setup(tmp_path)
     result = setup.preview([{"op": "append_rows", "sheet": "Hoja 1", "values": [["a"]]},
@@ -211,6 +226,23 @@ def test_apply_completes_without_writing_when_the_range_already_has_the_expected
     setup = Setup(tmp_path)
     plan = setup.preview([{"op": "update_range", "range": "'Hoja 1'!B2:B2", "values": [[1500]]}])
     setup.sheets.spreadsheets["sheet"]["Hoja 1"][1][1] = 1500  # the write already happened; the answer was lost
+    result = setup.apply(plan["plan_id"])
+    assert result["status"] == "succeeded" and setup.sheets.updates == []
+
+
+def test_apply_matches_a_canonical_unquoted_range_from_the_sheets_api(tmp_path: Path):
+    setup = Setup(tmp_path)
+    original_values = setup.sheets.values
+
+    def values(spreadsheet_id, ranges, render):
+        result = original_values(spreadsheet_id, ranges, render)
+        for entry in result:
+            entry["range"] = entry["range"].replace("'Simple'", "Simple")
+        return result
+
+    setup.sheets.values = values
+    plan = setup.preview([{"op": "update_range", "range": "'Simple'!A1:A1", "values": [["después"]]}])
+    setup.sheets.spreadsheets["sheet"]["Simple"][0][0] = "después"
     result = setup.apply(plan["plan_id"])
     assert result["status"] == "succeeded" and setup.sheets.updates == []
 
