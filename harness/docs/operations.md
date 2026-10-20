@@ -67,6 +67,8 @@ enums, and rejection of extra properties; invalid input returns
 | `get_file_info` | query | Metadata, `path` and the account's `can_edit`, `can_rename`, `can_move`, `can_trash`, `can_copy`, `can_download`, `can_comment` for one file of the tree. |
 | `read_file` | query | Page through the text of any dossier file: PDF, DOCX, text, Markdown, CSV, XLSX, Google Docs, Sheets or Slides. |
 | `list_comments` | query | List a file's comments with replies; resolved ones only with `include_resolved`. |
+| `preview_file_changes` | query | Resolve 1–20 protected folder/file operations (create folder, rename, move, copy, trash, export, convert) and store the accepted plan. |
+| `apply_file_changes` | mutation | Apply or resume the accepted file-change plan; Drive trash is reversible and no action calls `files.delete`. |
 | `read_google_doc` | query | Page through the body text of a Google Doc in the dossier tree, outside `_LitMan`, with its `revision_id`. |
 | `preview_document_edit` | query | Plan 1–20 closed operations on a dossier Google Doc (text edits, or paragraph, text and list styles; never both in one plan) and show each matched span with context. |
 | `apply_document_edit` | mutation | Send the accepted edit as one batch guarded by the preview's revision. |
@@ -89,7 +91,7 @@ developer when no tool fits. Each `tools/list` entry carries MCP
 `annotations`: `readOnlyHint` is `not mutates` (so `preview_*` tools, which
 only store a private local plan, count as read-only), `destructiveHint` is the
 tool's `destructive` flag (`apply_incorporation`, `apply_summary`,
-`apply_document_edit`, and `discard_analysis`), `idempotentHint` is `true`, and
+`apply_document_edit`, `apply_file_changes`, and `discard_analysis`), `idempotentHint` is `true`, and
 `openWorldHint` is `false`.
 Protocol errors use `-32700`, `-32600`, `-32601`, and `-32602`. Services are
 assembled per call, so `tools/list` works without local configuration.

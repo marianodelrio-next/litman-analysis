@@ -268,6 +268,20 @@ because summary provenance depends on it.
 with `author`, `created_time`, `resolved`, `quoted_text` and `replies`;
 resolved comments are excluded unless `include_resolved` is true.
 
+`dossier/file_changes.py` (`FileChangeService`) organizes dossier resources in
+one closed `file_changes` plan. `preview_file_changes` resolves 1–20
+`create_folder`, `rename`, `move`, `copy`, `trash`, `export`, or `convert`
+operations and returns each source path, destination path, and resulting name.
+It refuses resources outside the tree or in `_LitMan`, the root, manifest and
+context files, and manifest-managed resources for moves and trash. It also
+validates Drive capabilities in one batch and never adds automatic name
+suffixes. `apply_file_changes` rechecks membership, protection, capabilities,
+and names before each action; created folders, copies, exports, and conversions
+carry operation markers for duplicate-free resume. Trash calls Drive
+`files.update` with `trashed: true`, never `files.delete`; exports and
+conversions use temporary files. Conflicts retain earlier completed actions,
+while Drive rate limits remain recoverable by repeating the accepted plan.
+
 `adapters/sheets.py` (`SheetsGateway`) uses the same `drive`-scope credentials
 as Drive and Docs. A 403 with reason `accessNotConfigured` or
 `SERVICE_DISABLED` returns `sheets_api_disabled`. The error-body parser is
@@ -307,6 +321,9 @@ The installed product resources support this flow:
 - `conectar-licitacion` and the workspace `AGENTS.md` also route listing,
   searching, inspecting and reading any dossier file, and its comments, through
   the file tools.
+- `conectar-licitacion` uses the file-change preview/apply pair for folder and
+  file organization, explains permission or protection failures, and never
+  retries them through another route.
 - `ayuda-litman` answers "qué puedes hacer" by explaining every operation in
   business terms with an example phrase; a test keeps it complete against the
   registry.
