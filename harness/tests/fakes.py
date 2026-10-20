@@ -8,7 +8,8 @@ from pathlib import Path
 import subprocess
 import tomllib
 
-from litman_harness.dossier.models import ACTION_MARKER, FOLDER_MIME, GOOGLE_DOC_MIME, OPERATION_MARKER, Resource
+from litman_harness.dossier.models import (ACTION_MARKER, FOLDER_MIME, GOOGLE_DOC_MIME, OPERATION_MARKER,
+                                           Resource)
 from litman_harness.errors import HarnessError
 
 PDF = "application/pdf"
@@ -83,12 +84,22 @@ class FakeDrive:
         source = self.get(file_id)
         return self._create(name, source.mime_type, parent_id, operation_id, action_id, self.contents[file_id])
 
+    def rename(self, file_id, name):
+        self.resources[file_id] = replace(self.get(file_id), name=name)
+        return self.resources[file_id]
+
+    def trash(self, file_id):
+        self.resources[file_id] = replace(self.get(file_id), trashed=True)
+        return self.resources[file_id]
+
     def upload(self, name, parent_id, source, mime_type, operation_id, action_id):
         return self._create(name, mime_type, parent_id, operation_id, action_id, Path(source).read_bytes())
 
-    def upload_converted(self, name, parent_id, source, source_mime_type, operation_id, action_id):
-        self.converted.append((name, source_mime_type, Path(source).read_bytes()))
-        return self._create(name, GOOGLE_DOC_MIME, parent_id, operation_id, action_id, Path(source).read_bytes())
+    def upload_converted(self, name, parent_id, source, source_mime_type, operation_id, action_id,
+                         target_mime_type=GOOGLE_DOC_MIME):
+        content = Path(source).read_bytes()
+        self.converted.append((name, source_mime_type, content))
+        return self._create(name, target_mime_type, parent_id, operation_id, action_id, content)
 
     def export(self, file_id, mime_type, destination: Path):
         destination.write_bytes(self.exports[(file_id, mime_type)])

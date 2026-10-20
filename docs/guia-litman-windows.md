@@ -141,6 +141,7 @@ En el día a día solo necesitas abrir Codex en la carpeta LitMan y escribir lo 
 | Ver qué hay en una carpeta de la licitación o buscar un archivo | `qué hay en la carpeta Oferta` o `busca el archivo del presupuesto` |
 | Leer un archivo de la licitación (PDF, Word, Excel, Hojas de cálculo, Presentaciones, texto) | `lee el Excel de costes` |
 | Ver los comentarios de un archivo | `qué comentarios hay en la memoria técnica` |
+| Organizar carpetas o archivos | `crea una carpeta Entregas y mueve ahí la oferta final` |
 | Saber qué puede hacer LitMan, con ejemplos | `qué puedes hacer` |
 | Arreglar algo que no funciona | `prepara mi equipo` |
 
@@ -148,6 +149,7 @@ Cuatro reglas:
 
 - **Nada se cambia en Drive sin tu sí.** El asistente siempre te enseña el plan antes. Léelo y contesta sí o no.
 - **No toques la carpeta `_LitMan`** ni el archivo `contexto.md` a mano. Si alguien los edita, LitMan no los sobrescribe y te avisará.
+- **Para organizar archivos, también hay plan.** Antes de crear carpetas, renombrar, mover, copiar, enviar a la papelera, exportar o convertir, LitMan te muestra el origen, el destino y el nombre final. Los originales y los archivos internos están protegidos; si faltan permisos, el asistente te lo explica. La papelera nunca borra un archivo de forma permanente.
 - **Las licitaciones y los archivos de Drive se tocan solo con LitMan, nunca con el navegador ni manejando la pantalla.** Si pides algo que LitMan todavía no sabe hacer, el asistente te lo dirá y te sugerirá pedírselo al desarrollador de LitMan. Para editar o crear un Google Doc, el asistente te enseña cada cambio con el texto de alrededor y solo lo aplica si dices que sí. Puede cambiar el texto y dar formato básico (estilo de párrafo como título o encabezado, negrita, cursiva, subrayado, viñetas y listas numeradas), pero no mezcla texto y formato en una misma vista previa; también puede crear un documento nuevo a partir de un texto en Markdown. Las tablas, las imágenes y los comentarios los cambias tú en Google Docs. Un DOCX no se edita directamente: primero se crea su Google Doc.
 - **Antes de descartar un análisis, cierra** los archivos suyos que tengas abiertos (por ejemplo un PDF). Si no, el descarte falla y tendrás que repetirlo.
 
