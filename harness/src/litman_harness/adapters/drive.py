@@ -10,8 +10,9 @@ from ..errors import HarnessError
 _OPTIONS = {"supportsAllDrives": True}
 # Only the capabilities the harness checks: keeps responses small for chat agents.
 _CAPABILITIES = ("capabilities(canListChildren,canAddChildren,canDownload,canEdit,canMoveItemWithinDrive,"
-                 "canCopy)")
-_FIELDS = f"id,name,mimeType,version,size,driveId,parents,trashed,{_CAPABILITIES},webViewLink,appProperties,md5Checksum"
+                 "canCopy,canRename,canTrash,canComment)")
+_FIELDS = (f"id,name,mimeType,version,size,driveId,parents,trashed,{_CAPABILITIES},webViewLink,appProperties,"
+           "md5Checksum,modifiedTime")
 
 
 class DriveGateway(Protocol):
@@ -24,11 +25,17 @@ class DriveGateway(Protocol):
     def move(self, file_id: str, add_parent: str, remove_parents: tuple[str, ...]) -> Resource: ...
     def copy(self, file_id: str, name: str, parent_id: str, operation_id: str, action_id: str) -> Resource: ...
     def download(self, file_id: str, destination: Path) -> None: ...
+    def export(self, file_id: str, mime_type: str, destination: Path) -> None: ...
+    def comments(self, file_id: str) -> list[dict[str, Any]]: ...
     def upload(self, name: str, parent_id: str, source: Path, mime_type: str, operation_id: str,
                action_id: str) -> Resource: ...
     def upload_converted(self, name: str, parent_id: str, source: Path, source_mime_type: str, operation_id: str,
                          action_id: str) -> Resource: ...
 
+
+_COMMENT_AUTHOR = "author(displayName,me)"
+_COMMENT_FIELDS = (f"nextPageToken,comments(id,content,{_COMMENT_AUTHOR},createdTime,resolved,"
+                   f"quotedFileContent(value),replies(id,content,{_COMMENT_AUTHOR},createdTime,action,deleted))")
 
 _HTTP_ERRORS = {
     401: ("oauth_login_required", "La sesión de Google no es válida; ejecute `litman login`"),
@@ -141,6 +148,34 @@ class GoogleDriveGateway:
             done = False
             while not done:
                 _, done = _execute(downloader, chunk=True)
+
+    def export(self, file_id: str, mime_type: str, destination: Path) -> None:
+        """Export a Google-native file to ``mime_type`` (Drive limits an export to 10 MB)."""
+        from googleapiclient.http import MediaIoBaseDownload
+        destination.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        with destination.open("wb") as output:
+            downloader = MediaIoBaseDownload(output, self.service.files().export_media(fileId=file_id,
+                                                                                       mimeType=mime_type))
+            done = False
+            while not done:
+                _, done = _execute(downloader, chunk=True)
+
+    def comments(self, file_id: str) -> list[dict[str, Any]]:
+        """Every comment of the file that is not deleted, with its replies, as Drive returns them."""
+        result: list[dict[str, Any]] = []
+        token: str | None = None
+        seen: set[str] = set()
+        while True:
+            request = self.service.comments().list(fileId=file_id, includeDeleted=False, pageSize=100,
+                                                   fields=_COMMENT_FIELDS, pageToken=token)
+            page = _execute(request)
+            result.extend(item for item in page.get("comments", []) if isinstance(item, dict))
+            token = page.get("nextPageToken")
+            if not token:
+                return result
+            if not isinstance(token, str) or token in seen:
+                raise HarnessError("drive_invalid_page", "Paginación de Drive inválida")
+            seen.add(token)
 
     def upload(self, name: str, parent_id: str, source: Path, mime_type: str, operation_id: str,
                action_id: str) -> Resource:

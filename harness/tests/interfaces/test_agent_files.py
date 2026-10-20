@@ -76,6 +76,18 @@ def test_connect_skill_and_workspace_restrict_the_assistant_to_litman_tools():
     assert "vista previa" in connect_skill and "acepte" in connect_skill
 
 
+FILE_TOOLS = ("list_folder", "search_in_dossier", "get_file_info", "read_file", "list_comments")
+
+
+def test_connect_skill_and_workspace_guide_navigation_and_reading_of_any_file():
+    from litman_harness.interfaces.tools import registry
+    connect_skill = (AGENT / "skills" / "conectar-licitacion" / "SKILL.md").read_text(encoding="utf-8")
+    workspace = (AGENT / "workspace" / "AGENTS.md").read_text(encoding="utf-8")
+    for text in (connect_skill, workspace):
+        for operation in FILE_TOOLS:
+            assert operation in registry() and f"`{operation}`" in text
+
+
 def test_help_skill_explains_every_operation_with_an_example():
     from litman_harness.interfaces.tools import registry
     path = AGENT / "skills" / "ayuda-litman" / "SKILL.md"

@@ -1,10 +1,10 @@
 """Personal OAuth Google Docs adapter: read one document and send one guarded batch of edits."""
 from __future__ import annotations
 
-import json
 from typing import Any, Protocol
 
 from ..errors import HarnessError
+from .google_errors import reasons
 
 # Enough to count the tabs and read the first tab's body; never headers, footers or styles.
 _FIELDS = ("revisionId,suggestionsViewMode,"
@@ -25,24 +25,12 @@ _HTTP_ERRORS = {
 }
 
 
-def _reasons(content: Any) -> set[str]:
-    """``error.errors[].reason`` and ``error.details[].reason`` of a Google API error body."""
-    try:
-        error = json.loads(content.decode("utf-8") if isinstance(content, bytes) else content)["error"]
-    except (AttributeError, KeyError, TypeError, ValueError):
-        return set()
-    if not isinstance(error, dict):
-        return set()
-    items = [*(error.get("errors") or []), *(error.get("details") or [])]
-    return {item["reason"] for item in items if isinstance(item, dict) and isinstance(item.get("reason"), str)}
-
-
 def docs_http_error(status: int, content: Any = None, *, write: bool = False) -> HarnessError:
     """The stable harness error for a failed Google Docs HTTP response.
 
     A 400 on a write carries ``requiredRevisionId``: the document changed after the preview.
     """
-    if status == 403 and _reasons(content) & _DISABLED_REASONS:
+    if status == 403 and reasons(content) & _DISABLED_REASONS:
         return HarnessError("docs_api_disabled",
                             "La API de Google Docs no está habilitada: el administrador debe habilitar la Google Docs "
                             "API en el proyecto de Google Cloud del cliente OAuth",

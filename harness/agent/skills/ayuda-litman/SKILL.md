@@ -58,6 +58,22 @@ como vista previa y sólo se aplica cuando la persona lo acepta.
 - `apply_summary`: guarda el resumen aceptado en `contexto.md`.
   Ejemplo: "guarda el resumen"
 
+## Ver y leer archivos
+
+- `list_folder`: lista lo que hay en la carpeta de la licitación o en una
+  subcarpeta.
+  Ejemplo: "¿qué hay en la carpeta Oferta?"
+- `search_in_dossier`: busca archivos por nombre en toda la licitación.
+  Ejemplo: "busca el archivo del presupuesto"
+- `get_file_info`: da los detalles de un archivo y qué puedes hacer con él
+  (editar, renombrar, mover, comentar).
+  Ejemplo: "¿puedo editar el archivo de solvencia?"
+- `read_file`: lee cualquier archivo de la licitación: PDF, Word, texto,
+  Markdown, CSV, Excel, Google Docs, Hojas de cálculo o Presentaciones.
+  Ejemplo: "lee el Excel de costes" o "¿qué pone en la presentación?"
+- `list_comments`: muestra los comentarios de un archivo y sus respuestas.
+  Ejemplo: "¿qué comentarios hay en la memoria técnica?"
+
 ## Leer documentos
 
 - `read_document`: lee los pliegos originales y los resultados del análisis

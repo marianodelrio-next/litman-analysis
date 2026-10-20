@@ -140,8 +140,9 @@ def test_gateway_requests_only_the_capabilities_it_checks():
     service = Service()
     GoogleDriveGateway(service).get("f")
     fields = service.files_api.calls[0][1]["fields"]
-    assert ("capabilities(canListChildren,canAddChildren,canDownload,canEdit,canMoveItemWithinDrive,canCopy)"
-            in fields)
+    assert ("capabilities(canListChildren,canAddChildren,canDownload,canEdit,canMoveItemWithinDrive,canCopy,"
+            "canRename,canTrash,canComment)" in fields)
+    assert fields.endswith(",md5Checksum,modifiedTime")
 
 
 def test_move_changes_parents_and_copy_carries_markers_into_destination():

@@ -10,7 +10,8 @@ from litman_harness.interfaces.tools import invoke, registry, tool_descriptors
 OPERATIONS = {"identity", "diagnose", "inspect", "status", "preview_incorporation", "apply_incorporation",
               "preview_analysis", "execute_analysis", "discard_analysis", "preview_publication", "apply_publication",
               "read_document", "preview_summary", "apply_summary", "recover", "setup", "read_google_doc",
-              "preview_document_edit", "apply_document_edit", "preview_document_creation", "apply_document_creation"}
+              "preview_document_edit", "apply_document_edit", "preview_document_creation", "apply_document_creation",
+              "list_folder", "search_in_dossier", "get_file_info", "read_file", "list_comments"}
 
 
 def test_registry_exposes_operations_with_schema_and_kind():

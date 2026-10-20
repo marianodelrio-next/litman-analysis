@@ -45,12 +45,12 @@ def walk_tree(drive: Any, root: Resource, first_level: list[Resource] | None = N
     return items, False
 
 
-def _normalized(name: str) -> str:
+def normalized_name(name: str) -> str:
     decomposed = unicodedata.normalize("NFKD", name)
     return " ".join("".join(ch for ch in decomposed if not unicodedata.combining(ch)).lower().split())
 
 
-_STANDARD = {_normalized(label): role for role, label in FOLDER_ROLES}
+_STANDARD = {normalized_name(label): role for role, label in FOLDER_ROLES}
 
 
 def suggested_folder_ids(items: list[TreeItem], registered: dict[str, str | None]) -> dict[str, str]:
@@ -61,7 +61,7 @@ def suggested_folder_ids(items: list[TreeItem], registered: dict[str, str | None
     matches: dict[str, list[str]] = {}
     taken = {value for value in registered.values() if value}
     for item in items:
-        role = _STANDARD.get(_normalized(item.resource.name))
+        role = _STANDARD.get(normalized_name(item.resource.name))
         if (item.depth == 1 and item.resource.mime_type == FOLDER_MIME and role
                 and not registered.get(role) and item.resource.id not in taken):
             matches.setdefault(role, []).append(item.resource.id)

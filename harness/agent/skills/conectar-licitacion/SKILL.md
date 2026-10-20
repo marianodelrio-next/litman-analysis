@@ -24,7 +24,13 @@ description: Conecta una licitación por el ID de su carpeta de Drive y guía a 
    el estado de una operación y `overwrite_context: true` en
    `preview_incorporation` sólo si la persona lo pide.
 
-7. **Documentos de Google Docs** de la licitación (por ejemplo, la propuesta
+7. **Archivos de la licitación.** Para saber qué hay, usa `list_folder` (una
+   carpeta), `search_in_dossier` (por nombre) y `get_file_info` (detalle y
+   permisos). Lee cualquier archivo (PDF, DOCX, texto, Excel, Google Docs,
+   Sheets o Slides) con `read_file` (sigue `next_offset`) y los comentarios
+   con `list_comments`.
+
+   **Documentos de Google Docs** de la licitación (por ejemplo, la propuesta
    técnica en `Oferta`): léelos con `read_google_doc` (sigue `next_offset`).
    Para cambiar su texto, prepara `preview_document_edit` con operaciones
    cerradas (`replace_text`, `insert_after`, `append`); para crear uno nuevo,

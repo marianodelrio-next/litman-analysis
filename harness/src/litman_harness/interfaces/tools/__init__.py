@@ -56,8 +56,8 @@ _REGISTRY: dict[str, Tool] | None = None
 def registry() -> dict[str, Tool]:
     global _REGISTRY
     if _REGISTRY is None:
-        from . import analysis, documents, dossier, setup
-        tools = (*dossier.TOOLS, *documents.TOOLS, *analysis.TOOLS, *setup.TOOLS)
+        from . import analysis, documents, dossier, files, setup
+        tools = (*dossier.TOOLS, *files.TOOLS, *documents.TOOLS, *analysis.TOOLS, *setup.TOOLS)
         _REGISTRY = {tool.name: tool for tool in tools}
         if len(_REGISTRY) != len(tools):
             raise RuntimeError("Nombres de operación duplicados")

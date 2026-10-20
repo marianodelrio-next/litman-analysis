@@ -20,7 +20,7 @@ from ..adapters.docs import DocsGateway
 from ..adapters.documents import DOCX_MIME
 from ..errors import HarnessError
 from ..plans.models import Plan, PlanAction
-from .membership import belongs_to_root
+from .membership import belongs_to_root, in_litman
 from .models import FOLDER_MIME, GOOGLE_DOC_MIME, Resource
 from .service import ExpedienteService, OperationConflict, OperationRun, action_id
 from .summary import PAGE_SIZE
@@ -343,7 +343,7 @@ class DocumentService:
     def _inside(self, root: Resource, file_id: str) -> Resource:
         """A file inside the tree and not below ``_LitMan``, proved before reading its content."""
         item = self.drive.get(file_id)
-        if not belongs_to_root(self.drive, root, item) or self._below_litman(root, item):
+        if not belongs_to_root(self.drive, root, item) or in_litman(self.drive, root, item):
             raise HarnessError("document_outside_tree", "El documento no está dentro de la licitación conectada",
                                details={"document_id": file_id})
         return item
@@ -359,7 +359,7 @@ class DocumentService:
         """The root or a folder of the tree that is neither ``_LitMan`` nor below it."""
         folder = root if folder_id == root.id else self.drive.get(folder_id)
         inside = folder.id == root.id or (belongs_to_root(self.drive, root, folder)
-                                          and folder.name != LITMAN_FOLDER and not self._below_litman(root, folder))
+                                          and not in_litman(self.drive, root, folder))
         if folder.mime_type != FOLDER_MIME or not inside:
             raise HarnessError("invalid_parent", "La carpeta de destino debe ser una carpeta de la licitación fuera "
                                f"de {LITMAN_FOLDER}", details={"parent_folder_id": folder_id})
@@ -377,23 +377,6 @@ class DocumentService:
             raise HarnessError("unsupported_document", "Sólo se pueden leer y editar documentos de Google Docs",
                                details={"mime_type": item.mime_type})
         return item
-
-    def _below_litman(self, root: Resource, item: Resource) -> bool:
-        pending = list(item.parents)
-        seen: set[str] = set()
-        while pending:
-            parent_id = pending.pop()
-            if parent_id == root.id or parent_id in seen:
-                continue
-            seen.add(parent_id)
-            try:
-                parent = self.drive.get(parent_id)
-            except HarnessError:
-                continue
-            if parent.name == LITMAN_FOLDER:
-                return True
-            pending.extend(parent.parents)
-        return False
 
     def _read(self, document_id: str) -> tuple[dict[str, Any], int, DocumentText]:
         """The raw document, its tab count (child tabs included) and the first tab's text model."""
