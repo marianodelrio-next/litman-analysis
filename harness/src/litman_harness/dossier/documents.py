@@ -1,15 +1,16 @@
 """Native Google Docs of one dossier, read page by page, edited through closed operations and created.
 
 The assistant reads a document (a query), then proposes a short list of closed
-operations; the preview resolves them to Docs indexes on the text it read,
-simulates the result and stores a plan the person accepts.  The apply sends
-exactly one ``documents.batchUpdate`` guarded by the revision of the preview.
-A new document is created empty and filled with its text, or converted from a
-DOCX of the dossier, through a ``document_creation`` plan.
+operations (text edits, or paragraph, text and list styles); the preview
+resolves them to Docs indexes on the text it read, simulates the result and
+stores a plan the person accepts.  The apply sends exactly one
+``documents.batchUpdate`` guarded by the revision of the preview.  A new
+document is created empty and filled with its text, or converted from a DOCX of
+the dossier or from Markdown, through a ``document_creation`` plan.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from hashlib import sha256
 from pathlib import Path
 import tempfile
@@ -33,10 +34,20 @@ MAX_OPERATIONS = 20
 MAX_MATCH_CHARS = 1_000
 MAX_TEXT_CHARS = PAGE_SIZE
 MAX_NAME_CHARS = 255
+MAX_MARKDOWN_CHARS = 100_000
+MARKDOWN_MIME = "text/markdown"
+PARAGRAPH_STYLES = ("NORMAL_TEXT", "TITLE", "SUBTITLE", "HEADING_1", "HEADING_2", "HEADING_3")
+LISTS = {"bullets": "BULLET_DISC_CIRCLE_SQUARE", "numbered": "NUMBERED_DECIMAL_ALPHA_ROMAN", "none": None}
+TEXT_FLAGS = ("bold", "italic", "underline")
+# Required fields of each closed operation; set_text_style also takes at least one of TEXT_FLAGS.
 OPERATIONS = {"replace_text": ("find", "replace", "occurrences"), "insert_after": ("anchor", "text"),
-              "append": ("text",)}
-# Order of edits that share one index: the anchor's insertion, then the replaced text, then the append.
-_RANK = {"insert_after": 0, "replace_text": 1, "append": 2}
+              "append": ("text",), "set_paragraph_style": ("anchor", "style"),
+              "set_text_style": ("find", "occurrences"), "set_list": ("anchor", "list")}
+STYLE_OPERATIONS = {"set_paragraph_style", "set_text_style", "set_list"}
+# Order of edits that share one index: the anchor's insertion, then the replaced text, then the append;
+# style requests change no index, so their place among them does not matter.
+_RANK = {"insert_after": 0, "replace_text": 1, "append": 2, "set_paragraph_style": 3, "set_text_style": 3,
+         "set_list": 3}
 
 
 def utf16_units(text: str) -> int:
@@ -58,6 +69,8 @@ class DocumentText:
     deleted: list[bool]
     gaps: dict[int, str]
     final_newline: int | None
+    owner: list[int] = field(default_factory=list)  # paragraph number of each visible character
+    paragraphs: list[tuple[int, int]] = field(default_factory=list)  # Docs start and end index of each paragraph
 
     @classmethod
     def parse(cls, body: dict[str, Any]) -> "DocumentText":
@@ -68,7 +81,8 @@ class DocumentText:
             builder.gaps[len(builder.chars)] = builder.pending
         last = content[-1] if content else {}
         final_newline = last["endIndex"] - 1 if "paragraph" in last and isinstance(last.get("endIndex"), int) else None
-        return cls("".join(builder.chars), builder.index, builder.deleted, builder.gaps, final_newline)
+        return cls("".join(builder.chars), builder.index, builder.deleted, builder.gaps, final_newline,
+                   builder.owner, builder.paragraphs)
 
     def end_index(self, offset: int) -> int:
         """Docs index just after the visible character before ``offset``."""
@@ -86,6 +100,18 @@ class DocumentText:
             found.append((begin, end))
             start = end
         return found
+
+    def paragraph(self, offset: int) -> dict[str, Any]:
+        """The paragraph holding the visible character at ``offset``: Docs range, text and leading character."""
+        number = self.owner[offset]
+        first, last = offset, offset
+        while first and self.owner[first - 1] == number:
+            first -= 1
+        while last + 1 < len(self.owner) and self.owner[last + 1] == number:
+            last += 1
+        start, end = self.paragraphs[number]
+        return {"start": start, "end": end, "text": self.text[first:last + 1].rstrip("\n"),
+                "tab": self.text[first] == "\t"}
 
     def touches_suggestion(self, begin: int, end: int) -> bool:
         """Whether the span, or either of its edges, touches pending suggested text."""
@@ -106,13 +132,18 @@ class _TextBuilder:
         self.index: list[int] = []
         self.deleted: list[bool] = []
         self.gaps: dict[int, str] = {}
+        self.owner: list[int] = []
+        self.paragraphs: list[tuple[int, int]] = []
         self.expected: int | None = None
         self.pending: str | None = None
 
     def walk(self, content: list[dict[str, Any]]) -> None:
         for element in content:
             if "paragraph" in element:
-                for item in element["paragraph"].get("elements") or []:
+                items = element["paragraph"].get("elements") or []
+                if items:
+                    self.paragraphs.append((items[0]["startIndex"], items[-1]["endIndex"]))
+                for item in items:
                     run = item.get("textRun")
                     if run is None:
                         self.gap("break")
@@ -142,6 +173,7 @@ class _TextBuilder:
             self.chars.append(char)
             self.index.append(position)
             self.deleted.append(deleted)
+            self.owner.append(len(self.paragraphs) - 1)
             position += utf16_units(char)
             self.expected, self.pending = position, None
 
@@ -209,7 +241,7 @@ class DocumentService:
         requests = [request for edit in sorted(edits, key=lambda e: e.key, reverse=True) for request in edit.requests]
         action = PlanAction("edit_document", item.id, item.name, None, expected_version=revision, metadata={
             "requests": requests, "operations": previews, "expected_sha256": text_sha256(expected),
-            "expected_length": len(expected)})
+            "expected_length": len(expected), "style_only": clean[0]["op"] in STYLE_OPERATIONS})
         plan = Plan("document_edit", root.id, account, (action,), {})
         self.dossier.store().save(plan)
         return {**plan.json(), "document_id": item.id, "revision_id": revision, "operations": previews}
@@ -227,8 +259,16 @@ class DocumentService:
             # The previous attempt may have written and lost the answer: the expected body proves it.
             raw, _, document = self._read(item.id)
             if text_sha256(document.text) == action.metadata["expected_sha256"]:
-                run.complete(action, {"revision_id": raw.get("revisionId"), "resumed": True})
-                return self._edit_result(run, item, raw.get("revisionId"))
+                revision = raw.get("revisionId")
+                if action.metadata.get("style_only"):
+                    # A style-only plan leaves the text as it was, so the text proves nothing: styles are absolute,
+                    # and the unchanged body means resending them on the current revision cannot lose an edit.
+                    revision = self._batch_update(item.id, action.metadata["requests"], revision)
+                run.complete(action, {"revision_id": revision, "resumed": True})
+                return self._edit_result(run, item, revision)
+            if action.metadata.get("style_only"):
+                raise OperationConflict("El texto del documento cambió desde la vista previa",
+                                        details={"code": "document_changed", "document_id": item.id})
         run.note(action, {"sent": True})
         revision = self._batch_update(item.id, action.metadata["requests"], action.expected_version)
         run.complete(action, {"revision_id": revision})
@@ -242,15 +282,20 @@ class DocumentService:
     # -- creation --------------------------------------------------------------------------------
 
     def preview_creation(self, folder_id: str, parent_folder_id: str, name: str, text: str | None = None,
-                         source_file_id: str | None = None) -> dict[str, Any]:
-        """Store a ``document_creation`` plan for a new Google Doc from text or a dossier DOCX; writes nothing."""
-        if (text is None) == (source_file_id is None):
-            raise _invalid("Indique exactamente uno de text o source_file_id")
+                         source_file_id: str | None = None, markdown: str | None = None) -> dict[str, Any]:
+        """Store a ``document_creation`` plan for a new Google Doc from text, Markdown or a dossier DOCX.
+
+        Writes nothing.
+        """
+        if [text, source_file_id, markdown].count(None) != 2:
+            raise _invalid("Indique exactamente uno de text, markdown o source_file_id")
         _checked_text(name, "name", None, minimum=1, maximum=MAX_NAME_CHARS, newlines=False)
         if not name.strip():
             raise _invalid("name no puede estar en blanco", field="name")
         if text is not None:
             _checked_text(text, "text", None, minimum=1, maximum=MAX_TEXT_CHARS, newlines=True)
+        if markdown is not None:
+            _checked_text(markdown, "markdown", None, minimum=1, maximum=MAX_MARKDOWN_CHARS, newlines=True)
         root = self.dossier.root(folder_id)
         account = self.dossier.account_id()
         parent = self._parent(root, parent_folder_id)
@@ -259,9 +304,12 @@ class DocumentService:
             raise HarnessError("name_exists", "La carpeta de destino ya tiene un archivo con ese nombre",
                                details={"parent_folder_id": parent.id, "name": name, "file_ids": taken})
         source = None
+        body = text if text is not None else markdown
         if text is not None:
             actions = (PlanAction("create_document", None, name, parent.id),
                        PlanAction("write_initial_text", None, name, parent.id, metadata={"text": text}))
+        elif markdown is not None:
+            actions = (PlanAction("import_markdown", None, name, parent.id, metadata={"markdown": markdown}),)
         else:
             item = self._source(root, source_file_id)
             source = {"file_id": item.id, "name": item.name}
@@ -270,7 +318,7 @@ class DocumentService:
         plan = Plan("document_creation", root.id, account, actions, {})
         self.dossier.store().save(plan)
         return {**plan.json(), "parent_folder_id": parent.id, "name": name, "source": source,
-                "characters": None if text is None else len(text)}
+                "characters": None if body is None else len(body)}
 
     def apply_creation(self, accepted_plan_id: str) -> dict[str, Any]:
         return self.dossier.apply_plan(accepted_plan_id, "document_creation", self._run_creation)
@@ -293,6 +341,9 @@ class DocumentService:
                                             details={"code": "source_changed", "file_id": source.id})
                 created = self.dossier.ensure_marked(run, create, parent.id, lambda: self._convert(
                     source, create.name, parent.id, plan.operation_id, marker))
+            elif create.kind == "import_markdown":
+                created = self.dossier.ensure_marked(run, create, parent.id, lambda: self._import_markdown(
+                    create.metadata["markdown"], create.name, parent.id, plan.operation_id, marker))
             else:
                 created = self.dossier.ensure_marked(run, create, parent.id, lambda: self.drive.create_document(
                     create.name, parent.id, plan.operation_id, marker))
@@ -314,6 +365,13 @@ class DocumentService:
             path = Path(directory) / "source.docx"
             self.drive.download(source.id, path)
             return self.drive.upload_converted(name, parent_id, path, DOCX_MIME, operation_id, marker)
+
+    def _import_markdown(self, markdown: str, name: str, parent_id: str, operation_id: str, marker: str) -> Resource:
+        """Write the Markdown to a private temporary file and upload it converted to a Google Doc."""
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "document.md"
+            path.write_text(markdown, encoding="utf-8")
+            return self.drive.upload_converted(name, parent_id, path, MARKDOWN_MIME, operation_id, marker)
 
     def _write_initial_text(self, document_id: str, text: str) -> dict[str, Any]:
         """Fill the empty new document; on resume, a body that already holds the text proves the earlier write."""
@@ -413,20 +471,33 @@ def validated_operations(operations: Any) -> list[dict[str, Any]]:
         if kind not in OPERATIONS:
             raise _invalid("Operación no admitida", operation=index, allowed=list(OPERATIONS))
         fields = OPERATIONS[kind]
-        if set(operation) != {"op", *fields}:
-            raise _invalid(f"La operación {kind} lleva exactamente los campos op, " + ", ".join(fields),
-                           operation=index, fields=list(fields))
-        for name in fields:
+        flags = TEXT_FLAGS if kind == "set_text_style" else ()
+        given = set(operation) - {"op"}
+        if not set(fields) <= given <= {*fields, *flags} or (flags and not given & set(flags)):
+            raise _invalid(f"La operación {kind} lleva exactamente los campos op, " + ", ".join(fields)
+                           + (" y al menos uno de " + ", ".join(flags) if flags else ""),
+                           operation=index, fields=[*fields, *flags])
+        for name in [*fields, *sorted(given & set(flags))]:
             value = operation[name]
             if name == "occurrences":
                 if not isinstance(value, int) or isinstance(value, bool) or value < 1:
                     raise _invalid("occurrences debe ser un entero mayor o igual que 1", operation=index)
             elif name in ("find", "anchor"):
                 _checked_text(value, name, index, minimum=1, maximum=MAX_MATCH_CHARS, newlines=False)
+            elif name == "style" or name == "list":
+                allowed = PARAGRAPH_STYLES if name == "style" else tuple(LISTS)
+                if value not in allowed:
+                    raise _invalid(f"{name} debe ser uno de " + ", ".join(allowed), operation=index, field=name)
+            elif name in flags:
+                if not isinstance(value, bool):
+                    raise _invalid(f"{name} debe ser true o false", operation=index, field=name)
             else:
                 _checked_text(value, name, index, minimum=0 if name == "replace" else 1, maximum=MAX_TEXT_CHARS,
                               newlines=True)
-        clean.append({"op": kind, **{name: operation[name] for name in fields}})
+        clean.append({"op": kind, **{name: operation[name] for name in [*fields, *flags] if name in operation}})
+    if len({item["op"] in STYLE_OPERATIONS for item in clean}) > 1:
+        raise HarnessError("mixed_operations", "Las operaciones de formato no se mezclan con las de texto en un "
+                           "mismo plan; prepare un plan para cada tipo")
     return clean
 
 
@@ -435,9 +506,10 @@ def planned_edits(document: DocumentText, operations: list[dict[str, Any]]) -> t
     edits: list[_Edit] = []
     previews: list[dict[str, Any]] = []
     spans: list[tuple[int, int, int]] = []
+    paragraphs: dict[tuple[str, int], int] = {}
     for index, operation in enumerate(operations):
         kind = operation["op"]
-        if kind == "replace_text":
+        if kind in ("replace_text", "set_text_style"):
             found = document.matches(operation["find"])
             if len(found) != operation["occurrences"]:
                 raise HarnessError("occurrences_mismatch", "El número de apariciones no coincide con el documento",
@@ -446,19 +518,36 @@ def planned_edits(document: DocumentText, operations: list[dict[str, Any]]) -> t
             for begin, end in found:
                 _refuse_suggestions(document, begin, end, index)
                 start, stop = document.index[begin], document.end_index(end)
+                if kind == "set_text_style":
+                    style = {flag: operation[flag] for flag in TEXT_FLAGS if flag in operation}
+                    edits.append(_Edit(start, _RANK[kind], index, begin, begin, "", ({"updateTextStyle": {
+                        "range": {"startIndex": start, "endIndex": stop}, "textStyle": style,
+                        "fields": ",".join(style)}},)))
+                    spans.append((begin, end, index))
+                    continue
                 requests: tuple[dict[str, Any], ...] = (
                     {"deleteContentRange": {"range": {"startIndex": start, "endIndex": stop}}},)
                 if operation["replace"]:
                     requests += ({"insertText": {"location": {"index": start}, "text": operation["replace"]}},)
                 edits.append(_Edit(start, _RANK[kind], index, begin, end, operation["replace"], requests))
                 spans.append((begin, end, index))
-        elif kind == "insert_after":
+        elif kind in ("insert_after", "set_paragraph_style", "set_list"):
             found = document.matches(operation["anchor"])
             if len(found) != 1:
                 raise HarnessError("anchor_not_unique", "El ancla debe aparecer exactamente una vez",
                                    details={"operation": index, "actual": len(found)})
             begin, end = found[0]
             _refuse_suggestions(document, begin, end, index)
+            if kind != "insert_after":
+                request, paragraph = _paragraph_request(document, operation, begin, index)
+                if (kind, paragraph["start"]) in paragraphs:
+                    raise HarnessError("overlapping_operations", "Dos operaciones dan formato al mismo párrafo",
+                                       details={"operations": sorted({paragraphs[kind, paragraph["start"]], index})})
+                paragraphs[kind, paragraph["start"]] = index
+                edits.append(_Edit(paragraph["start"], _RANK[kind], index, begin, begin, "", (request,)))
+                previews.append({**operation, "matches": [document.context(begin, end)],
+                                 "paragraph": paragraph["text"]})
+                continue
             position = document.end_index(end)
             edits.append(_Edit(position, _RANK[kind], index, end, end, operation["text"],
                                ({"insertText": {"location": {"index": position}, "text": operation["text"]}},)))
@@ -479,6 +568,23 @@ def planned_edits(document: DocumentText, operations: list[dict[str, Any]]) -> t
             raise HarnessError("overlapping_operations", "Dos operaciones afectan al mismo texto",
                                details={"operations": sorted({first, second})})
     return edits, previews
+
+
+def _paragraph_request(document: DocumentText, operation: dict[str, Any], offset: int,
+                       index: int) -> tuple[dict[str, Any], dict[str, Any]]:
+    """The paragraph style or list request for the paragraph holding ``offset``, with that paragraph."""
+    paragraph = document.paragraph(offset)
+    span = {"startIndex": paragraph["start"], "endIndex": paragraph["end"]}
+    if operation["op"] == "set_paragraph_style":
+        return {"updateParagraphStyle": {"range": span, "paragraphStyle": {"namedStyleType": operation["style"]},
+                                         "fields": "namedStyleType"}}, paragraph
+    if paragraph["tab"]:
+        # Docs turns leading tabs into nesting levels and removes them, which would shift every later index.
+        raise HarnessError("unsupported_document", "El párrafo empieza con un tabulador; Google Docs lo convertiría "
+                           "en un nivel de lista", details={"operation": index})
+    if operation["list"] == "none":
+        return {"deleteParagraphBullets": {"range": span}}, paragraph
+    return {"createParagraphBullets": {"range": span, "bulletPreset": LISTS[operation["list"]]}}, paragraph
 
 
 def _refuse_suggestions(document: DocumentText, begin: int, end: int, index: int) -> None:

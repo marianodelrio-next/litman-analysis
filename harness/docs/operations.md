@@ -68,9 +68,9 @@ enums, and rejection of extra properties; invalid input returns
 | `read_file` | query | Page through the text of any dossier file: PDF, DOCX, text, Markdown, CSV, XLSX, Google Docs, Sheets or Slides. |
 | `list_comments` | query | List a file's comments with replies; resolved ones only with `include_resolved`. |
 | `read_google_doc` | query | Page through the body text of a Google Doc in the dossier tree, outside `_LitMan`, with its `revision_id`. |
-| `preview_document_edit` | query | Plan 1–20 closed text operations on a dossier Google Doc and show each matched span with context. |
+| `preview_document_edit` | query | Plan 1–20 closed operations on a dossier Google Doc (text edits, or paragraph, text and list styles; never both in one plan) and show each matched span with context. |
 | `apply_document_edit` | mutation | Send the accepted edit as one batch guarded by the preview's revision. |
-| `preview_document_creation` | query | Plan a new Google Doc in a dossier folder from text or a dossier DOCX. |
+| `preview_document_creation` | query | Plan a new Google Doc in a dossier folder from text, Markdown or a dossier DOCX. |
 | `apply_document_creation` | mutation | Create the accepted Google Doc and return `document_id` and `web_view_link`. |
 | `recover` | query | Report local operation state. |
 | `setup` | local mutation | Validate Core and save `codex` or `claude-code`, plus an optional model. |

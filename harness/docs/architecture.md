@@ -167,30 +167,55 @@ breaks, tables of contents, and inline objects contribute nothing.
 
 `preview_document_edit` accepts 1–20 closed operations: `replace_text`
 (`find`, `replace`, exact `occurrences`), `insert_after` (`anchor`, `text`),
-and `append` (`text`, before the body's final newline). Each `find` or
-`anchor` must fall within one paragraph. The preview resolves every span to Docs
+and `append` (`text`, before the body's final newline), plus three style
+operations: `set_paragraph_style` (`anchor`, `style` one of `NORMAL_TEXT`,
+`TITLE`, `SUBTITLE`, `HEADING_1`, `HEADING_2`, `HEADING_3`), `set_text_style`
+(`find`, exact `occurrences`, and at least one of `bold`, `italic`,
+`underline`) and `set_list` (`anchor`, `list` one of `bullets`, `numbered`,
+`none`). A plan holds only text operations or only style operations
+(`mixed_operations`). Each `find` or `anchor` must fall within one paragraph. The preview resolves every span to Docs
 indexes counted in UTF-16 code units, refuses overlapping spans, spans touching
 suggestions, documents with more than one tab, and documents the account cannot
 edit, then simulates the requests in descending index order and stores a
-`document_edit` plan with the request list, the preview's revision, and the
-expected text's SHA-256 and length. The preview shows each matched span with up
+`document_edit` plan with the request list, the preview's revision, the
+expected text's SHA-256 and length, and whether it is style-only. The preview shows each matched span with up
 to 80 characters of context. `apply_document_edit` re-checks membership, MIME
 type, and `canEdit`, then sends exactly one `documents.batchUpdate` of
 `deleteContentRange`/`insertText` requests with
 `writeControl.requiredRevisionId`. A changed document is rejected by Docs and
 recorded as a `conflict` with code `document_changed`. If an earlier attempt
 sent the batch and lost the answer, the resumed apply completes without a
-second batch when the body's hash equals the expected one. Formatting, tables,
-images, comments, suggestions, headers, and footers are out of scope; inserted
-text takes the style of the paragraph where it lands.
+second batch when the body's hash equals the expected one.
+
+Style operations resolve to index-based `updateParagraphStyle` (range of the
+paragraph holding the anchor, `fields: namedStyleType`), `updateTextStyle`
+(range of each match, `fields` limited to the given flags),
+`createParagraphBullets` (`BULLET_DISC_CIRCLE_SQUARE` or
+`NUMBERED_DECIMAL_ALPHA_ROMAN`) and `deleteParagraphBullets` requests. They
+change no index, and the plan's expected text is the current text. The preview
+shows the paragraph of each paragraph or list operation. It refuses two
+operations on the same paragraph property or on overlapping text spans
+(`overlapping_operations`), and `set_list` on a paragraph that starts with a
+tab (`unsupported_document`), because Docs turns leading tabs into nesting
+levels and removes them. Each `set_list` operation starts its own list, so
+consecutive numbered paragraphs each restart at 1. A style-only plan whose
+answer was lost cannot be recognized by the body text, which is unchanged: on
+resume it is resent once with the document's current revision, only if the
+body text still equals the planned text; otherwise it ends as a
+`document_changed` conflict. Styles are absolute, so resending is idempotent.
+Tables, images, comments, suggestions, headers, and footers are out of scope;
+inserted text takes the style of the paragraph where it lands.
 
 `preview_document_creation` plans a new Google Doc named `name` in a dossier
-folder that is not `_LitMan`, from `text` or by converting a dossier DOCX
-(`source_file_id`), never both. A name already used in that folder returns
+folder that is not `_LitMan`, from `text`, from `markdown` (1–100,000 characters), or by converting a dossier
+DOCX (`source_file_id`); exactly one of the three. A name already used in that folder returns
 `name_exists`, and it is checked again at apply. Text documents are created
 empty with markers and then filled with one revision-guarded insert; a DOCX is
 downloaded to a temporary directory and uploaded converted, as publication does
-for the live offer. A resumed creation adopts the marked document and never
+for the live offer. Markdown is written to a temporary `.md` file and uploaded
+with MIME type `text/markdown` converted to a Google Doc in one marked create,
+so Drive turns headings, lists, bold, and italics into Docs formatting and no
+Docs call is needed. A resumed creation adopts the marked document and never
 writes its text twice.
 
 A Docs 403 with reason `accessNotConfigured` or `SERVICE_DISABLED` returns

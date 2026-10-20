@@ -30,6 +30,7 @@ class FakeDrive:
         self.moved: list[str] = []
         self.exports: dict[tuple[str, str], bytes] = {}  # (file ID, MIME type) → exported bytes
         self.comment_threads: dict[str, list[dict]] = {}  # file ID → comments as Drive returns them
+        self.converted: list[tuple[str, str, bytes]] = []  # (name, source MIME type, content) of converted uploads
         self.docs: FakeDocs | None = None  # when set, every created Google Doc also exists there, empty
         self._counter = 0
 
@@ -86,6 +87,7 @@ class FakeDrive:
         return self._create(name, mime_type, parent_id, operation_id, action_id, Path(source).read_bytes())
 
     def upload_converted(self, name, parent_id, source, source_mime_type, operation_id, action_id):
+        self.converted.append((name, source_mime_type, Path(source).read_bytes()))
         return self._create(name, GOOGLE_DOC_MIME, parent_id, operation_id, action_id, Path(source).read_bytes())
 
     def export(self, file_id, mime_type, destination: Path):
@@ -321,8 +323,11 @@ class FakeDocs:
 
     Each token takes its UTF-16 width in index space: the section break, table,
     row and cell markers and inline objects take one index; text characters take
-    one or two.  Only ``insertText`` and ``deleteContentRange`` by index are
-    implemented, and every write changes ``revisionId``.
+    one or two.  Only ``insertText``, ``deleteContentRange``, ``updateParagraphStyle``,
+    ``updateTextStyle``, ``createParagraphBullets`` and ``deleteParagraphBullets`` by
+    index are implemented, and every write changes ``revisionId``.  A text
+    character carries its text style flags and a paragraph's final newline carries
+    its named style and list kind (see ``paragraph_style`` and ``text_style``).
     """
 
     def __init__(self):
@@ -389,6 +394,18 @@ class FakeDocs:
                 assert begin < end and all(token[0] == "char" for token in tokens[begin:end])
                 assert end < len(tokens), "no se puede borrar el salto final del cuerpo"
                 del tokens[begin:end]
+            elif kind == "updateParagraphStyle":
+                assert body["fields"] == "namedStyleType" and set(body["paragraphStyle"]) == {"namedStyleType"}
+                _style_paragraphs(tokens, body["range"], "named_style", body["paragraphStyle"]["namedStyleType"])
+            elif kind == "createParagraphBullets":
+                preset = body["bulletPreset"]
+                kind = "bullets" if preset.startswith("BULLET_") else "numbered"
+                _style_paragraphs(tokens, body["range"], "list", kind)
+            elif kind == "deleteParagraphBullets":
+                _style_paragraphs(tokens, body["range"], "list", "none")
+            elif kind == "updateTextStyle":
+                assert set(body["fields"].split(",")) == set(body["textStyle"]), "fields debe limitarse a lo pedido"
+                _style_text(tokens, body["range"], body["textStyle"])
             else:
                 raise AssertionError(f"petición no admitida: {kind}")
         self._write(document_id, tokens)
@@ -405,6 +422,33 @@ class FakeDocs:
         tokens[position:position] = _chars(text)
         self._write(document_id, tokens)
 
+    def paragraph_style(self, document_id: str, paragraph: str) -> tuple[str, str]:
+        """``(named style, list kind)`` of the one paragraph whose text is ``paragraph``."""
+        tokens = self.documents[document_id]["tokens"]
+        found = []
+        start = 0
+        for position, token in enumerate(tokens):
+            if token[0] == "char" and token[1] == "\n":
+                if "".join(t[1] for t in tokens[start:position] if t[0] == "char") == paragraph:
+                    attributes = dict(token[3])
+                    found.append((attributes.get("named_style", "NORMAL_TEXT"), attributes.get("list", "none")))
+                start = position + 1
+            elif token[0] != "char":
+                start = position + 1
+        assert len(found) == 1, f"{len(found)} párrafos con el texto {paragraph!r}"
+        return found[0]
+
+    def text_style(self, document_id: str, snippet: str, nth: int = 0) -> dict[str, bool]:
+        """Text style flags of the ``nth`` occurrence of ``snippet``; every character must carry the same."""
+        tokens = [t for t in self.documents[document_id]["tokens"] if t[0] == "char"]
+        text = "".join(t[1] for t in tokens)
+        begin = -1
+        for _ in range(nth + 1):
+            begin = text.index(snippet, begin + 1)
+        styles = {tuple(sorted(t[3])) for t in tokens[begin:begin + len(snippet)]}
+        assert len(styles) == 1, "el fragmento tiene formatos distintos"
+        return dict(styles.pop())
+
     def plain_text(self, document_id: str) -> str:
         """Every character not carrying a suggested insertion, in token order."""
         return "".join(token[1] for token in self.documents[document_id]["tokens"]
@@ -417,7 +461,37 @@ class FakeDocs:
 
 
 def _chars(text: str, suggestion: str | None = None) -> list:
-    return [("char", char, suggestion) for char in text]
+    """Character tokens ``("char", char, suggestion, attributes)``; attributes is a tuple of (name, value) pairs."""
+    return [("char", char, suggestion, ()) for char in text]
+
+
+def _with_attribute(token: tuple, name: str, value) -> tuple:
+    attributes = {**dict(token[3]), name: value}
+    return (*token[:3], tuple(sorted(attributes.items())))
+
+
+def _style_paragraphs(tokens: list, range_: dict, name: str, value) -> None:
+    """Set a paragraph attribute on the final newline of every paragraph overlapping the Docs index range."""
+    at, start = 0, 0
+    for position, token in enumerate(tokens):
+        width = _width(token)
+        if token[0] == "char" and token[1] == "\n":
+            if start < range_["endIndex"] and range_["startIndex"] < at + width:
+                tokens[position] = _with_attribute(token, name, value)
+            start = at + width
+        elif token[0] != "char":
+            start = at + width
+        at += width
+
+
+def _style_text(tokens: list, range_: dict, style: dict) -> None:
+    at = 0
+    for position, token in enumerate(tokens):
+        if token[0] == "char" and range_["startIndex"] <= at < range_["endIndex"]:
+            for name, value in style.items():
+                token = _with_attribute(token, name, value)
+            tokens[position] = token
+        at += _width(token)
 
 
 def _width(token) -> int:
