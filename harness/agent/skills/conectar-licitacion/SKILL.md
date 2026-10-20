@@ -31,7 +31,12 @@ description: Conecta una licitación por el ID de su carpeta de Drive y guía a 
    placement only when shown by the plan, preserving its move, copy, in-place,
    or skipped strategy. This is a preview: speak in future tense and do not say
    that folders or files have already been created, moved, or written. Ask for
-   acceptance only after this explanation.
+   acceptance only after this explanation; a short folder list is appropriate
+   even when routine status summaries are limited to one or two sentences.
+   End the preview turn by asking for acceptance. Do not call
+   `apply_incorporation` or claim acceptance until the person explicitly accepts
+   that displayed plan in a subsequent message. An intent to organize the
+   dossier or a predicted future acceptance is not acceptance.
 
    After `apply_incorporation`, summarize created and reused folders, original
    placement, and the `contexto.md` outcome only when confirmed by the result
