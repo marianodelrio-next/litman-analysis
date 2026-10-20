@@ -1,0 +1,8 @@
+{
+  "change": "CHG-0008",
+  "design_digest": "sha256:16861302994cd802c69fac2c8cf5efae543c64ca37e9bf5c340cf3ce3462487a",
+  "approved_by": "mariano.delrio@nextdigital.es",
+  "approved_at": "2026-10-20T13:27:34Z",
+  "method": "chat",
+  "message": "Minetras estabas he hecho pull de una tarea a main. Repasa y si todo okay apruebo CHG-0008"
+}

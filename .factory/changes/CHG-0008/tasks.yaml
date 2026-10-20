@@ -1,0 +1,84 @@
+change: CHG-0008
+design_digest: sha256:16861302994cd802c69fac2c8cf5efae543c64ca37e9bf5c340cf3ce3462487a
+tasks:
+- id: CHG-0008-01
+  title: Single product version, CHANGELOG.md and the scripted, documented release
+    flow
+  depends_on: []
+  complexity: normal
+  review:
+  - quality
+  - conformance
+  scope:
+  - scripts/**
+  - CHANGELOG.md
+  - AGENTS.md
+  - docs/**
+  - core/pyproject.toml
+  - core/uv.lock
+  - core/src/litman_core/__init__.py
+  - core/deployment/local-install/README.md
+  - harness/pyproject.toml
+  - harness/uv.lock
+  - harness/src/litman_harness/__init__.py
+  - harness/deployment/README.md
+  - harness/tests/deployment/test_release.py
+  acceptance:
+    AC-01: bash -lc 'python3 scripts/release.py check && cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache
+      uv run pytest -q tests/deployment/test_release.py'
+    AC-02: bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q tests/deployment/test_release.py'
+    AC-03: bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q tests/deployment/test_release.py'
+    AC-04: manual
+    AC-10: bash -lc 'cd core && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q && cd ../harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest -q'
+- id: CHG-0008-02
+  title: Tag-only installers, the CLI-only check-update command and the installed
+    version in diagnose
+  depends_on:
+  - CHG-0008-01
+  complexity: normal
+  review:
+  - quality
+  - conformance
+  scope:
+  - harness/deployment/**
+  - harness/src/litman_harness/**
+  - harness/tests/**
+  - harness/docs/**
+  - docs/windows-codex-validation.md
+  - docs/codebase-map.md
+  - CHANGELOG.md
+  acceptance:
+    AC-05: bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q tests/deployment/test_install_script.py'
+    AC-06: bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q tests/test_updates.py tests/interfaces/test_transports.py'
+    AC-07: bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q tests/test_installation.py tests/interfaces'
+    AC-10: bash -lc 'cd core && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q && cd ../harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest -q'
+- id: CHG-0008-03
+  title: The actualizar-equipo product skill and the update documentation
+  depends_on:
+  - CHG-0008-02
+  complexity: normal
+  review:
+  - quality
+  - conformance
+  scope:
+  - harness/agent/**
+  - harness/src/litman_harness/installation.py
+  - harness/tests/**
+  - harness/docs/**
+  - harness/deployment/README.md
+  - docs/guia-litman-windows.md
+  - docs/windows-codex-validation.md
+  - CHANGELOG.md
+  acceptance:
+    AC-08: bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q tests/test_installation.py tests/interfaces/test_agent_files.py'
+    AC-09: manual
+    AC-10: bash -lc 'cd core && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q && cd ../harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest -q'
