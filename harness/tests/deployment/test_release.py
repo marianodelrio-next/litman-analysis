@@ -203,6 +203,19 @@ def test_prepare_refuses_a_version_lower_than_the_current_one(repo: Path):
     assert _git(repo, "status", "--porcelain").stdout.strip() == ""
 
 
+def test_prepare_leaves_no_file_changed_when_a_later_site_does_not_match(repo: Path):
+    # harness/uv.lock is rewritten after core/pyproject.toml in VERSION_SITES;
+    # breaking it must not leave core/pyproject.toml (or any other site)
+    # rewritten to the new version.
+    (repo / "harness" / "uv.lock").write_text("no version marker here\n", encoding="utf-8")
+    _commit_all(repo, "break a later version site")
+    result = _run_release(repo, "prepare", "0.2.0", "--no-tests")
+    assert result.returncode != 0
+    assert "harness/uv.lock" in result.stderr
+    assert _git(repo, "status", "--porcelain").stdout.strip() == ""
+    assert "0.1.0" in (repo / "core" / "pyproject.toml").read_text(encoding="utf-8")
+
+
 def test_prepare_refuses_an_empty_unreleased_section(repo: Path):
     (repo / "CHANGELOG.md").write_text(CHANGELOG_EMPTY_UNRELEASED, encoding="utf-8")
     _commit_all(repo, "empty unreleased")

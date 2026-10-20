@@ -126,7 +126,7 @@ def parse_changelog(text: str) -> list[ChangelogEntry]:
     """Parse ``## [Unreleased]`` then descending ``## [X.Y.Z] - YYYY-MM-DD`` sections.
 
     Raises ``ReleaseError`` if the file does not follow this structure. Returns
-    the version sections (not Unreleased), oldest first.
+    the version sections (not Unreleased), in document order (newest first).
     """
     heading_pattern = re.compile(r"^## (.+)$", re.MULTILINE)
     headings = list(heading_pattern.finditer(text))
@@ -220,14 +220,21 @@ def cmd_check(args: argparse.Namespace) -> int:
     return 0
 
 
-def _substitute_site(site: VersionSite, root: Path, new_version: str) -> None:
-    path = root / site.rel_path
-    text = _read(path)
-    match = site.pattern.search(text)
-    if not match:
-        raise ReleaseError(f"{site.label} ({site.rel_path}): version not found")
-    start, end = match.span(1)
-    _write(path, text[:start] + new_version + text[end:])
+def _compute_rewrites(root: Path, new_version: str) -> list[tuple[Path, str]]:
+    """Apply every site's substitution in memory; two sites may share a file
+    (the Harness pin lives beside its own version), so later sites must see
+    earlier ones' edits. Raises before writing anything if any site is stale.
+    """
+    texts: dict[Path, str] = {}
+    for site in VERSION_SITES:
+        path = root / site.rel_path
+        text = texts[path] if path in texts else _read(path)
+        match = site.pattern.search(text)
+        if not match:
+            raise ReleaseError(f"{site.label} ({site.rel_path}): version not found")
+        start, end = match.span(1)
+        texts[path] = text[:start] + new_version + text[end:]
+    return list(texts.items())
 
 
 def rewrite_changelog(text: str, version: str, release_date: str) -> str:
@@ -281,12 +288,15 @@ def cmd_prepare(args: argparse.Namespace) -> int:
         return 1
 
     release_date = args.date or date.today().isoformat()
+    # Compute every rewrite before writing any file, so a late failure (a
+    # site whose pattern no longer matches) never leaves a partial rewrite.
     try:
-        for site in VERSION_SITES:
-            _substitute_site(site, REPO_ROOT, version)
+        rewrites = _compute_rewrites(REPO_ROOT, version)
     except ReleaseError as exc:
         print(f"prepare: {exc}", file=sys.stderr)
         return 1
+    for path, text in rewrites:
+        _write(path, text)
     _write(CHANGELOG_PATH, rewrite_changelog(changelog_text, version, release_date))
 
     print(f"prepare: rewrote every version site and CHANGELOG.md to {version}")
