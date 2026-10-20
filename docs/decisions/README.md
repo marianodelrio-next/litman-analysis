@@ -12,6 +12,7 @@ Package-specific decisions remain with their owner:
 ## Index
 
 - [0001 — Separate development workflow from product runtime](0001-development-workflow-boundary.md)
+- [0002 — Tagged releases, a single product version, and the changelog](0002-tagged-releases.md)
 
 Add new records in number order. Once a decision is accepted, change only its
 status; record a replacement in a new decision and mark the old one as

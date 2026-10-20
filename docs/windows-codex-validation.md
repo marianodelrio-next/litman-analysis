@@ -132,7 +132,7 @@ Command: `litman-core info`
 Expected output: a single JSON object with `contract: 1`, for example:
 
 ```json
-{"contract": 1, "version": "0.1.0", "providers": ["claude-code", "codex"],
+{"contract": 1, "version": "X.Y.Z", "providers": ["claude-code", "codex"],
  "environment": {
    "providers": {"codex": {"cli": true, "session": true},
                  "claude-code": {"cli": false, "session": false}},

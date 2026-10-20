@@ -37,6 +37,10 @@ public compatibility promise.
 - [Repository decisions](decisions/README.md) record cross-package and durable
   development-process decisions. Package decisions remain with Core or
   Harness.
+- [Releasing LitMan](releasing.md) is the scripted, documented release flow:
+  the single product version, `CHANGELOG.md`, and `scripts/release.py`.
+- [CHANGELOG.md](../CHANGELOG.md) records every user-visible change, by
+  version.
 
 The [Windows Codex app validation guide](windows-codex-validation.md) is the
 manual checklist for installing and operating LitMan with the Codex app on
