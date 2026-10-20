@@ -1,8 +1,8 @@
-"""Google Docs of the dossier: read, and edit through closed operations the person accepts."""
+"""Google Docs of the dossier: read, edit through closed operations and create, as the person accepts."""
 from __future__ import annotations
 
 from . import Tool, schema
-from ...dossier.documents import MAX_OPERATIONS, OPERATIONS
+from ...dossier.documents import MAX_NAME_CHARS, MAX_OPERATIONS, MAX_TEXT_CHARS, OPERATIONS
 from .dossier import _FOLDER_ID, _GATE, _PLAN_ID
 
 _DOCUMENT_ID = {"type": "string", "description": "ID de un Google Doc dentro de la carpeta de la licitación."}
@@ -46,5 +46,29 @@ TOOLS = (
          "documento cambió desde la vista previa devuelve conflict (document_changed) sin escribir." + _GATE,
          schema({"plan_id": _PLAN_ID}, ("plan_id",)),
          lambda ctx, args: ctx.services().documents.apply_edit(args["plan_id"]),
+         mutates=True),
+    Tool("preview_document_creation",
+         "Consulta (no escribe en Drive): prepara un Google Doc nuevo llamado name en parent_folder_id (la carpeta de "
+         "la licitación o una subcarpeta, nunca _LitMan), con el texto text o convirtiendo el DOCX source_file_id de "
+         "la licitación (exactamente uno de los dos), y guarda localmente un plan que la persona debe aceptar. Falla "
+         "con name_exists si la carpeta ya tiene un archivo con ese nombre. Sólo texto: sin formato.",
+         schema({"folder_id": _FOLDER_ID,
+                 "parent_folder_id": {"type": "string", "description": "ID de la carpeta de destino dentro de la "
+                                                                       "licitación."},
+                 "name": {"type": "string", "minLength": 1, "maxLength": MAX_NAME_CHARS,
+                          "description": "Nombre del documento nuevo, sin saltos de línea."},
+                 "text": {"type": "string", "minLength": 1, "maxLength": MAX_TEXT_CHARS,
+                          "description": "Texto inicial; cada \\n empieza un párrafo. No se usa con source_file_id."},
+                 "source_file_id": {"type": "string", "description": "ID de un DOCX de la licitación que se "
+                                                                     "convierte; no se usa con text."}},
+                ("folder_id", "parent_folder_id", "name")),
+         lambda ctx, args: ctx.services().documents.preview_creation(args["folder_id"], args["parent_folder_id"],
+                                                                     args["name"], args.get("text"),
+                                                                     args.get("source_file_id"))),
+    Tool("apply_document_creation",
+         "Mutación: aplica sólo el plan_id de creación guardado y aceptado y devuelve document_id y web_view_link; "
+         "repetir la aceptación tras una interrupción no duplica el documento ni su texto." + _GATE,
+         schema({"plan_id": _PLAN_ID}, ("plan_id",)),
+         lambda ctx, args: ctx.services().documents.apply_creation(args["plan_id"]),
          mutates=True),
 )
