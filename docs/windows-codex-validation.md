@@ -25,7 +25,7 @@ the text below.
 
 Confirm all of the following before starting:
 
-- The code for CHG-0003 and CHG-0005 is merged into the remote `master`. The guided
+- The code for CHG-0003, CHG-0005, and CHG-0006 is merged into the remote `master`. The guided
   install one-liner installs the latest `v*` tag if one exists, otherwise
   `origin/HEAD` (`harness/deployment/install.ps1`), so without a tag it
   installs whatever is on `master` at the time.
@@ -40,6 +40,8 @@ Confirm all of the following before starting:
 - An authorized test Drive folder containing a synthetic tender with Spanish
   names and text (`PCAP`, `anuncio`, `adjudicación` in file names) and two
   files that share the same visible name but have different Drive file IDs.
+- Access to the Google Cloud project that owns the OAuth client, to enable
+  and disable the Google Docs API (section 8), or someone who administers it.
 - A short, disposable working directory for this run.
 
 Record, without including sensitive content: Windows edition and version,
@@ -149,8 +151,10 @@ Command: `litman diagnose`
 
 Expected output: a JSON envelope `{"ok": true, "result": {...}}` covering the
 configured adapter, OAuth scopes, `litman-core` (including its environment
-check above), the concurrency gate, configured paths, and the installation
-status (`litman install`), without tokens, secrets, or local paths.
+check above), the concurrency gate, the Google Docs API state (`docs_api`:
+`enabled`, `disabled`, or `unknown`), configured paths, and the installation
+status (`litman install`), without tokens, secrets, or local paths. Before
+`litman login`, `docs_api` is `unknown`.
 
 Action: run setup with the Codex provider.
 
@@ -294,7 +298,54 @@ they inherit from the expected user profile and are not broadly readable.
   file is still locked. This is a known limitation of the current discard
   path, not a bug to fix in this guide; record it as-is.
 
-## 8. Repair
+## 8. Google Docs: read, edit, conflict, and create
+
+Run these steps on the real account after section 7, against the live offer
+(the Google Doc in `Oferta`) of the synthetic tender. They also settle the
+open questions of CHG-0006: whether the `drive`-scope token is accepted by the
+Docs API, the exact error payloads, and whether `revisionId` is returned.
+
+- **Disabled API.** With the Google Docs API disabled in the OAuth client's
+  Cloud project, run `litman diagnose`. Expected output: `docs_api` is
+  `disabled`. Ask the app to read the technical proposal. Expected output: the
+  assistant explains that the administrator must enable the Google Docs API
+  (`docs_api_disabled`, message *"La API de Google Docs no está habilitada: el
+  administrador debe habilitar la Google Docs API en el proyecto de Google
+  Cloud del cliente OAuth"*) and does not open a browser. **Observe and
+  record** the HTTP 403 reason Google returns.
+- **Enabled API.** Enable the Google Docs API in APIs & Services > Library,
+  wait a few minutes, and run `litman diagnose` again without logging in
+  again. Expected output: `docs_api` is `enabled`. If it stays `unknown` or
+  the next steps return `insufficient_permission`, **observe and record** the
+  response: the `drive` scope may not be accepted and the design needs a
+  decision.
+- **Read.** In the app, type *"lee la propuesta técnica de la licitación"*.
+  Expected output: the assistant calls `read_google_doc` and summarizes the
+  text; the result carries a non-null `revision_id` (**observe and record**
+  whether it is returned to an editor).
+- **Edit.** Ask the app to replace one sentence of the proposal that contains
+  accents (`á`, `ñ`) and to append one line at the end. Expected output: the
+  assistant shows the `preview_document_edit` result, with each matched span
+  and its context, and waits for your answer. After you accept,
+  `apply_document_edit` returns `succeeded`; open the document in Google Docs
+  and confirm both changes, with the formatting of the surrounding paragraph
+  and nothing else changed. At no point does the assistant use computer use or
+  a browser.
+- **Conflict.** Ask for another edit and stop at the preview. Change any text
+  in the document by hand in Google Docs, then accept the preview. Expected
+  output: `conflict` with code `document_changed` and nothing written by
+  LitMan; the assistant offers to read the document again. **Observe and
+  record** the HTTP status and payload Docs returns for the stale revision.
+- **Create from text.** Ask the app to create a Google Doc named
+  `Prueba LitMan` in `Oferta` with two short paragraphs. Expected output: a
+  preview, then after you accept a `document_id` and `web_view_link`; the
+  document contains the two paragraphs once. Asking for the same name again
+  returns `name_exists`.
+- **Create from DOCX.** Ask the app to create a Google Doc from a DOCX of the
+  tender. Expected output: a converted Google Doc in the chosen folder, the
+  DOCX unchanged.
+
+## 9. Repair
 
 Action: delete the token (`token.json`) under the harness state directory,
 then type **"prepara mi equipo"** in the app again.
@@ -303,7 +354,7 @@ Expected output: the skill's first step, `diagnose`, detects the missing
 session and the skill addresses only that failing step (OAuth/login), per
 `preparar-equipo`'s repair behavior, rather than repeating the whole setup.
 
-## 9. Uninstall
+## 10. Uninstall
 
 Action: open a file inside the LitMan workspace folder in another program,
 then run the uninstall script requesting workspace removal.
@@ -339,7 +390,7 @@ itself (`%USERPROFILE%\LitMan`) is removed only because
 `LITMAN_REMOVE_WORKSPACE=1` was requested; without it, uninstall keeps the
 folder, the OAuth client and token, and private data by default.
 
-## 10. Run both test suites natively
+## 11. Run both test suites natively
 
 Action: from a native PowerShell session (no WSL), run each package's tests.
 
@@ -352,7 +403,7 @@ cd ..\harness; uv run pytest -q
 
 Expected output: both suites pass. Record any skipped test and why.
 
-## 11. Results and reporting
+## 12. Results and reporting
 
 For each system, app, and provider combination exercised, record: system and
 version, step executed, result, non-sensitive local evidence, and whether a

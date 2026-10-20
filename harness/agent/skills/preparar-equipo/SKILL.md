@@ -21,9 +21,15 @@ explicas.
    CLI del proveedor (Codex o Claude Code) no tiene sesión, dale el comando
    de login de esa CLI para que lo ejecute ella misma; no lo ejecutes tú
    salvo que lo pida explícitamente en ese turno.
-5. Ejecuta `setup` con el proveedor por defecto de esta app (Codex →
+5. **Google Docs.** Si `diagnose` devuelve `docs_api` igual a `disabled`, explica
+   que el administrador del proyecto de Google Cloud del cliente OAuth debe
+   habilitar una vez la Google Docs API; hasta entonces no se pueden leer,
+   editar ni crear Google Docs, pero el resto de LitMan funciona. Con
+   `unknown` (sin sesión de Drive o sin conexión), repite la comprobación tras
+   `litman login`; no bloquees por ello.
+6. Ejecuta `setup` con el proveedor por defecto de esta app (Codex →
    `codex`, Claude → `claude-code`) y el modelo si la persona lo pide.
-6. Vuelve a llamar a `diagnose`. Si todo está en verde salvo pasos humanos
+7. Vuelve a llamar a `diagnose`. Si todo está en verde salvo pasos humanos
    ya hechos, pasa a la skill `conectar-licitacion`. Si el navegador PDF no
    está disponible, avísalo sin bloquear: en Ubuntu su instalación requiere
    `sudo`, así que la hace la persona o su IT, nunca tú.

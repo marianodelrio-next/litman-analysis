@@ -96,6 +96,24 @@ registered dossier resource, and Harness checks format and provenance rather
 than claiming to verify meaning. This keeps generation outside the deterministic
 runtime and acceptance explicit.
 
+## Document edits use closed index-based operations guarded by the Docs revision
+
+The assistant changes a dossier Google Doc only through closed operations
+(`replace_text`, `insert_after`, `append`) that the preview resolves to Docs
+indexes on the text it read and simulates into an expected text. The apply
+sends one `documents.batchUpdate` of index-based `deleteContentRange` and
+`insertText` requests in descending index order, guarded by
+`writeControl.requiredRevisionId`; a lost answer is resolved by comparing the
+body with the expected text's hash. `replaceAllText` was rejected because it
+matches case-insensitively by default, reaches every tab, header, and footer,
+and cannot be limited to the counted matches. Exporting to DOCX and re-uploading
+was rejected because it destroys formatting, comments, revision history, and the
+live-offer ID; free-form Docs requests from the assistant were rejected because
+they have no deterministic preview; computer use in a browser was rejected as
+unreliable and outside the acceptance model. Docs v1 uses the existing `drive`
+scope, so no new login is required, but the Google Docs API must be enabled in
+the OAuth client's Cloud project.
+
 ## Product agents are separate from development agents
 
 Files under `harness/agent/` are installed product behavior. Repository skills

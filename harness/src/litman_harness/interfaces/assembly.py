@@ -24,6 +24,9 @@ from ..local_paths import CONFIGURABLE, METADATA_ENV, client_path, plan_store_ro
 from ..plans import PlanStore
 from ..settings import load_settings
 
+# An ID that no document has: a 404 proves the Docs API answers for this OAuth client.
+DOCS_PROBE_ID = "litman-docs-api-probe-0000000000000000000000"
+
 
 @dataclass(frozen=True)
 class Services:
@@ -82,6 +85,17 @@ def build_services(env: Mapping[str, str] | None = None, *, provider: DesktopOAu
                     DocumentService(expediente, docs))
 
 
+def docs_api_status(docs: DocsGateway) -> str:
+    """``enabled``, ``disabled`` or ``unknown`` from one read of a document that does not exist."""
+    try:
+        docs.get(DOCS_PROBE_ID)
+    except HarnessError as exc:
+        return {"not_found": "enabled", "docs_api_disabled": "disabled"}.get(exc.code, "unknown")
+    except Exception:  # noqa: BLE001 - diagnostics must report, not crash
+        return "unknown"
+    return "enabled"
+
+
 def diagnose(env: Mapping[str, str] | None = None) -> dict[str, Any]:
     """Configuration report without tokens, secrets or local paths."""
     env = os.environ if env is None else env
@@ -102,6 +116,7 @@ def diagnose(env: Mapping[str, str] | None = None) -> dict[str, Any]:
         "oauth": None,
         "core_executable_found": core.core_executable() is not None,
         "shared_state": {"available": False, "mechanism": "unavailable"},
+        "docs_api": "unknown",
         "paths_configured": {name: bool(env.get(name)) for name in CONFIGURABLE},
         "setup": {"configured": settings is not None,
                   "provider": settings.get("provider") if settings else None,
@@ -125,11 +140,15 @@ def diagnose(env: Mapping[str, str] | None = None) -> dict[str, Any]:
             usable = "error" not in report["oauth"]
             report["shared_state"] = {"available": usable,
                                       "mechanism": "drive_v2_if_match" if usable else "unavailable"}
+    services = None
     try:
-        report["identity"] = build_services(env).expediente.identity()
+        services = build_services(env)
+        report["identity"] = services.expediente.identity()
     except HarnessError as exc:
         if not any(item["code"] == exc.code for item in report["errors"]):
             report["errors"].append({"code": exc.code, "message": str(exc)})
     except Exception as exc:  # noqa: BLE001 - diagnostics must report, not crash
         report["errors"].append({"code": "identity_unavailable", "message": safe_exception_message(exc)})
+    if services is not None:
+        report["docs_api"] = docs_api_status(services.docs)
     return report

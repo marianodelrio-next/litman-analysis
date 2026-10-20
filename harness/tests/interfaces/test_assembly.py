@@ -91,3 +91,66 @@ def test_diagnose_reports_the_saved_setup(harness_env, tmp_path: Path):
     path.write_text('provider = "codex"\nmodel = "gpt-5.6-luna"\n', encoding="utf-8")
     report = assembly.diagnose()
     assert report["setup"] == {"configured": True, "provider": "codex", "model": "gpt-5.6-luna"}
+
+
+class _Docs:
+    def __init__(self, outcome):
+        self.outcome = outcome
+        self.calls = []
+
+    def get(self, document_id):
+        self.calls.append(document_id)
+        if isinstance(self.outcome, BaseException):
+            raise self.outcome
+        return self.outcome
+
+
+def _with_docs(monkeypatch, docs):
+    class Services:
+        class expediente:
+            @staticmethod
+            def identity():
+                return {"email": "persona@example.com"}
+
+    services = Services()
+    services.docs = docs
+    monkeypatch.setattr(assembly, "build_services", lambda env=None: services)
+
+
+def test_diagnose_reports_the_docs_api_enabled_when_the_probe_is_not_found(unconfigured_env, monkeypatch):
+    from litman_harness.adapters.docs import docs_http_error
+    docs = _Docs(docs_http_error(404))
+    _with_docs(monkeypatch, docs)
+    report = assembly.diagnose()
+    assert report["docs_api"] == "enabled" and docs.calls == [assembly.DOCS_PROBE_ID]
+    assert report["identity"] == {"email": "persona@example.com"}
+    assert not any(item["code"] == "not_found" for item in report["errors"])
+
+
+def test_diagnose_reports_the_docs_api_disabled(unconfigured_env, monkeypatch):
+    from litman_harness.adapters.docs import docs_http_error
+    content = b'{"error": {"code": 403, "errors": [{"reason": "accessNotConfigured"}]}}'
+    _with_docs(monkeypatch, _Docs(docs_http_error(403, content)))
+    report = assembly.diagnose()
+    assert report["docs_api"] == "disabled"
+    assert not any(item["code"] == "docs_api_disabled" for item in report["errors"])
+
+
+def test_diagnose_reports_the_docs_api_unknown_and_never_fails_because_of_it(unconfigured_env, monkeypatch):
+    from litman_harness.adapters.docs import docs_http_error
+    from litman_harness.errors import HarnessError
+    for outcome in (docs_http_error(401), docs_http_error(500), HarnessError("read_only_adapter", "x"),
+                    RuntimeError("offline"), {"revisionId": "r1"}):
+        _with_docs(monkeypatch, _Docs(outcome))
+        report = assembly.diagnose()
+        assert report["docs_api"] == ("enabled" if isinstance(outcome, dict) else "unknown")
+        assert report["identity"] == {"email": "persona@example.com"}
+
+
+def test_diagnose_reports_the_docs_api_unknown_without_services(unconfigured_env, monkeypatch):
+    monkeypatch.setattr(assembly, "build_services", lambda env=None: (_ for _ in ()).throw(RuntimeError("offline")))
+    assert assembly.diagnose()["docs_api"] == "unknown"
+
+
+def test_diagnose_reports_the_docs_api_unknown_with_the_metadata_adapter(harness_env):
+    assert assembly.diagnose()["docs_api"] == "unknown"
