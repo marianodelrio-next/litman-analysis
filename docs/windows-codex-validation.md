@@ -367,6 +367,16 @@ folder, so that the app reads the current MCP server `instructions` and the
 reinstalled skills. An installation made before CHG-0007 must first run the
 guided installation command again to get `ayuda-litman`.
 
+- **Update skill.** Ask *"actualiza mi equipo"*. With no update available,
+  expect a short up-to-date response. To verify the update path, use a test
+  repository with a newer stable tag and changelog entry: expect a brief,
+  non-technical Spanish summary and a PowerShell command. The assistant must
+  not run that command. Close Codex, paste the command into PowerShell, wait
+  for the installer to finish, and reopen Codex. Confirm configuration and
+  the Google session remain available. A pre-update installation must first
+  run the guided install command once to record its source and install this
+  skill.
+
 - **Help.** Type *"qué puedes hacer"*. Expected output: the `ayuda-litman`
   skill answers with LitMan's capabilities grouped by purpose (prepare the
   computer, connect and organize the tender, analysis, summary, reading,

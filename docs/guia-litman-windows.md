@@ -70,6 +70,8 @@ LitMan se instala pegando un solo comando. Tarda unos minutos.
      3. Escriba: prepara mi equipo
    ```
    Funciona aunque tu nombre de usuario de Windows lleve tildes (por ejemplo, `María Núñez`) y con el Control inteligente de aplicaciones activado: no hace falta desactivarlo.
+   El instalador obtiene únicamente la última versión estable publicada. Si
+   todavía no se ha publicado ninguna, se detendrá sin instalar LitMan.
 4. Si en cambio sale un mensaje que empieza por **Falta**, el instalador te dice qué programa falta:
 
 | Mensaje | Qué hacer |
@@ -145,7 +147,20 @@ En el día a día solo necesitas abrir Codex en la carpeta LitMan y escribir lo 
 | Comentar un archivo o responder a un comentario | `responde al comentario de Ana diciendo que ya está corregido` |
 | Organizar carpetas o archivos | `crea una carpeta Entregas y mueve ahí la oferta final` |
 | Saber qué puede hacer LitMan, con ejemplos | `qué puedes hacer` |
+| Comprobar y actualizar LitMan | `actualiza mi equipo` |
 | Arreglar algo que no funciona | `prepara mi equipo` |
+
+## Actualizar y desinstalar
+
+Para actualizar LitMan, escribe **actualiza mi equipo** en Codex. La skill
+resume en pocas frases las novedades y muestra el comando que debes ejecutar en
+PowerShell. Antes de pegarlo, cierra Codex por completo; cuando termine, vuelve
+a abrirlo. La configuración y tu sesión de Google se conservan.
+
+Si instalaste LitMan antes de que existiera esta actualización guiada, pega
+una vez el comando de instalación del paso 2 para instalar la nueva skill y
+guardar la ubicación del repositorio. A partir de entonces, usa **actualiza mi
+equipo**.
 
 Cuatro reglas:
 
@@ -176,10 +191,6 @@ Para casi cualquier problema, lo primero es escribir **prepara mi equipo**: el a
 | Te avisa de que alguien ha cambiado `contexto.md` | No es un error. El asistente te lo explica y no sobrescribe nada; solo se sustituye si tú se lo pides. |
 
 Si avisas al equipo técnico, copia el mensaje de error tal cual. No envíes capturas con documentos de licitaciones ni el archivo `client_secret.json`.
-
-## Actualizar y desinstalar
-
-**Actualizar.** Pega en PowerShell el mismo comando del paso 2 y, al terminar, cierra y vuelve a abrir Codex. Tu configuración y tu sesión de Google se conservan.
 
 **Desinstalar.** Cierra Codex y cualquier archivo de la carpeta LitMan. Luego, en PowerShell, pega:
 

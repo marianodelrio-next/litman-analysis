@@ -107,13 +107,18 @@ Protocol errors use `-32700`, `-32600`, `-32601`, and `-32602`. Services are
 assembled per call, so `tools/list` works without local configuration.
 
 `install`, `uninstall`, `login`, and `check-update` are CLI-only and are not
-included in `tools/list`. `litman check-update` reads the source checkout from
+included in `tools/list`. Installers select only stable `vX.Y.Z` tags and do
+not fall back to a branch. `litman check-update` reads the source checkout from
 the private install manifest, fetches tags, and reports the newest stable
 version and its changelog entries. `update_source_missing` means the existing
 installation must be reinstalled once with the current installer;
 `update_check_failed` means Git could not check the tags or changelog. The
 `diagnose` result also includes the installed Harness `version`, without
-revealing the local source path.
+revealing the local source path. The installed `actualizar-equipo` skill
+summarizes available changes, runs the returned command on Linux, and asks the
+person to close the app and run it in PowerShell on Windows. Restart the app
+after the update. Older installations must run the guided installer once to
+save their source checkout and install the skill.
 
 ## Core setup and execution
 

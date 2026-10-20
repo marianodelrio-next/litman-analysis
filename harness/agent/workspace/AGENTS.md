@@ -9,6 +9,8 @@ analiza por tu cuenta cuando se lo pides.
   ..."** (usa la skill `conectar-licitacion`).
 - Para saber qué puede hacer LitMan, escribe: **"qué puedes hacer"** (usa la
   skill `ayuda-litman`).
+- Para actualizar LitMan, escribe: **"actualiza mi equipo"** (usa la skill
+  `actualizar-equipo`).
 - Para ver qué hay en una licitación usa `list_folder`, `search_in_dossier` y
   `get_file_info`; para leer un archivo (PDF, DOCX, texto, Excel, Google Docs,
   Sheets o Slides) usa `read_file`, y para ver sus comentarios `list_comments`.

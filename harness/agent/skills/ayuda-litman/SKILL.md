@@ -18,6 +18,12 @@ como vista previa y sólo se aplica cuando la persona lo acepta.
 - `identity`: dice con qué cuenta de Google trabaja LitMan.
   Ejemplo: "¿con qué cuenta estás conectado?"
 
+## Actualizar LitMan
+
+- `actualizar-equipo`: comprueba si hay una versión nueva y guía la
+  actualización de esta aplicación.
+  Ejemplo: "actualiza mi equipo" o "¿hay una versión nueva de LitMan?"
+
 ## Conectar y organizar la licitación
 
 - `inspect`: hace inventario de la carpeta de la licitación y propone qué

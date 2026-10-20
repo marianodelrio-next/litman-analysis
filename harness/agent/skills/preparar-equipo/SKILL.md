@@ -1,10 +1,10 @@
 ---
 name: preparar-equipo
-description: Prepara, repara, actualiza o desinstala LitMan en este equipo guiando a la persona paso a paso, sin ejecutar nunca un instalador de Git, uv, la CLI del proveedor o un navegador por su cuenta.
+description: Prepara, repara o desinstala LitMan en este equipo guiando a la persona paso a paso, sin ejecutar nunca un instalador de Git, uv, la CLI del proveedor o un navegador por su cuenta.
 ---
 
-Úsala cuando la persona escriba "prepara mi equipo", algo no funcione o
-quiera actualizar/desinstalar. Nunca instales Git, uv, la CLI del proveedor
+Úsala cuando la persona escriba "prepara mi equipo" o algo no funcione, o
+quiera desinstalar. Nunca instales Git, uv, la CLI del proveedor
 ni un navegador: eso lo decide y ejecuta la persona, tú sólo detectas y
 explicas.
 
@@ -34,9 +34,6 @@ explicas.
    ya hechos, pasa a la skill `conectar-licitacion`. Si el navegador PDF no
    está disponible, avísalo sin bloquear: en Ubuntu su instalación requiere
    `sudo`, así que la hace la persona o su IT, nunca tú.
-
-**Actualizar.** Pide que vuelva a pegar la frase de instalación de la app
-(README) y que reinicie la aplicación.
 
 **Reparar.** Repite `diagnose` y resuelve sólo el paso que falle.
 

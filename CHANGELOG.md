@@ -19,3 +19,5 @@ LitMan is published as a single product version, shared by Core and Harness; see
   authorization.
 - Guided installation and setup for Codex and Claude Code, including the
   product skills that drive dossier work from the chat.
+- Guided updates that summarize new versions and explain how to install them
+  on Windows or Linux.
