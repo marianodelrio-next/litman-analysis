@@ -41,8 +41,3 @@ public compatibility promise.
   the single product version, `CHANGELOG.md`, and `scripts/release.py`.
 - [CHANGELOG.md](../CHANGELOG.md) records every user-visible change, by
   version.
-
-The [Windows Codex app validation guide](windows-codex-validation.md) is the
-manual checklist for installing and operating LitMan with the Codex app on
-native Windows; it is maintained separately from this documentation
-consolidation.
