@@ -49,6 +49,8 @@ def test_tools_declare_mcp_annotations_derived_from_their_kind():
         assert registry()[name].descriptor()["annotations"]["readOnlyHint"] is True
     assert DESTRUCTIVE & set(registry()) <= {tool.name for tool in registry().values() if tool.mutates}
 
+
+
 def test_invalid_arguments_are_invalid_request_before_building_services():
     def factory():
         raise AssertionError("services must not be built for invalid arguments")

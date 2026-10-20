@@ -209,6 +209,8 @@ def test_help_skill_is_installed_recorded_and_uninstalled(app: str, tmp_path: Pa
     assert "skill:ayuda-litman" in result["removed"]
     assert not skill.exists()
 
+
+
 def test_claude_install_creates_claude_md_with_agents_reference(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     env = _env(tmp_path, monkeypatch)
     home = tmp_path / "home"
