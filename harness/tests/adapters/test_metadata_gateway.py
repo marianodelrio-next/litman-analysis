@@ -11,7 +11,8 @@ from litman_harness.errors import HarnessError
 def test_metadata_gateway_is_read_only(harness_env, tmp_path):
     gateway = MetadataGateway(Path(harness_env["LITMAN_HARNESS_METADATA"]))
     assert [item.id for item in gateway.children("root", "shared")] == ["source"]
-    for call in (lambda: gateway.create_folder("x", "root", "op"), lambda: gateway.download("source", tmp_path / "x"),
+    for call in (lambda: gateway.create_folder("x", "root", "op"),
+                 lambda: gateway.create_document("x", "root", "op", "act"), lambda: gateway.download("source", tmp_path / "x"),
                  lambda: gateway.move("source", "folder", ("root",)),
                  lambda: gateway.copy("source", "x", "folder", "op", "act")):
         with pytest.raises(HarnessError) as raised:

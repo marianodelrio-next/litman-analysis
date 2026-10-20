@@ -74,6 +74,16 @@ def test_upload_converted_creates_google_doc_directly_in_destination(tmp_path: P
     assert created.app_properties == {"litman_operation_id": "op", "litman_action_id": "a"}
 
 
+def test_create_document_creates_an_empty_google_doc_with_markers():
+    service = Service()
+    created = GoogleDriveGateway(service).create_document("Notas", "offer", "op", "a")
+    name, kwargs = service.files_api.calls[-1]
+    assert name == "create" and "media_body" not in kwargs and kwargs["supportsAllDrives"] is True
+    assert kwargs["body"] == {"name": "Notas", "mimeType": GOOGLE_DOC_MIME, "parents": ["offer"],
+                              "appProperties": {"litman_operation_id": "op", "litman_action_id": "a"}}
+    assert created.mime_type == GOOGLE_DOC_MIME and created.has_markers("op", "a")
+
+
 def test_gateway_calls_match_the_real_drive_v3_discovery_document(tmp_path: Path):
     """Build the real Drive v3 client offline so every parameter is validated by the API schema."""
     from googleapiclient.discovery import build
@@ -81,6 +91,7 @@ def test_gateway_calls_match_the_real_drive_v3_discovery_document(tmp_path: Path
 
     folder = '{"id": "f", "mimeType": "application/vnd.google-apps.folder", "driveId": "d"}'
     created = '{"id": "n", "mimeType": "application/vnd.google-apps.folder", "parents": ["f"]}'
+    document = '{"id": "g", "mimeType": "application/vnd.google-apps.document", "parents": ["f"]}'
     http = HttpMockSequence([
         ({"status": "200"}, '{"user": {"permissionId": "p"}}'),
         ({"status": "200"}, folder),
@@ -88,6 +99,7 @@ def test_gateway_calls_match_the_real_drive_v3_discovery_document(tmp_path: Path
         ({"status": "200"}, folder),
         ({"status": "200"}, '{"files": []}'),
         ({"status": "200"}, created),
+        ({"status": "200"}, document),
     ])
     service = build("drive", "v3", http=http, static_discovery=True)
     gateway = GoogleDriveGateway(service)
@@ -96,6 +108,7 @@ def test_gateway_calls_match_the_real_drive_v3_discovery_document(tmp_path: Path
     assert gateway.children("f", "d") == []
     assert gateway.find_by_markers("f", "op", "act") == []
     assert gateway.create_folder("Oferta", "f", "op", "act").id == "n"
+    assert gateway.create_document("Notas", "f", "op", "act").id == "g"
 
 
 def _real_gateway(responses):

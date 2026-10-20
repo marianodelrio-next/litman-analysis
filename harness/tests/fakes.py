@@ -28,6 +28,7 @@ class FakeDrive:
         self.crash_on_create: set[int] = set()
         self.move_denied: set[str] = set()  # file IDs whose move Drive rejects with 403
         self.moved: list[str] = []
+        self.docs: FakeDocs | None = None  # when set, every created Google Doc also exists there, empty
         self._counter = 0
 
     def add(self, resource: Resource, content: bytes | None = None) -> Resource:
@@ -63,6 +64,9 @@ class FakeDrive:
     def create_folder(self, name, parent_id, operation_id, action_id):
         return self._create(name, FOLDER_MIME, parent_id, operation_id, action_id, None)
 
+    def create_document(self, name, parent_id, operation_id, action_id):
+        return self._create(name, GOOGLE_DOC_MIME, parent_id, operation_id, action_id, None)
+
     def move(self, file_id, add_parent, remove_parents):
         if file_id in self.move_denied:
             raise HarnessError("insufficient_permission", "Drive rechazó el movimiento", details={"http_status": 403})
@@ -89,6 +93,8 @@ class FakeDrive:
         self.add(Resource(identifier, name, mime, "1", drive_id=parent.drive_id, parents=(parent_id,),
                           app_properties={OPERATION_MARKER: operation_id, ACTION_MARKER: action_id}), content)
         self.created.append(identifier)
+        if mime == GOOGLE_DOC_MIME and self.docs is not None:
+            self.docs.add(identifier, [""])
         if len(self.created) in self.crash_on_create:
             raise RuntimeError("timeout simulado tras crear el recurso")
         return self.resources[identifier]

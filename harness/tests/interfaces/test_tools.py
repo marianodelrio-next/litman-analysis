@@ -10,7 +10,7 @@ from litman_harness.interfaces.tools import invoke, registry, tool_descriptors
 OPERATIONS = {"identity", "diagnose", "inspect", "status", "preview_incorporation", "apply_incorporation",
               "preview_analysis", "execute_analysis", "discard_analysis", "preview_publication", "apply_publication",
               "read_document", "preview_summary", "apply_summary", "recover", "setup", "read_google_doc",
-              "preview_document_edit", "apply_document_edit"}
+              "preview_document_edit", "apply_document_edit", "preview_document_creation", "apply_document_creation"}
 
 
 def test_registry_exposes_operations_with_schema_and_kind():
@@ -28,7 +28,8 @@ def test_registry_exposes_operations_with_schema_and_kind():
     assert {tool.name for tool in registry().values() if tool.mutates} == {"apply_incorporation", "execute_analysis",
                                                                               "discard_analysis", "apply_publication",
                                                                               "apply_summary", "setup",
-                                                                              "apply_document_edit"}
+                                                                              "apply_document_edit",
+                                                                              "apply_document_creation"}
 
 
 def test_invalid_arguments_are_invalid_request_before_building_services():
@@ -54,10 +55,17 @@ def test_document_tools_declare_closed_operations_and_reject_bad_arguments_befor
     assert operations["maxItems"] == 20 and operations["items"]["additionalProperties"] is False
     assert operations["items"]["properties"]["op"]["enum"] == ["replace_text", "insert_after", "append"]
     assert registry()["read_google_doc"].input_schema["required"] == ["folder_id", "document_id"]
+    creation = registry()["preview_document_creation"].input_schema
+    assert creation["required"] == ["folder_id", "parent_folder_id", "name"]
+    assert {"text", "source_file_id"} <= set(creation["properties"])
     for name, args in (("read_google_doc", {"folder_id": "root", "document_id": 1}),
                        ("preview_document_edit", {"folder_id": "root", "document_id": "d", "operations": {}}),
                        ("preview_document_edit", {"folder_id": "root", "document_id": "d", "operations": ["x"]}),
-                       ("apply_document_edit", {"plan_id": "p", "operations": []})):
+                       ("apply_document_edit", {"plan_id": "p", "operations": []}),
+                       ("preview_document_creation", {"folder_id": "root", "parent_folder_id": "root"}),
+                       ("preview_document_creation", {"folder_id": "root", "parent_folder_id": "root", "name": "n",
+                                                      "text": 1}),
+                       ("apply_document_creation", {})):
         assert invoke(name, args, factory)["error"]["code"] == "invalid_request"
 
 

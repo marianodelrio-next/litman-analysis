@@ -4,8 +4,9 @@ from dataclasses import replace
 from pathlib import Path
 
 import pytest
-from fakes import OBJECT, AtomicSharedState, FakeDocs, dossier_drive
+from fakes import OBJECT, AtomicSharedState, FakeDocs, dossier_drive, minimal_docx
 
+from litman_harness.adapters.documents import DOCX_MIME
 from litman_harness.dossier.documents import (CONTENT_NOTE, DocumentService, DocumentText, _Edit, simulated_text,
                                               text_sha256)
 from litman_harness.dossier.models import FOLDER_MIME, GOOGLE_DOC_MIME, Resource
@@ -15,6 +16,7 @@ from litman_harness.errors import HarnessError
 from litman_harness.plans import PlanStore
 from litman_harness.plans.models import OperationStatus
 
+DOCX = minimal_docx("Memoria técnica", ("Lote 1", "Grúas"))
 BODY = ["Memoria técnica", "El licitador ofrece mantenimiento portuario.", "Plazo: 12 meses. Plazo ampliable.",
         {"table": [["Lote 1", "Grúas"]]}, "Fin"]
 
@@ -31,9 +33,17 @@ class Setup:
         self.drive.add(Resource("elsewhere", "Otra carpeta", FOLDER_MIME, "1", drive_id="shared"))
         self.drive.add(Resource("loose-doc", "Suelto", GOOGLE_DOC_MIME, "1", drive_id="shared",
                                 parents=("elsewhere",), capabilities={"canEdit": True}))
+        self.drive.add(Resource("litman-sub", "Borradores", FOLDER_MIME, "1", drive_id="shared", parents=("litman",)))
+        self.drive.add(Resource("memoria-docx", "memoria.docx", DOCX_MIME, "1", drive_id="shared", parents=("sub",)),
+                       DOCX)
+        self.drive.add(Resource("litman-docx", "interno.docx", DOCX_MIME, "1", drive_id="shared",
+                                parents=("litman",)), DOCX)
+        self.drive.add(Resource("loose-docx", "suelto.docx", DOCX_MIME, "1", drive_id="shared",
+                                parents=("elsewhere",)), DOCX)
         self.docs = FakeDocs()
         for document_id in ("offer-doc", "sub-doc", "litman-doc", "loose-doc"):
             self.docs.add(document_id, BODY)
+        self.drive.docs = self.docs
         self.store = PlanStore(tmp_path / "plans")
         self.state = AtomicSharedState(self.drive) if shared_state else None
         self.dossier = ExpedienteService(self.drive, self.store, self.state)
@@ -309,3 +319,139 @@ def test_an_edit_plan_cannot_be_applied_as_another_kind(tmp_path: Path):
     preview = setup.preview([{"op": "append", "text": "x"}])
     assert error(lambda: setup.dossier.apply_incorporation(preview["plan_id"])).code == "invalid_plan"
     assert setup.docs.batches == []
+
+
+# -- document creation -----------------------------------------------------------------------------
+
+def create(setup: Setup, name: str = "Notas", parent: str = "sub", **source) -> dict:
+    return setup.documents.preview_creation("root", parent, name, **(source or {"text": "Notas\nsegunda línea 😀"}))
+
+
+def test_creation_from_text_creates_a_marked_google_doc_containing_the_text(tmp_path: Path):
+    setup = Setup(tmp_path)
+    preview = create(setup)
+    assert preview["kind"] == "document_creation" and preview["parent_folder_id"] == "sub"
+    assert preview["name"] == "Notas" and preview["source"] is None and preview["characters"] == 21
+    assert setup.drive.created == [] and setup.docs.batches == [] and len(setup.plans()) == 1
+    result = setup.documents.apply_creation(preview["plan_id"])
+    assert result["status"] == "succeeded" and result["writes"] is True
+    created = setup.drive.resources[result["document_id"]]
+    assert setup.drive.created == [created.id] and result["web_view_link"] == created.web_view_link
+    assert created.name == "Notas" and created.mime_type == GOOGLE_DOC_MIME and created.parents == ("sub",)
+    assert created.app_properties["litman_operation_id"] == preview["operation_id"]
+    assert setup.docs.plain_text(created.id) == "Notas\nsegunda línea 😀\n"
+    (document_id, requests, revision), = setup.docs.batches
+    assert document_id == created.id and revision == "rev-1"
+    assert requests == [{"insertText": {"location": {"index": 1}, "text": "Notas\nsegunda línea 😀"}}]
+    assert setup.documents.read("root", created.id)["text"] == "Notas\nsegunda línea 😀\n"
+    replay = setup.documents.apply_creation(preview["plan_id"])
+    assert replay["replayed"] is True and replay["writes"] is False and len(setup.drive.created) == 1
+
+
+def test_creation_converts_a_docx_of_the_dossier_into_a_google_doc(tmp_path: Path):
+    setup = Setup(tmp_path)
+    preview = create(setup, "Memoria editable", "root", source_file_id="memoria-docx")
+    assert preview["source"] == {"file_id": "memoria-docx", "name": "memoria.docx"} and preview["characters"] is None
+    result = setup.documents.apply_creation(preview["plan_id"])
+    created = setup.drive.resources[result["document_id"]]
+    assert created.mime_type == GOOGLE_DOC_MIME and created.parents == ("root",)
+    assert created.name == "Memoria editable" and setup.drive.contents[created.id] == DOCX
+    assert created.app_properties["litman_operation_id"] == preview["operation_id"]
+    assert setup.docs.batches == [] and setup.drive.resources["memoria-docx"].parents == ("sub",)
+
+
+@pytest.mark.parametrize("source", [{}, {"text": "x", "source_file_id": "memoria-docx"}])
+def test_creation_takes_exactly_one_of_text_or_source(tmp_path: Path, source):
+    setup = Setup(tmp_path)
+    call = lambda: setup.documents.preview_creation("root", "sub", "Notas", **source)  # noqa: E731
+    assert error(call).code == "invalid_request" and setup.plans() == []
+
+
+@pytest.mark.parametrize("name, text", [("", "x"), ("  ", "x"), ("a\nb", "x"), ("Notas", ""),
+                                        ("Notas", "x\x00"), ("Notas", "x" * (PAGE_SIZE + 1))])
+def test_creation_rejects_invalid_names_and_text(tmp_path: Path, name, text):
+    setup = Setup(tmp_path)
+    assert error(lambda: create(setup, name, text=text)).code == "invalid_request" and setup.plans() == []
+
+
+@pytest.mark.parametrize("parent", ["offer-doc", "elsewhere", "litman", "litman-sub", "other-root"])
+def test_creation_parent_must_be_a_dossier_folder_outside_litman(tmp_path: Path, parent):
+    setup = Setup(tmp_path)
+    setup.drive.forbidden.discard("other-root")
+    assert error(lambda: create(setup, parent=parent)).code == "invalid_parent" and setup.plans() == []
+
+
+@pytest.mark.parametrize("source, code", [("source", "unsupported_document"), ("sub-doc", "unsupported_document"),
+                                          ("loose-docx", "document_outside_tree"),
+                                          ("litman-docx", "document_outside_tree")])
+def test_creation_source_must_be_a_docx_of_the_dossier(tmp_path: Path, source, code):
+    setup = Setup(tmp_path)
+    assert error(lambda: create(setup, source_file_id=source)).code == code
+    assert setup.plans() == [] and setup.drive.created == []
+
+
+def test_name_already_used_in_the_parent_is_refused_at_preview_and_at_apply(tmp_path: Path):
+    setup = Setup(tmp_path)
+    taken = error(lambda: create(setup, "Memoria"))
+    assert taken.code == "name_exists" and taken.details["file_ids"] == ["sub-doc"] and setup.plans() == []
+    preview = create(setup)
+    setup.drive.add(Resource("rival", "Notas", GOOGLE_DOC_MIME, "1", drive_id="shared", parents=("sub",)))
+    result = setup.documents.apply_creation(preview["plan_id"])
+    assert result["status"] == "conflict" and result["conflict"]["code"] == "name_exists"
+    assert result["writes"] is False and setup.drive.created == []
+
+
+def test_interruption_right_after_creation_leaves_one_document_with_the_text_once(tmp_path: Path):
+    setup = Setup(tmp_path)
+    preview = create(setup)
+    setup.drive.crash_on_create = {1}
+    assert error(lambda: setup.documents.apply_creation(preview["plan_id"])).code == "operation_interrupted"
+    result = setup.documents.apply_creation(preview["plan_id"])
+    assert result["status"] == "succeeded" and setup.drive.created == [result["document_id"]]
+    assert setup.docs.plain_text(result["document_id"]) == "Notas\nsegunda línea 😀\n"
+    assert len(setup.docs.batches) == 1
+
+
+def test_lost_answer_of_the_initial_text_is_completed_without_writing_it_twice(tmp_path: Path):
+    setup = Setup(tmp_path)
+    preview = create(setup)
+    setup.docs.lose_answer = {"new-1"}
+    assert error(lambda: setup.documents.apply_creation(preview["plan_id"])).code == "operation_interrupted"
+    result = setup.documents.apply_creation(preview["plan_id"])
+    assert result["status"] == "succeeded" and result["document_id"] == "new-1"
+    assert setup.docs.plain_text("new-1") == "Notas\nsegunda línea 😀\n" and len(setup.docs.batches) == 1
+
+
+def test_new_document_edited_before_the_initial_text_is_a_conflict(tmp_path: Path):
+    setup = Setup(tmp_path)
+    preview = create(setup)
+    setup.drive.crash_on_create = {1}
+    error(lambda: setup.documents.apply_creation(preview["plan_id"]))
+    setup.docs.edit_outside("new-1", 1, "Escrito a mano")
+    result = setup.documents.apply_creation(preview["plan_id"])
+    assert result["status"] == "conflict" and result["conflict"]["code"] == "document_changed"
+    assert setup.docs.batches == [] and setup.docs.plain_text("new-1") == "Escrito a mano\n"
+
+
+def test_source_changed_after_preview_is_a_conflict_without_creating(tmp_path: Path):
+    setup = Setup(tmp_path)
+    preview = create(setup, source_file_id="memoria-docx")
+    setup.drive.write_text("memoria-docx", "otro contenido")
+    result = setup.documents.apply_creation(preview["plan_id"])
+    assert result["status"] == "conflict" and result["conflict"]["code"] == "source_changed"
+    assert setup.drive.created == []
+
+
+def test_creation_rechecks_the_parent_at_apply(tmp_path: Path):
+    setup = Setup(tmp_path)
+    preview = create(setup)
+    setup.drive.resources["sub"] = replace(setup.drive.resources["sub"], parents=("elsewhere",))
+    assert error(lambda: setup.documents.apply_creation(preview["plan_id"])).code == "invalid_parent"
+    assert setup.drive.created == []
+
+
+def test_creation_with_the_read_only_adapter_stops_at_the_concurrency_gate(tmp_path: Path):
+    setup = Setup(tmp_path, shared_state=False)
+    result = setup.documents.apply_creation(create(setup)["plan_id"])
+    assert result["status"] == "pending_concurrency_gate" and result["writes"] is False
+    assert setup.drive.created == [] and setup.docs.batches == []
