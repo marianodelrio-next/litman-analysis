@@ -10,6 +10,7 @@ LitMan is published as a single product version, shared by Core and Harness; see
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-10-20
 ### Added
 
 - Local procurement analysis with LitMan Core, usable on its own or through
