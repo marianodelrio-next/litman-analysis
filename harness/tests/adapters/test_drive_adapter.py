@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from litman_harness.adapters.drive import GoogleDriveGateway
-from litman_harness.dossier.models import GOOGLE_DOC_MIME
+from litman_harness.dossier.models import GOOGLE_DOC_MIME, GOOGLE_SHEET_MIME
 from litman_harness.errors import HarnessError
 
 
@@ -34,7 +34,9 @@ class Files:
 
     def update(self, **kwargs):
         self.calls.append(("update", kwargs))
-        return Request({"id": kwargs["fileId"], "parents": [kwargs["addParents"]]})
+        if "addParents" in kwargs:
+            return Request({"id": kwargs["fileId"], "parents": [kwargs["addParents"]]})
+        return Request({"id": kwargs["fileId"], **kwargs["body"]})
 
     def copy(self, **kwargs):
         self.calls.append(("copy", kwargs))
@@ -73,6 +75,35 @@ def test_upload_converted_creates_google_doc_directly_in_destination(tmp_path: P
     body = service.files_api.calls[-1][1]["body"]
     assert body["mimeType"] == GOOGLE_DOC_MIME and body["parents"] == ["offer"]
     assert created.app_properties == {"litman_operation_id": "op", "litman_action_id": "a"}
+
+
+def test_upload_converted_sends_markdown_converted_to_a_google_doc(tmp_path: Path):
+    source = tmp_path / "documento.md"
+    source.write_text("# Título\n\n- uno\n", encoding="utf-8")
+    service = Service()
+    GoogleDriveGateway(service).upload_converted("Notas", "offer", source, "text/markdown", "op", "a")
+    kwargs = service.files_api.calls[-1][1]
+    assert kwargs["body"]["mimeType"] == GOOGLE_DOC_MIME and kwargs["media_body"].mimetype() == "text/markdown"
+
+
+def test_markdown_upload_matches_the_real_drive_v3_discovery_document(tmp_path: Path):
+    source = tmp_path / "documento.md"
+    source.write_text("# Título\n", encoding="utf-8")
+    document = '{"id": "g", "mimeType": "application/vnd.google-apps.document", "parents": ["f"]}'
+    gateway = _real_gateway([({"status": "200"}, document)])
+    created = gateway.upload_converted("Notas", "f", source, "text/markdown", "op", "act")
+    assert created.id == "g" and created.mime_type == GOOGLE_DOC_MIME
+
+
+def test_upload_converted_accepts_a_different_target_mime_type(tmp_path: Path):
+    source = tmp_path / "datos.xlsx"
+    source.write_bytes(b"xlsx")
+    service = Service()
+    created = GoogleDriveGateway(service).upload_converted(
+        "Datos", "folder", source, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "op", "a",
+        target_mime_type=GOOGLE_SHEET_MIME)
+    body = service.files_api.calls[-1][1]["body"]
+    assert body["mimeType"] == GOOGLE_SHEET_MIME and created.mime_type == GOOGLE_SHEET_MIME
 
 
 def test_create_document_creates_an_empty_google_doc_with_markers():
@@ -128,6 +159,18 @@ def test_drive_http_errors_become_stable_harness_errors(status: str, code: str):
     assert raised.value.details == {"http_status": int(status)}
 
 
+@pytest.mark.parametrize("reason, code", [("exportSizeLimitExceeded", "export_too_large"),
+                                          ("userRateLimitExceeded", "drive_rate_limited"),
+                                          ("rateLimitExceeded", "drive_rate_limited"),
+                                          ("otherReason", "insufficient_permission")])
+def test_drive_403_reasons_are_mapped_to_specific_codes(reason: str, code: str):
+    body = json.dumps({"error": {"errors": [{"reason": reason}]}})
+    gateway = _real_gateway([({"status": "403"}, body)])
+    with pytest.raises(HarnessError) as raised:
+        gateway.get("hidden")
+    assert raised.value.code == code
+
+
 def test_inaccessible_parent_does_not_break_membership():
     from litman_harness.dossier.membership import belongs_to_root
     from litman_harness.dossier.models import FOLDER_MIME, Resource
@@ -160,6 +203,45 @@ def test_move_changes_parents_and_copy_carries_markers_into_destination():
     assert kwargs["body"] == {"name": "pliego.pdf", "parents": ["originales"],
                               "appProperties": {"litman_operation_id": "op", "litman_action_id": "act"}}
     assert copied.id == "copy" and copied.has_markers("op", "act")
+
+
+def test_rename_and_trash_send_the_minimal_update_body():
+    service = Service()
+    gateway = GoogleDriveGateway(service)
+    renamed = gateway.rename("pliego", "nuevo-nombre.pdf")
+    name, kwargs = service.files_api.calls[-1]
+    assert name == "update" and kwargs["fileId"] == "pliego" and kwargs["body"] == {"name": "nuevo-nombre.pdf"}
+    assert renamed.id == kwargs["fileId"]
+    trashed = gateway.trash("pliego")
+    name, kwargs = service.files_api.calls[-1]
+    assert name == "update" and kwargs["fileId"] == "pliego" and kwargs["body"] == {"trashed": True}
+    assert trashed.id == kwargs["fileId"]
+
+
+def test_rename_trash_export_and_conversion_upload_match_the_real_drive_v3_discovery_document(tmp_path: Path):
+    from googleapiclient.discovery import build
+    from googleapiclient.http import HttpMockSequence
+    renamed = '{"id": "p", "name": "nuevo.pdf", "mimeType": "application/pdf", "parents": ["o"]}'
+    trashed = '{"id": "p", "trashed": true, "mimeType": "application/pdf", "parents": ["o"]}'
+    converted = '{"id": "s", "mimeType": "application/vnd.google-apps.spreadsheet", "parents": ["o"]}'
+    http = HttpMockSequence([
+        ({"status": "200"}, renamed),
+        ({"status": "200"}, trashed),
+        ({"status": "200", "content-range": "bytes 0-4/5"}, "texto"),
+        ({"status": "200"}, converted),
+    ])
+    service = build("drive", "v3", http=http, static_discovery=True)
+    gateway = GoogleDriveGateway(service)
+    assert gateway.rename("p", "nuevo.pdf").name == "nuevo.pdf"
+    assert gateway.trash("p").trashed is True
+    destination = tmp_path / "doc.pdf"
+    gateway.export("doc", "application/pdf", destination)
+    assert destination.read_bytes() == b"texto"
+    source = tmp_path / "datos.csv"
+    source.write_bytes(b"a,b\n1,2\n")
+    created = gateway.upload_converted("Datos", "o", source, "text/csv", "op", "act",
+                                       target_mime_type="application/vnd.google-apps.spreadsheet")
+    assert created.mime_type == "application/vnd.google-apps.spreadsheet"
 
 
 def test_move_and_copy_match_the_real_drive_v3_discovery_document():

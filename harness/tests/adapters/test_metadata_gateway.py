@@ -15,6 +15,7 @@ def test_metadata_gateway_is_read_only(harness_env, tmp_path):
                  lambda: gateway.create_document("x", "root", "op", "act"), lambda: gateway.download("source", tmp_path / "x"),
                  lambda: gateway.move("source", "folder", ("root",)),
                  lambda: gateway.copy("source", "x", "folder", "op", "act"),
+                 lambda: gateway.rename("source", "x"), lambda: gateway.trash("source"),
                  lambda: gateway.export("source", "text/plain", tmp_path / "x"),
                  lambda: gateway.comments("source")):
         with pytest.raises(HarnessError) as raised:

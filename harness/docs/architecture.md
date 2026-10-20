@@ -167,30 +167,55 @@ breaks, tables of contents, and inline objects contribute nothing.
 
 `preview_document_edit` accepts 1–20 closed operations: `replace_text`
 (`find`, `replace`, exact `occurrences`), `insert_after` (`anchor`, `text`),
-and `append` (`text`, before the body's final newline). Each `find` or
-`anchor` must fall within one paragraph. The preview resolves every span to Docs
+and `append` (`text`, before the body's final newline), plus three style
+operations: `set_paragraph_style` (`anchor`, `style` one of `NORMAL_TEXT`,
+`TITLE`, `SUBTITLE`, `HEADING_1`, `HEADING_2`, `HEADING_3`), `set_text_style`
+(`find`, exact `occurrences`, and at least one of `bold`, `italic`,
+`underline`) and `set_list` (`anchor`, `list` one of `bullets`, `numbered`,
+`none`). A plan holds only text operations or only style operations
+(`mixed_operations`). Each `find` or `anchor` must fall within one paragraph. The preview resolves every span to Docs
 indexes counted in UTF-16 code units, refuses overlapping spans, spans touching
 suggestions, documents with more than one tab, and documents the account cannot
 edit, then simulates the requests in descending index order and stores a
-`document_edit` plan with the request list, the preview's revision, and the
-expected text's SHA-256 and length. The preview shows each matched span with up
+`document_edit` plan with the request list, the preview's revision, the
+expected text's SHA-256 and length, and whether it is style-only. The preview shows each matched span with up
 to 80 characters of context. `apply_document_edit` re-checks membership, MIME
 type, and `canEdit`, then sends exactly one `documents.batchUpdate` of
 `deleteContentRange`/`insertText` requests with
 `writeControl.requiredRevisionId`. A changed document is rejected by Docs and
 recorded as a `conflict` with code `document_changed`. If an earlier attempt
 sent the batch and lost the answer, the resumed apply completes without a
-second batch when the body's hash equals the expected one. Formatting, tables,
-images, comments, suggestions, headers, and footers are out of scope; inserted
-text takes the style of the paragraph where it lands.
+second batch when the body's hash equals the expected one.
+
+Style operations resolve to index-based `updateParagraphStyle` (range of the
+paragraph holding the anchor, `fields: namedStyleType`), `updateTextStyle`
+(range of each match, `fields` limited to the given flags),
+`createParagraphBullets` (`BULLET_DISC_CIRCLE_SQUARE` or
+`NUMBERED_DECIMAL_ALPHA_ROMAN`) and `deleteParagraphBullets` requests. They
+change no index, and the plan's expected text is the current text. The preview
+shows the paragraph of each paragraph or list operation. It refuses two
+operations on the same paragraph property or on overlapping text spans
+(`overlapping_operations`), and `set_list` on a paragraph that starts with a
+tab (`unsupported_document`), because Docs turns leading tabs into nesting
+levels and removes them. Each `set_list` operation starts its own list, so
+consecutive numbered paragraphs each restart at 1. A style-only plan whose
+answer was lost cannot be recognized by the body text, which is unchanged: on
+resume it is resent once with the document's current revision, only if the
+body text still equals the planned text; otherwise it ends as a
+`document_changed` conflict. Styles are absolute, so resending is idempotent.
+Tables, images, comments, suggestions, headers, and footers are out of scope;
+inserted text takes the style of the paragraph where it lands.
 
 `preview_document_creation` plans a new Google Doc named `name` in a dossier
-folder that is not `_LitMan`, from `text` or by converting a dossier DOCX
-(`source_file_id`), never both. A name already used in that folder returns
+folder that is not `_LitMan`, from `text`, from `markdown` (1–100,000 characters), or by converting a dossier
+DOCX (`source_file_id`); exactly one of the three. A name already used in that folder returns
 `name_exists`, and it is checked again at apply. Text documents are created
 empty with markers and then filled with one revision-guarded insert; a DOCX is
 downloaded to a temporary directory and uploaded converted, as publication does
-for the live offer. A resumed creation adopts the marked document and never
+for the live offer. Markdown is written to a temporary `.md` file and uploaded
+with MIME type `text/markdown` converted to a Google Doc in one marked create,
+so Drive turns headings, lists, bold, and italics into Docs formatting and no
+Docs call is needed. A resumed creation adopts the marked document and never
 writes its text twice.
 
 A Docs 403 with reason `accessNotConfigured` or `SERVICE_DISABLED` returns
@@ -242,6 +267,20 @@ because summary provenance depends on it.
 `list_comments` reads Drive comments (`comments.list`, `includeDeleted=false`)
 with `author`, `created_time`, `resolved`, `quoted_text` and `replies`;
 resolved comments are excluded unless `include_resolved` is true.
+
+`dossier/file_changes.py` (`FileChangeService`) organizes dossier resources in
+one closed `file_changes` plan. `preview_file_changes` resolves 1–20
+`create_folder`, `rename`, `move`, `copy`, `trash`, `export`, or `convert`
+operations and returns each source path, destination path, and resulting name.
+It refuses resources outside the tree or in `_LitMan`, the root, manifest and
+context files, and manifest-managed resources for moves and trash. It also
+validates Drive capabilities in one batch and never adds automatic name
+suffixes. `apply_file_changes` rechecks membership, protection, capabilities,
+and names before each action; created folders, copies, exports, and conversions
+carry operation markers for duplicate-free resume. Trash calls Drive
+`files.update` with `trashed: true`, never `files.delete`; exports and
+conversions use temporary files. Conflicts retain earlier completed actions,
+while Drive rate limits remain recoverable by repeating the accepted plan.
 
 `adapters/sheets.py` (`SheetsGateway`) uses the same `drive`-scope credentials
 as Drive and Docs. A 403 with reason `accessNotConfigured` or
@@ -326,6 +365,9 @@ The installed product resources support this flow:
 - `conectar-licitacion` also routes changing a dossier Google Sheet through
   `preview_sheet_edit`/`apply_sheet_edit`, applying only the preview the
   person accepts.
+- `conectar-licitacion` uses the file-change preview/apply pair for folder and
+  file organization, explains permission or protection failures, and never
+  retries them through another route.
 - `ayuda-litman` answers "qué puedes hacer" by explaining every operation in
   business terms with an example phrase; a test keeps it complete against the
   registry.

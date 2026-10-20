@@ -6,6 +6,7 @@ from typing import Any, Protocol
 
 from ..dossier.models import ACTION_MARKER, FOLDER_MIME, GOOGLE_DOC_MIME, OPERATION_MARKER, Resource
 from ..errors import HarnessError
+from .google_errors import reasons
 
 _OPTIONS = {"supportsAllDrives": True}
 # Only the capabilities the harness checks: keeps responses small for chat agents.
@@ -24,13 +25,15 @@ class DriveGateway(Protocol):
     def create_document(self, name: str, parent_id: str, operation_id: str, action_id: str) -> Resource: ...
     def move(self, file_id: str, add_parent: str, remove_parents: tuple[str, ...]) -> Resource: ...
     def copy(self, file_id: str, name: str, parent_id: str, operation_id: str, action_id: str) -> Resource: ...
+    def rename(self, file_id: str, name: str) -> Resource: ...
+    def trash(self, file_id: str) -> Resource: ...
     def download(self, file_id: str, destination: Path) -> None: ...
     def export(self, file_id: str, mime_type: str, destination: Path) -> None: ...
     def comments(self, file_id: str) -> list[dict[str, Any]]: ...
     def upload(self, name: str, parent_id: str, source: Path, mime_type: str, operation_id: str,
                action_id: str) -> Resource: ...
     def upload_converted(self, name: str, parent_id: str, source: Path, source_mime_type: str, operation_id: str,
-                         action_id: str) -> Resource: ...
+                         action_id: str, target_mime_type: str = GOOGLE_DOC_MIME) -> Resource: ...
 
 
 _COMMENT_AUTHOR = "author(displayName,me)"
@@ -44,8 +47,19 @@ _HTTP_ERRORS = {
 }
 
 
-def http_error(status: int) -> HarnessError:
+_RATE_LIMITED_REASONS = {"userRateLimitExceeded", "rateLimitExceeded"}
+
+
+def http_error(status: int, content: Any = None) -> HarnessError:
     """The stable harness error for a failed Drive HTTP status (shared by every Drive adapter)."""
+    if status == 403:
+        found = reasons(content)
+        if "exportSizeLimitExceeded" in found:
+            return HarnessError("export_too_large", "La exportación supera el límite de 10 MB de Drive",
+                                details={"http_status": status})
+        if found & _RATE_LIMITED_REASONS:
+            return HarnessError("drive_rate_limited", "Drive limitó temporalmente las solicitudes; repita la "
+                                "aceptación", details={"http_status": status})
     code, message = _HTTP_ERRORS.get(status, ("drive_error", "Drive rechazó la solicitud"))
     return HarnessError(code, message, details={"http_status": status})
 
@@ -56,7 +70,7 @@ def _execute(request: Any, *, chunk: bool = False) -> Any:
     try:
         return request.next_chunk() if chunk else request.execute()
     except HttpError as exc:
-        raise http_error(int(getattr(exc.resp, "status", 0) or 0)) from exc
+        raise http_error(int(getattr(exc.resp, "status", 0) or 0), exc.content) from exc
 
 
 def _markers(operation_id: str, action_id: str) -> dict[str, str]:
@@ -140,6 +154,15 @@ class GoogleDriveGateway:
         return Resource.from_api(_execute(self.service.files().copy(fileId=file_id, body=body, fields=_FIELDS,
                                                                     **_OPTIONS)))
 
+    def rename(self, file_id: str, name: str) -> Resource:
+        request = self.service.files().update(fileId=file_id, body={"name": name}, fields=_FIELDS, **_OPTIONS)
+        return Resource.from_api(_execute(request))
+
+    def trash(self, file_id: str) -> Resource:
+        """Move a file to the Drive trash; ``files.delete`` is never called."""
+        request = self.service.files().update(fileId=file_id, body={"trashed": True}, fields=_FIELDS, **_OPTIONS)
+        return Resource.from_api(_execute(request))
+
     def download(self, file_id: str, destination: Path) -> None:
         from googleapiclient.http import MediaIoBaseDownload
         destination.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
@@ -183,9 +206,9 @@ class GoogleDriveGateway:
                                    "appProperties": _markers(operation_id, action_id)}, source, mime_type)
 
     def upload_converted(self, name: str, parent_id: str, source: Path, source_mime_type: str, operation_id: str,
-                         action_id: str) -> Resource:
-        """Upload a DOCX converting it to a native Google Doc directly in its destination."""
-        return self._create_media({"name": name, "parents": [parent_id], "mimeType": GOOGLE_DOC_MIME,
+                         action_id: str, target_mime_type: str = GOOGLE_DOC_MIME) -> Resource:
+        """Upload a file converting it to ``target_mime_type`` (a Google Doc by default) in its destination."""
+        return self._create_media({"name": name, "parents": [parent_id], "mimeType": target_mime_type,
                                    "appProperties": _markers(operation_id, action_id)}, source, source_mime_type)
 
     def _create_media(self, body: dict[str, Any], source: Path, mime_type: str) -> Resource:

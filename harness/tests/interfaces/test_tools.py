@@ -12,7 +12,7 @@ OPERATIONS = {"identity", "diagnose", "inspect", "status", "preview_incorporatio
               "read_document", "preview_summary", "apply_summary", "recover", "setup", "read_google_doc",
               "preview_document_edit", "apply_document_edit", "preview_document_creation", "apply_document_creation",
               "list_folder", "search_in_dossier", "get_file_info", "read_file", "list_comments",
-              "preview_sheet_edit", "apply_sheet_edit"}
+              "preview_sheet_edit", "apply_sheet_edit", "preview_file_changes", "apply_file_changes"}
 
 
 def test_registry_exposes_operations_with_schema_and_kind():
@@ -32,7 +32,8 @@ def test_registry_exposes_operations_with_schema_and_kind():
                                                                               "apply_summary", "setup",
                                                                               "apply_document_edit",
                                                                               "apply_document_creation",
-                                                                              "apply_sheet_edit"}
+                                                                              "apply_sheet_edit",
+                                                                              "apply_file_changes"}
 
 
 DESTRUCTIVE = {"apply_document_edit", "apply_file_changes", "apply_sheet_edit", "apply_summary",
@@ -75,11 +76,17 @@ def test_document_tools_declare_closed_operations_and_reject_bad_arguments_befor
 
     operations = registry()["preview_document_edit"].input_schema["properties"]["operations"]
     assert operations["maxItems"] == 20 and operations["items"]["additionalProperties"] is False
-    assert operations["items"]["properties"]["op"]["enum"] == ["replace_text", "insert_after", "append"]
+    assert operations["items"]["properties"]["op"]["enum"] == [
+        "replace_text", "insert_after", "append", "set_paragraph_style", "set_text_style", "set_list"]
+    assert {"style", "list", "bold", "italic", "underline"} <= set(operations["items"]["properties"])
+    description = registry()["preview_document_edit"].description
+    assert all(name in description for name in ("set_paragraph_style", "set_text_style", "set_list", "mixed_operations"))
+    assert "sin formato" not in description and "markdown" in registry()["preview_document_creation"].description
     assert registry()["read_google_doc"].input_schema["required"] == ["folder_id", "document_id"]
     creation = registry()["preview_document_creation"].input_schema
     assert creation["required"] == ["folder_id", "parent_folder_id", "name"]
-    assert {"text", "source_file_id"} <= set(creation["properties"])
+    assert {"text", "markdown", "source_file_id"} <= set(creation["properties"])
+    assert creation["properties"]["markdown"]["maxLength"] == 100_000
     for name, args in (("read_google_doc", {"folder_id": "root", "document_id": 1}),
                        ("preview_document_edit", {"folder_id": "root", "document_id": "d", "operations": {}}),
                        ("preview_document_edit", {"folder_id": "root", "document_id": "d", "operations": ["x"]}),
@@ -87,6 +94,8 @@ def test_document_tools_declare_closed_operations_and_reject_bad_arguments_befor
                        ("preview_document_creation", {"folder_id": "root", "parent_folder_id": "root"}),
                        ("preview_document_creation", {"folder_id": "root", "parent_folder_id": "root", "name": "n",
                                                       "text": 1}),
+                       ("preview_document_creation", {"folder_id": "root", "parent_folder_id": "root", "name": "n",
+                                                      "markdown": 1}),
                        ("apply_document_creation", {})):
         assert invoke(name, args, factory)["error"]["code"] == "invalid_request"
 

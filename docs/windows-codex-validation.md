@@ -344,6 +344,22 @@ Docs API, the exact error payloads, and whether `revisionId` is returned.
 - **Create from DOCX.** Ask the app to create a Google Doc from a DOCX of the
   tender. Expected output: a converted Google Doc in the chosen folder, the
   DOCX unchanged.
+- **Format.** Ask the app to make the first line of the proposal a title, put
+  one word in bold and italics, and turn two consecutive paragraphs into a
+  bulleted list. Expected output: a `preview_document_edit` result with each
+  paragraph or span and its context. After you accept, `apply_document_edit`
+  returns `succeeded`; open the document in Google Docs and confirm the three
+  formats and that no text changed. Then ask for a text change and a format
+  change together: the assistant must prepare two separate previews
+  (`mixed_operations` otherwise). **Observe and record** whether numbered
+  paragraphs restart at 1 for each operation.
+- **Create from Markdown.** Ask the app to create a Google Doc named
+  `Prueba Markdown` in `Oferta` from a short Markdown text with a heading, a
+  bulleted list, one bold word, and an accent. Expected output: a preview,
+  then after you accept a Google Doc whose heading, list, and bold are real
+  Docs formatting, with no Markdown symbols left. **Observe and record**
+  whether Drive accepted the `text/markdown` upload; if it rejects it, the
+  design needs a fallback decision.
 
 ## 9. LitMan-only guidance, help, and tool approval
 
@@ -401,6 +417,15 @@ guided installation command again to get `ayuda-litman`.
   Google Doc, then ask *"qué comentarios hay en la memoria técnica"*. Expected
   output: `list_comments` shows only the open comment with its reply and its
   quoted text; asking for the resolved ones too shows both.
+- **File changes.** In a disposable test subfolder, ask to create a folder,
+  rename a non-registered file, move or copy it, then export a Google-native
+  file or convert an XLSX/CSV to a Google Sheet. Before acceptance, confirm
+  that `preview_file_changes` shows every source, destination and resulting
+  name; after accepting, confirm `apply_file_changes` makes only those changes.
+  Ask to trash a disposable file and confirm it reaches Drive's trash, then
+  try an original or `_LitMan` resource and confirm it is refused. **Observe
+  and record** the approval prompt and any permission or export-size error;
+  the assistant must not use computer use, a browser, or another Drive route.
 - **Approval prompts.** During section 8, and again here with a
   `preview_document_edit` followed by `apply_document_edit` and a
   `preview_sheet_edit` followed by `apply_sheet_edit`, **observe and

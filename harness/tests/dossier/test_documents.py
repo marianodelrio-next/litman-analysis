@@ -321,6 +321,178 @@ def test_an_edit_plan_cannot_be_applied_as_another_kind(tmp_path: Path):
     assert setup.docs.batches == []
 
 
+# -- style operations ------------------------------------------------------------------------------
+
+STYLES = [
+    {"op": "set_paragraph_style", "anchor": "Memoria técnica", "style": "HEADING_1"},
+    {"op": "set_text_style", "find": "Plazo", "occurrences": 2, "bold": True},
+    {"op": "set_list", "anchor": "Grúas", "list": "bullets"}]
+
+
+def test_style_preview_stores_index_based_requests_and_the_unchanged_text_hash(tmp_path: Path):
+    setup = Setup(tmp_path)
+    preview = setup.preview([
+        {"op": "set_paragraph_style", "anchor": "mantenimiento", "style": "TITLE"},
+        {"op": "set_text_style", "find": "Plazo", "occurrences": 2, "bold": True, "italic": False},
+        {"op": "set_list", "anchor": "Fin", "list": "numbered"}])
+    assert preview["kind"] == "document_edit" and setup.docs.batches == [] and len(setup.plans()) == 1
+    paragraph_op, text_op, list_op = preview["operations"]
+    assert paragraph_op["matches"][0]["text"] == "mantenimiento"
+    assert paragraph_op["paragraph"] == "El licitador ofrece mantenimiento portuario."
+    assert [match["offset"] for match in text_op["matches"]] == [61, 78]
+    assert list_op["paragraph"] == "Fin"
+    action = setup.store.load("person-1", preview["plan_id"]).actions[0]
+    assert action.expected_version == "rev-1" and action.metadata["style_only"] is True
+    assert action.metadata["expected_sha256"] == text_sha256(setup.text())
+    assert action.metadata["expected_length"] == len(setup.text())
+    by_name = {name: body for request in action.metadata["requests"] for name, body in request.items()}
+    assert by_name["updateParagraphStyle"] == {"range": {"startIndex": 17, "endIndex": 62},
+                                               "paragraphStyle": {"namedStyleType": "TITLE"},
+                                               "fields": "namedStyleType"}
+    assert by_name["createParagraphBullets"]["bulletPreset"] == "NUMBERED_DECIMAL_ALPHA_ROMAN"
+    text_requests = [r["updateTextStyle"] for r in action.metadata["requests"] if "updateTextStyle" in r]
+    assert len(text_requests) == 2 and all(r["fields"] == "bold,italic" for r in text_requests)
+    assert all(r["textStyle"] == {"bold": True, "italic": False} for r in text_requests)
+
+
+def test_apply_formats_paragraphs_text_and_lists_with_one_guarded_batch_and_no_text_change(tmp_path: Path):
+    setup = Setup(tmp_path)
+    before = setup.text()
+    preview = setup.preview([*STYLES, {"op": "set_list", "anchor": "Fin", "list": "none"},
+                             {"op": "set_text_style", "find": "ofrece", "occurrences": 1, "underline": True}])
+    result = setup.documents.apply_edit(preview["plan_id"])
+    assert result["status"] == "succeeded" and result["writes"] is True and result["revision_id"] == "rev-2"
+    [(document_id, requests, revision)] = setup.docs.batches
+    assert document_id == "offer-doc" and revision == preview["revision_id"] == "rev-1"
+    assert {name for request in requests for name in request} == {
+        "updateParagraphStyle", "updateTextStyle", "createParagraphBullets", "deleteParagraphBullets"}
+    assert setup.text() == before
+    assert setup.docs.paragraph_style("offer-doc", "Memoria técnica") == ("HEADING_1", "none")
+    assert setup.docs.paragraph_style("offer-doc", "Grúas") == ("NORMAL_TEXT", "bullets")
+    assert setup.docs.paragraph_style("offer-doc", "Fin") == ("NORMAL_TEXT", "none")
+    assert setup.docs.paragraph_style("offer-doc", "El licitador ofrece mantenimiento portuario.") == (
+        "NORMAL_TEXT", "none")
+    assert setup.docs.text_style("offer-doc", "ofrece") == {"underline": True}
+    assert setup.docs.text_style("offer-doc", "licitador") == {}
+    assert [setup.docs.text_style("offer-doc", "Plazo", nth) for nth in (0, 1)] == [{"bold": True}] * 2
+    assert setup.docs.text_style("offer-doc", "ampliable") == {}
+
+
+def test_text_style_only_touches_the_given_flags(tmp_path: Path):
+    setup = Setup(tmp_path)
+    first = setup.preview([{"op": "set_text_style", "find": "Fin", "occurrences": 1, "bold": True, "italic": True}])
+    setup.documents.apply_edit(first["plan_id"])
+    second = setup.preview([{"op": "set_text_style", "find": "Fin", "occurrences": 1, "italic": False}])
+    setup.documents.apply_edit(second["plan_id"])
+    assert setup.docs.batches[1][1][0]["updateTextStyle"]["fields"] == "italic"
+    assert setup.docs.text_style("offer-doc", "Fin") == {"bold": True, "italic": False}
+
+
+@pytest.mark.parametrize("operations, code", [
+    ([{"op": "set_paragraph_style", "anchor": "Fin", "style": "HEADING_4"}], "invalid_request"),
+    ([{"op": "set_paragraph_style", "anchor": "Fin", "style": "heading_1"}], "invalid_request"),
+    ([{"op": "set_paragraph_style", "anchor": "Fin"}], "invalid_request"),
+    ([{"op": "set_paragraph_style", "anchor": "a\nb", "style": "TITLE"}], "invalid_request"),
+    ([{"op": "set_text_style", "find": "Fin", "occurrences": 1}], "invalid_request"),
+    ([{"op": "set_text_style", "find": "Fin", "occurrences": 1, "bold": "yes"}], "invalid_request"),
+    ([{"op": "set_text_style", "find": "Fin", "occurrences": 1, "bold": 1}], "invalid_request"),
+    ([{"op": "set_text_style", "find": "Fin", "occurrences": 1, "color": True}], "invalid_request"),
+    ([{"op": "set_text_style", "find": "Fin", "bold": True}], "invalid_request"),
+    ([{"op": "set_list", "anchor": "Fin", "list": "roman"}], "invalid_request"),
+    ([{"op": "set_list", "anchor": "Fin", "list": "bullets", "text": "x"}], "invalid_request"),
+    ([{"op": "set_text_style", "find": "Plazo", "occurrences": 1, "bold": True}], "occurrences_mismatch"),
+    ([{"op": "set_text_style", "find": "inexistente", "occurrences": 1, "bold": True}], "occurrences_mismatch"),
+    ([{"op": "set_paragraph_style", "anchor": "Plazo", "style": "TITLE"}], "anchor_not_unique"),
+    ([{"op": "set_list", "anchor": "inexistente", "list": "bullets"}], "anchor_not_unique"),
+    ([{"op": "set_paragraph_style", "anchor": "Fin", "style": "TITLE"},
+      {"op": "set_paragraph_style", "anchor": "Fin", "style": "SUBTITLE"}], "overlapping_operations"),
+    ([{"op": "set_list", "anchor": "Memoria", "list": "bullets"},
+      {"op": "set_list", "anchor": "técnica", "list": "none"}], "overlapping_operations"),
+    ([{"op": "set_text_style", "find": "Plazo", "occurrences": 2, "bold": True},
+      {"op": "set_text_style", "find": "Plazo:", "occurrences": 1, "italic": True}], "overlapping_operations"),
+    ([{"op": "set_paragraph_style", "anchor": "Fin", "style": "TITLE"},
+      {"op": "append", "text": "x"}], "mixed_operations"),
+    ([{"op": "replace_text", "find": "Fin", "replace": "x", "occurrences": 1},
+      {"op": "set_text_style", "find": "Grúas", "occurrences": 1, "bold": True}], "mixed_operations"),
+])
+def test_invalid_style_previews_store_no_plan(tmp_path: Path, operations, code):
+    setup = Setup(tmp_path)
+    assert error(lambda: setup.preview(operations)).code == code
+    assert setup.plans() == [] and setup.docs.batches == []
+
+
+def test_style_operations_on_different_properties_of_one_paragraph_are_allowed(tmp_path: Path):
+    setup = Setup(tmp_path)
+    preview = setup.preview([{"op": "set_paragraph_style", "anchor": "Fin", "style": "HEADING_2"},
+                             {"op": "set_list", "anchor": "Fin", "list": "bullets"},
+                             {"op": "set_text_style", "find": "Fin", "occurrences": 1, "bold": True}])
+    setup.documents.apply_edit(preview["plan_id"])
+    assert setup.docs.paragraph_style("offer-doc", "Fin") == ("HEADING_2", "bullets")
+
+
+@pytest.mark.parametrize("kind", ["bullets", "numbered", "none"])
+def test_set_list_refuses_a_paragraph_that_starts_with_a_tab(tmp_path: Path, kind):
+    setup = Setup(tmp_path)
+    setup.docs.add("offer-doc", ["\tsangrado", "normal"])
+    assert error(lambda: setup.preview([{"op": "set_list", "anchor": "sangrado", "list": kind}])
+                 ).code == "unsupported_document"
+    assert setup.plans() == []
+    assert setup.preview([{"op": "set_list", "anchor": "normal", "list": kind}])
+    assert setup.preview([{"op": "set_paragraph_style", "anchor": "sangrado", "style": "TITLE"}])
+
+
+def test_style_spans_touching_pending_suggestions_are_refused(tmp_path: Path):
+    setup = Setup(tmp_path)
+    setup.docs.add("offer-doc", [["Señor ", ("borrador ", "insert"), "José"]])
+    assert error(lambda: setup.preview([{"op": "set_text_style", "find": "José", "occurrences": 1, "bold": True}])
+                 ).code == "pending_suggestions"
+
+
+def test_style_paragraphs_inside_a_table_cell_are_styled(tmp_path: Path):
+    setup = Setup(tmp_path)
+    preview = setup.preview([{"op": "set_paragraph_style", "anchor": "Grúas", "style": "SUBTITLE"}])
+    setup.documents.apply_edit(preview["plan_id"])
+    assert setup.docs.paragraph_style("offer-doc", "Grúas") == ("SUBTITLE", "none")
+    assert setup.docs.paragraph_style("offer-doc", "Lote 1") == ("NORMAL_TEXT", "none")
+
+
+def test_style_apply_rechecks_membership_and_a_changed_document_is_a_conflict(tmp_path: Path):
+    setup = Setup(tmp_path)
+    preview = setup.preview(STYLES)
+    setup.docs.edit_outside("offer-doc", 1, "Nuevo ")
+    result = setup.documents.apply_edit(preview["plan_id"])
+    assert result["status"] == "conflict" and result["conflict"]["code"] == "document_changed"
+    assert result["writes"] is False and setup.text().startswith("Nuevo Memoria")
+
+
+def test_style_plan_whose_answer_was_lost_is_resent_with_the_current_revision(tmp_path: Path):
+    setup = Setup(tmp_path)
+    preview = setup.preview([{"op": "set_paragraph_style", "anchor": "Fin", "style": "HEADING_3"},
+                             {"op": "set_text_style", "find": "Fin", "occurrences": 1, "bold": True}])
+    setup.docs.lose_answer.add("offer-doc")
+    assert error(lambda: setup.documents.apply_edit(preview["plan_id"])).code == "operation_interrupted"
+    assert setup.docs.documents["offer-doc"]["revision"] == "rev-2"
+    result = setup.documents.apply_edit(preview["plan_id"])
+    assert result["status"] == "succeeded" and result["revision_id"] == "rev-3"
+    assert [batch[2] for batch in setup.docs.batches] == ["rev-1", "rev-2"]
+    assert setup.docs.batches[0][1] == setup.docs.batches[1][1]
+    assert setup.docs.paragraph_style("offer-doc", "Fin") == ("HEADING_3", "none")
+    assert setup.docs.text_style("offer-doc", "Fin") == {"bold": True}
+    replayed = setup.documents.apply_edit(preview["plan_id"])
+    assert replayed["replayed"] is True and len(setup.docs.batches) == 2
+
+
+def test_style_plan_whose_answer_was_lost_and_whose_text_then_changed_is_a_conflict(tmp_path: Path):
+    setup = Setup(tmp_path)
+    preview = setup.preview([{"op": "set_text_style", "find": "Fin", "occurrences": 1, "bold": True}])
+    setup.docs.lose_answer.add("offer-doc")
+    assert error(lambda: setup.documents.apply_edit(preview["plan_id"])).code == "operation_interrupted"
+    setup.docs.edit_outside("offer-doc", 1, "Nuevo ")
+    result = setup.documents.apply_edit(preview["plan_id"])
+    assert result["status"] == "conflict" and result["conflict"]["code"] == "document_changed"
+    assert len(setup.docs.batches) == 1
+
+
 # -- document creation -----------------------------------------------------------------------------
 
 def create(setup: Setup, name: str = "Notas", parent: str = "sub", **source) -> dict:
@@ -360,8 +532,45 @@ def test_creation_converts_a_docx_of_the_dossier_into_a_google_doc(tmp_path: Pat
     assert setup.docs.batches == [] and setup.drive.resources["memoria-docx"].parents == ("sub",)
 
 
-@pytest.mark.parametrize("source", [{}, {"text": "x", "source_file_id": "memoria-docx"}])
-def test_creation_takes_exactly_one_of_text_or_source(tmp_path: Path, source):
+MARKDOWN = "# Título\n\nUn párrafo con **negrita** y 😀.\n\n- uno\n- dos\n"
+
+
+def test_creation_from_markdown_uploads_it_converted_to_a_marked_google_doc(tmp_path: Path):
+    setup = Setup(tmp_path)
+    preview = create(setup, markdown=MARKDOWN)
+    assert preview["kind"] == "document_creation" and preview["characters"] == len(MARKDOWN)
+    assert preview["source"] is None and setup.drive.created == [] and len(setup.plans()) == 1
+    result = setup.documents.apply_creation(preview["plan_id"])
+    assert result["status"] == "succeeded" and result["writes"] is True
+    created = setup.drive.resources[result["document_id"]]
+    assert created.name == "Notas" and created.mime_type == GOOGLE_DOC_MIME and created.parents == ("sub",)
+    assert created.app_properties["litman_operation_id"] == preview["operation_id"]
+    assert setup.drive.converted == [("Notas", "text/markdown", MARKDOWN.encode("utf-8"))]
+    assert setup.docs.batches == [] and result["web_view_link"] == created.web_view_link
+    replay = setup.documents.apply_creation(preview["plan_id"])
+    assert replay["replayed"] is True and len(setup.drive.created) == 1 and len(setup.drive.converted) == 1
+
+
+def test_interrupted_markdown_creation_leaves_one_document(tmp_path: Path):
+    setup = Setup(tmp_path)
+    preview = create(setup, markdown=MARKDOWN)
+    setup.drive.crash_on_create = {1}
+    assert error(lambda: setup.documents.apply_creation(preview["plan_id"])).code == "operation_interrupted"
+    result = setup.documents.apply_creation(preview["plan_id"])
+    assert result["status"] == "succeeded" and setup.drive.created == [result["document_id"]]
+
+
+@pytest.mark.parametrize("markdown", ["", "x" * 100_001, "a\x00b"])
+def test_creation_rejects_invalid_markdown(tmp_path: Path, markdown):
+    setup = Setup(tmp_path)
+    assert error(lambda: create(setup, markdown=markdown)).code == "invalid_request" and setup.plans() == []
+    assert create(setup, name="Largo", markdown="x" * 100_000)
+
+
+@pytest.mark.parametrize("source", [{}, {"text": "x", "source_file_id": "memoria-docx"},
+                                    {"text": "x", "markdown": "# x"},
+                                    {"markdown": "# x", "source_file_id": "memoria-docx"}])
+def test_creation_takes_exactly_one_of_text_markdown_or_source(tmp_path: Path, source):
     setup = Setup(tmp_path)
     call = lambda: setup.documents.preview_creation("root", "sub", "Notas", **source)  # noqa: E731
     assert error(call).code == "invalid_request" and setup.plans() == []

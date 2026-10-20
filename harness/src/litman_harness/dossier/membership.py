@@ -8,9 +8,13 @@ from .models import Resource
 from .tree import LITMAN_FOLDER
 
 
-def belongs_to_root(drive: Any, root: Resource, item: Resource) -> bool:
-    """Prove containment via declared parent IDs only; never search outside the dossier."""
-    if item.trashed or item.drive_id != root.drive_id:
+def belongs_to_root(drive: Any, root: Resource, item: Resource, *, ignore_own_trashed: bool = False) -> bool:
+    """Prove containment via declared parent IDs only; never search outside the dossier.
+
+    ``ignore_own_trashed`` skips the item's own ``trashed`` flag (but not an
+    ancestor's): a trash action sets it on the item itself as its very effect.
+    """
+    if (item.trashed and not ignore_own_trashed) or item.drive_id != root.drive_id:
         return False
     pending = list(item.parents)
     seen: set[str] = set()
