@@ -76,6 +76,9 @@ def test_document_tools_declare_closed_operations_and_reject_bad_arguments_befor
     assert operations["items"]["properties"]["op"]["enum"] == [
         "replace_text", "insert_after", "append", "set_paragraph_style", "set_text_style", "set_list"]
     assert {"style", "list", "bold", "italic", "underline"} <= set(operations["items"]["properties"])
+    description = registry()["preview_document_edit"].description
+    assert all(name in description for name in ("set_paragraph_style", "set_text_style", "set_list", "mixed_operations"))
+    assert "sin formato" not in description and "markdown" in registry()["preview_document_creation"].description
     assert registry()["read_google_doc"].input_schema["required"] == ["folder_id", "document_id"]
     creation = registry()["preview_document_creation"].input_schema
     assert creation["required"] == ["folder_id", "parent_folder_id", "name"]

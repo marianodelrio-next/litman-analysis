@@ -43,9 +43,12 @@ TOOLS = (
                                                          args.get("offset", 0))),
     Tool("preview_document_edit",
          "Consulta (no escribe en Drive): resuelve sobre el texto actual de un Google Doc de la licitación hasta "
-         f"{MAX_OPERATIONS} operaciones cerradas (replace_text, insert_after, append) y guarda localmente un plan con "
-         "revision_id y cada texto afectado con su contexto, que la persona debe aceptar. Sólo texto del cuerpo: sin "
-         "formato, tablas, imágenes, comentarios ni sugerencias.",
+         f"{MAX_OPERATIONS} operaciones cerradas y guarda localmente un plan con revision_id y cada texto o párrafo "
+         "afectado con su contexto, que la persona debe aceptar. Operaciones de texto: replace_text, insert_after, "
+         "append. Operaciones de formato: set_paragraph_style (título, subtítulo, encabezados 1-3 o texto normal), "
+         "set_text_style (negrita, cursiva, subrayado) y set_list (viñetas, numerada o ninguna); un plan lleva sólo "
+         "operaciones de texto o sólo de formato (mixed_operations). Sólo el cuerpo: sin tablas, imágenes, "
+         "comentarios ni sugerencias.",
          schema({"folder_id": _FOLDER_ID, "document_id": _DOCUMENT_ID,
                  "operations": {"type": "array", "minItems": 1, "maxItems": MAX_OPERATIONS, "items": _OPERATION}},
                 ("folder_id", "document_id", "operations")),
