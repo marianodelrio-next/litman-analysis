@@ -365,6 +365,15 @@ outputs. Suggested folders remain suggestions until the person confirms them.
 `propose_summary` or `refresh_summary`, `decide_detailed_analysis`, then no
 recommendation. Each recommendation identifies its reason, tool, and arguments.
 
+The guided installers use only published stable `vX.Y.Z` tags and stop when no
+tag exists; they never install a branch. The installed `preparar-equipo` skill
+diagnoses and repairs setup. The separate `actualizar-equipo` skill checks the
+newest tagged version, summarizes its changelog, and guides updates: it runs
+the generated command on Linux and asks the person to run it in PowerShell
+after closing the app on Windows. Both paths end by restarting the app.
+Installations predating the update check need one manual reinstall to install
+this skill and record the source checkout.
+
 The installed product resources support this flow:
 
 - `conectar-licitacion` guides connection and asks once whether to prepare a
@@ -389,8 +398,8 @@ The installed product resources support this flow:
 - `resumir-licitacion` defines what to read, the fixed keys, sources, and
   proposal format.
 - `preparar-equipo` guides diagnostics, OAuth, the Google Docs API check,
-  provider session, setup, repair, update, and uninstall without independently running Git, uv, a
-  provider CLI, or a browser.
+  provider session, setup, repair, and uninstall without independently running
+  Git, uv, a provider CLI, or a browser.
 - `lector-licitacion` is read-only. Claude uses Haiku with only the `status`
   and `read_document` MCP tools; Codex uses `gpt-5.6-luna`, low reasoning, and
   a read-only sandbox with the same two operations.

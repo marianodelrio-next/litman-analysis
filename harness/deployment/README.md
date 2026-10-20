@@ -8,14 +8,15 @@ for LitMan Harness. For contributor setup, use the
 
 This route is for someone who already has Git and either Codex App or Claude
 Desktop. Paste one command into a terminal. The installer is idempotent, so the
-same command also updates an existing installation.
+same command also reinstalls an existing installation from the latest
+published version.
 
 | Component | Windows | Ubuntu |
 | --- | --- | --- |
 | LitMan folder opened in the app | `%USERPROFILE%\LitMan` | `~/LitMan` |
 | Hidden repository checkout, never opened in the app | `%LOCALAPPDATA%\LitMan\src` | `~/.local/share/litman/src` |
 | `litman`, `litman-mcp`, and `litman-core` | uv tool with uv-managed Python 3.11 | same |
-| Product skills (`conectar-licitacion`, `resumir-licitacion`, `preparar-equipo`, `ayuda-litman`) | Codex: `~/.agents/skills`; Claude: `~/.claude/skills` | same |
+| Product skills (`conectar-licitacion`, `resumir-licitacion`, `preparar-equipo`, `actualizar-equipo`, `ayuda-litman`) | Codex: `~/.agents/skills`; Claude: `~/.claude/skills` | same |
 | `lector-licitacion` reader agent | `~/.codex/agents/*.toml`; `~/.claude/agents/*.md` | same |
 | `litman` MCP registration | delimited block in `~/.codex/config.toml`; `~/.claude.json` with user scope | same |
 | OAuth client/token, settings, state, install manifest | `%LOCALAPPDATA%\litman-harness` | `~/.config` and `~/.local/state/litman-harness` |
@@ -41,7 +42,10 @@ exists, they stop without installing. Run `litman check-update` to check for a
 new version; the `actualizar-equipo` skill summarizes the changes and guides
 the update. Close and reopen the app after updating. Installations created
 before tagged updates were introduced need this install command once to save
-the repository location.
+the repository location and install the `actualizar-equipo` skill. Afterwards,
+ask the app to **“actualiza mi equipo”**. On Linux the skill runs the update;
+on Windows it asks you to close the app, run the displayed command in
+PowerShell, and reopen the app. Restart the app after every update.
 
 The script clones or updates the repository, installs the tools with
 `uv tool install --python 3.11 harness --with core`, then runs
@@ -85,9 +89,12 @@ setup with `litman install --oauth-client`, `litman login`, provider sign-in,
 
 ### Update, repair, or uninstall
 
-- Update by running the same guided installation command, then restart the app.
-  Existing installations need this update to get new product skills such as
-  `ayuda-litman`.
+- Update by asking **“actualiza mi equipo”** in the app. The skill checks the
+  newest published version, summarizes its changes, and guides the platform's
+  update steps. Close and reopen the app after the update.
+- Installations created before tagged updates were introduced need the guided
+  installation command once to save the source checkout and install the new
+  skill. Future updates use **“actualiza mi equipo”**.
 - Repair by writing **“prepara mi equipo”** in the app. The skill runs
   diagnostics and addresses only missing setup.
 - Uninstall with the script for the current platform:

@@ -52,6 +52,28 @@ def test_prepare_team_skill_references_real_operations_and_installation_commands
     assert "litman install --oauth-client" in prepare_skill
     assert "--delete-original" in prepare_skill
     assert "conectar-licitacion" in prepare_skill
+    assert "Actualizar" not in prepare_skill
+    assert "actualiz" not in prepare_skill.lower()
+
+
+def test_update_team_skill_guides_platform_specific_updates():
+    path = AGENT / "skills" / "actualizar-equipo" / "SKILL.md"
+    meta = _frontmatter(path)
+    skill = path.read_text(encoding="utf-8")
+    assert meta["name"] == "actualizar-equipo"
+    assert all(phrase in meta["description"] for phrase in
+               ("actualiza mi equipo", "actualiza LitMan", "hay una versión nueva"))
+    assert "litman check-update" in skill and "command" in skill
+    assert "update_source_missing" in skill and "update_check_failed" in skill
+    assert "Linux" in skill and "Windows" in skill
+    assert skill.rstrip().endswith("Cierra y vuelve a abrir la aplicación.")
+
+
+def test_help_and_workspace_template_route_team_updates_to_update_skill():
+    help_skill = (AGENT / "skills" / "ayuda-litman" / "SKILL.md").read_text(encoding="utf-8")
+    workspace = (AGENT / "workspace" / "AGENTS.md").read_text(encoding="utf-8")
+    assert "actualiza mi equipo" in help_skill
+    assert "actualiza mi equipo" in workspace
 
 
 def test_workspace_template_mentions_the_litman_binary_placeholder():
