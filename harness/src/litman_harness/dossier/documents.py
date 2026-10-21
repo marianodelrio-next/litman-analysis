@@ -637,7 +637,7 @@ def planned_edits(document: DocumentText,
     """Index-based edits, per operation the matched spans with context, and the checks of each style.
 
     Refuses ambiguous plans.  A check states, by visible offset, a style property's value before the plan
-    and the value the plan sets; ``set_list`` has no check, because its list kind is not read back.
+    and the value the plan sets; a ``set_list`` check is ``unverifiable``, because its list kind is not read back.
     """
     edits: list[_Edit] = []
     previews: list[dict[str, Any]] = []
