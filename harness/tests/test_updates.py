@@ -11,6 +11,7 @@ from litman_harness.errors import HarnessError
 
 
 def test_check_update_returns_newer_tag_changes_and_posix_command(tmp_path, monkeypatch):
+    monkeypatch.setattr(updates, "__version__", "0.1.0")
     source = tmp_path / "src O'Brien"
     source.mkdir()
     manifest = tmp_path / "state" / "install-manifest.json"
@@ -40,6 +41,7 @@ def test_check_update_returns_newer_tag_changes_and_posix_command(tmp_path, monk
 
 
 def test_check_update_powershell_quotes_custom_path(tmp_path, monkeypatch):
+    monkeypatch.setattr(updates, "__version__", "0.1.0")
     manifest = tmp_path / "manifest.json"
     source = "C:\\Users\\O'Brien Smith\\LitMan"
     manifest.write_text(json.dumps({"source": source, "app": "codex"}), encoding="utf-8")
@@ -53,6 +55,7 @@ def test_check_update_powershell_quotes_custom_path(tmp_path, monkeypatch):
 
 
 def test_check_update_has_no_command_when_no_tag_or_newer_installed(tmp_path, monkeypatch):
+    monkeypatch.setattr(updates, "__version__", "0.1.0")
     manifest = tmp_path / "manifest.json"
     manifest.write_text('{"source":"/src","app":"claude"}', encoding="utf-8")
     monkeypatch.setattr(updates, "manifest_path", lambda env: manifest)

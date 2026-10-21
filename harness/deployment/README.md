@@ -139,7 +139,7 @@ This route is for an IT-managed Python environment. Build or obtain compatible
 
 ```sh
 uv venv --python 3.11 .venv
-uv pip install --python .venv/bin/python /path/litman_core-0.1.0-py3-none-any.whl /path/litman_harness-0.1.0-py3-none-any.whl
+uv pip install --python .venv/bin/python /path/litman_core-0.2.0-py3-none-any.whl /path/litman_harness-0.2.0-py3-none-any.whl
 .venv/bin/litman setup --json '{"provider": "codex"}'
 .venv/bin/litman diagnose
 .venv/bin/litman-mcp
