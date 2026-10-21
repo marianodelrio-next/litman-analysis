@@ -1,7 +1,7 @@
-<!-- factory-template: design/design.md@1 -->
-<!-- Replace CHG-0000 with the id reserved by `swfactory design register`. Keep the design proportional
+<!-- factory-template: design/design.md@2 -->
+<!-- Replace CHG-N with the id reserved by `swfactory design register` (e.g. CHG-12; tasks CHG-12.1, CHG-12.2). Keep the design proportional
      to the change; delete these comments. Everything here is in English. -->
-# CHG-0000 — Title
+# CHG-N — Title
 
 ## Context
 Verified current behaviour, with file references.
@@ -23,12 +23,13 @@ interfaces between tasks, known pitfalls.
 
 ## Tasks
 ```yaml
-- id: CHG-0000-01
+- id: CHG-N.1
   title: …
   depends_on: []
   complexity: normal
   review: [quality]
   scope: ["src/…/**"]          # optional
+  integrate: pr                # optional: pr (the person merges) or merge; default git.integrate
   acceptance:
     AC-01: "pytest …"
     AC-02: manual

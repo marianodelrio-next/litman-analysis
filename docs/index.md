@@ -34,7 +34,7 @@ public compatibility promise.
   conventions without repeating operational rules.
 - [Working agreements](working-agreements.md) record durable collaboration
   choices.
-- [Repository decisions](decisions/README.md) record cross-package and durable
+- [Repository decisions](decisions/index.md) record cross-package and durable
   development-process decisions. Package decisions remain with Core or
   Harness.
 - [Releasing LitMan](releasing.md) is the scripted, documented release flow:

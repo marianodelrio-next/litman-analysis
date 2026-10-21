@@ -14,7 +14,7 @@ it does not replace or repeat those instructions.
 - Keep repository development tooling at the root and product-agent resources
   in `harness/agent/`. See the [codebase map](codebase-map.md).
 - Keep package-specific implementation decisions beside their owner. Reserve
-  [repository decisions](decisions/README.md) for cross-package architecture,
+  [repository decisions](decisions/index.md) for cross-package architecture,
   public contracts, security, data models, and durable development process.
 
 ## Implementation style
