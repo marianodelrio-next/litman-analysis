@@ -71,3 +71,8 @@ it does not replace or repeat those instructions.
   (`No such file or directory: 'cd'`). Write acceptance commands the way
   `[checks]` does, for example `bash -lc 'cd harness && …'` or
   `uv --directory harness run pytest …`. (2026-10-21, CHG-10.1)
+- `swfactory` treats every acceptance value other than `manual` as a command,
+  so a prose criterion (CHG-10.2's AC-08, "Run the required full Harness and
+  Core suites …") is executed, reported `not_run`, and cannot be recorded with
+  `--manual` (`ac_not_manual`). Write a criterion verified by hand or by review
+  as `manual`, and put the procedure in the design. (2026-10-21, CHG-10.2)
