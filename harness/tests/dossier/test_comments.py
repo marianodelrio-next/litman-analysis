@@ -328,6 +328,7 @@ def test_two_fresh_candidates_for_one_lost_add_are_a_conflict(tmp_path: Path):
                           created="2026-10-21T11:00:00Z")
     result = setup.apply(plan["plan_id"])
     assert result["status"] == "conflict" and len(setup.docs.comment_batches) == 1
+    assert result["conflict"]["write_may_have_occurred"] is True
 
 
 def test_a_reconciled_comment_without_its_live_anchor_is_a_conflict(tmp_path: Path):
@@ -339,6 +340,7 @@ def test_a_reconciled_comment_without_its_live_anchor_is_a_conflict(tmp_path: Pa
     del setup.docs.anchors["gdoc"][created["anchorId"]]
     result = setup.apply(plan["plan_id"])
     assert result["status"] == "conflict" and result["conflict"]["code"] == "comment_anchor_unverified"
+    assert result["conflict"]["write_may_have_occurred"] is True
 
 
 def test_a_batch_google_refuses_writes_nothing_and_can_be_retried(tmp_path: Path):
@@ -347,6 +349,22 @@ def test_a_batch_google_refuses_writes_nothing_and_can_be_retried(tmp_path: Path
     setup.docs.comment_fault["gdoc"] = "rejected"
     assert error(lambda: setup.apply(plan["plan_id"])).code == "docs_request_rejected"
     assert setup.apply(plan["plan_id"])["status"] == "succeeded" and len(setup.docs.comment_batches) == 2
+
+
+@pytest.mark.parametrize("status", [408, 500, 503])
+def test_a_status_that_may_follow_processing_keeps_the_batch_uncertain_and_unsent(tmp_path: Path, status):
+    setup = Setup(tmp_path)
+    plan = setup.preview("gdoc", [ADD])
+    send = setup.docs.batch_update_comments
+
+    def ambiguous(*args):
+        send(*args)
+        raise HarnessError("docs_error", "Google Docs rechazó la solicitud", details={"http_status": status})
+    setup.docs.batch_update_comments = ambiguous
+    failure = error(lambda: setup.apply(plan["plan_id"]))
+    assert failure.code == "comment_write_uncertain" and failure.details["write_may_have_occurred"] is True
+    result = setup.apply(plan["plan_id"])
+    assert result["status"] == "succeeded" and len(setup.docs.comment_batches) == 1
 
 
 def test_a_lost_reply_is_reconciled_by_its_parent_thread_and_new_post(tmp_path: Path):

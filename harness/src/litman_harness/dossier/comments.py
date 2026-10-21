@@ -37,6 +37,8 @@ OPERATIONS = {"add": frozenset({"content", "anchor"}), "reply": frozenset({"comm
               "resolve": frozenset({"comment_id"})}
 _OPTIONAL = {"resolve": frozenset({"content"})}
 _PLAIN_ACTIONS = (None, "COMMENT_ACTION_TYPE_UNSPECIFIED", "NO_COMMENT_ACTION_CHANGE")
+# Statuses Google answers before processing a batch: nothing of it was written, so it may be sent again.
+_NOT_PROCESSED = frozenset({401, 403, 404, 429})
 _ANCHOR_REQUIRED = ("Este plan aceptado añade un comentario general sin ancla, que ya no se admite. No se ha escrito "
                     "nada de lo pendiente: prepare un plan nuevo con preview_comment_changes en el que cada add "
                     "lleve el fragmento exacto del documento (anchor).")
@@ -88,11 +90,6 @@ def is_native(operation: dict[str, Any]) -> bool:
 
 def _is_mine(raw: dict[str, Any]) -> bool:
     author = raw.get("author")
-    return isinstance(author, dict) and bool(author.get("me"))
-
-
-def _native_mine(post: dict[str, Any]) -> bool:
-    author = post.get("author")
     return isinstance(author, dict) and bool(author.get("me"))
 
 
@@ -372,7 +369,7 @@ class CommentService:
             if exc.code == "document_changed":
                 raise OperationConflict(str(exc), details={"code": "document_changed",
                                                            "document_id": item.id}) from exc
-            if isinstance(status, int) and 400 <= status < 500:
+            if exc.code == "docs_request_rejected" or status in _NOT_PROCESSED:
                 run.forget(action)  # Google refused the whole batch: nothing was written
                 raise
             raise self._uncertain(run, positions, cause=exc.code) from exc
@@ -436,7 +433,7 @@ class CommentService:
                 candidates = [thread]
             else:
                 candidates = [thread for key, thread in threads.items() if key not in state["threads"]
-                              and key not in claimed and _native_mine(thread.get("headPost") or {})
+                              and key not in claimed and _is_mine(thread.get("headPost") or {})
                               and (thread.get("headPost") or {}).get("content") == operation["content"]
                               and _fresh(thread.get("headPost") or {}, state["after"])]
             chosen = self._single(run, index, candidates, identical, lambda t: (t.get("headPost") or {}))
@@ -447,7 +444,8 @@ class CommentService:
                                         "Google Docs", details={"code": "comment_anchor_unverified",
                                                                 "operation": index,
                                                                 "comment_id": NATIVE_PREFIX + chosen["commentId"],
-                                                                "completed": list(run.completed)})
+                                                                "completed": list(run.completed),
+                                                                "write_may_have_occurred": True})
             return {"comment_id": chosen["commentId"]}
         thread = threads.get(operation["comment_id"])
         if thread is None:
@@ -459,7 +457,7 @@ class CommentService:
             match = [post for post in posts if post.get("postId") == returned]
         else:
             match = [post for post in posts if post.get("postId") not in known and post.get("postId") not in claimed
-                     and _native_mine(post) and _fresh(post, state["after"])
+                     and _is_mine(post) and _fresh(post, state["after"])
                      and (post.get("commentAction") == "RESOLVE" if resolving
                           else post.get("commentAction") in _PLAIN_ACTIONS)
                      and (resolving and operation.get("content") is None
@@ -480,7 +478,7 @@ class CommentService:
         if len(candidates) > identical:
             raise OperationConflict("Hay más de un candidato para reconciliar esta operación sin duplicarla",
                                     details={"operation": index, "candidates": len(candidates),
-                                             "completed": list(run.completed)})
+                                             "completed": list(run.completed), "write_may_have_occurred": True})
         if not candidates:
             return None
         return min(candidates, key=lambda candidate: (post_of(candidate).get("createTime") or "",

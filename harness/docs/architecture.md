@@ -342,7 +342,10 @@ proof, `ALL_FAILED_UNKNOWN_REASON` ends as recoverable `comment_save_failed`
 and anything else as recoverable `comment_write_uncertain`, both with
 `write_may_have_occurred: true`; repeating the acceptance only reconciles and
 never resends. A stale revision is a `document_changed` conflict; any other
-400 on the batch (`docs_request_rejected`) wrote nothing and clears the marker.
+400 on the batch (`docs_request_rejected`) or a 401, 403, 404 or 429 wrote
+nothing and clears the marker; any other failure after sending, such as a 408
+or a 5xx, stays uncertain. Ambiguous or off-anchor reconciliation conflicts
+also carry `write_may_have_occurred: true`.
 A stored legacy plan with an unfinished unanchored `add` is refused whole with
 `comment_anchor_required` before any write; completed legacy actions replay.
 
