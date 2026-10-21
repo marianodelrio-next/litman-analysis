@@ -1,0 +1,8 @@
+{
+  "change": "CHG-0001",
+  "design_digest": "sha256:882d4dfb13acfb8c3fd067626c9ba38d84d9b782474f90005287adb57fc16a72",
+  "rejected_by": "mariano.delrio@nextdigital.es",
+  "rejected_at": "2026-10-21T07:35:24Z",
+  "method": "chat",
+  "reason": "No product changes to merge; the legacy work was already in master. Closing the Factory record without publishing."
+}
