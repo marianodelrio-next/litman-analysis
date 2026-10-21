@@ -1,5 +1,5 @@
 change: CHG-10
-design_digest: sha256:e82a08c7f15a4c425fa60b6a41e31d3c23802d4d7e965b9d3538e6266c7c7ecb
+design_digest: sha256:39396fd3c90bfca5675815c2bb035b9dfaeb8c9be4407353a2ee535ffb06826e
 tasks:
 - id: CHG-10.1
   title: Enforce anchored-only native comments with verified recovery and legacy access

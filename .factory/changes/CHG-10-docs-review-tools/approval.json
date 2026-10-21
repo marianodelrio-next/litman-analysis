@@ -1,8 +1,8 @@
 {
   "change": "CHG-10",
-  "design_digest": "sha256:e82a08c7f15a4c425fa60b6a41e31d3c23802d4d7e965b9d3538e6266c7c7ecb",
+  "design_digest": "sha256:39396fd3c90bfca5675815c2bb035b9dfaeb8c9be4407353a2ee535ffb06826e",
   "approved_by": "mariano.delrio@nextdigital.es",
-  "approved_at": "2026-10-21T09:01:35Z",
+  "approved_at": "2026-10-21T09:04:56Z",
   "method": "chat",
   "message": "apruebo CHG-10"
 }

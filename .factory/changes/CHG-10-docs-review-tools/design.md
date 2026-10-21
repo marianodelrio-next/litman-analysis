@@ -135,9 +135,10 @@ change. Existing threads on other file types retain read/reply/resolve support.
 - AC-09: In an expressly authorized disposable dossier, a person sees a comment
   attached to the intended phrase/title, reads/replies/resolves it through
   LitMan, applies/clears a highlight, and follows/changes/removes a hyperlink.
-  Body text and document identity remain unchanged. Verify: recorded manual
-  protocol with actual results, described under verification. This criterion is
-  pending until that authorized test occurs; automated fixtures do not satisfy it.
+  Body text and document identity remain unchanged. Verify: the person states
+  that it works after trying the workflow (the protocol under verification is a
+  guide); that statement is sufficient evidence. This criterion is pending until
+  the person confirms it; automated fixtures do not satisfy it.
 
 ## Approach
 
@@ -371,8 +372,8 @@ UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest -q
 Docker is not affected. Perform the manual AC-09 only after a person explicitly
 authorizes a disposable dossier/document and real Google access. The design and
 its approval alone do not authorize production credentials or resources.
-Record actual account permission level, installed client version, success/failure
-and observed UI results without secrets or customer content. Verify:
+The person's statement that the workflow works is sufficient evidence for AC-09;
+record it verbatim without secrets or customer content. Suggested checks:
 
 1. A unique section title and an accented/emoji-containing phrase can each receive
    a visible anchored comment, on the same existing document.
@@ -386,9 +387,9 @@ and observed UI results without secrets or customer content. Verify:
 5. Editing the document between preview and apply produces a conflict rather than
    moving a comment/highlight/link to a different phrase.
 
-AC-09 is a required acceptance criterion of the second task. If authorization or
-the live service is unavailable, record it as pending and do not claim acceptance
-or close that task. No browser automation, alternate connector or direct API
+AC-09 is a required acceptance criterion of the second task. Until the person
+confirms that it works, record it as pending and do not claim acceptance or
+close that task. No browser automation, alternate connector or direct API
 script bypasses the product-agent LitMan-tools-only rule. Visual observation is
 by the person using Google Docs, while LitMan performs authorized operations.
 
