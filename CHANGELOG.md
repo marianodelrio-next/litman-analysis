@@ -14,6 +14,14 @@ LitMan is published as a single product version, shared by Core and Harness; see
 
 - Explain planned dossier folders before incorporation and summarize confirmed
   folder and context outcomes after it.
+- New comments on dossier Google Docs are attached to an exact phrase or
+  section title and appear on that text in Google Docs; general comments are no
+  longer created, and new comments on other file types are refused. Creating
+  them requires edit access to the document. A comment is reported as created
+  only once LitMan can see it in the document; if that cannot be confirmed,
+  LitMan says so and never sends it twice. Existing comments remain readable
+  and can still be replied to and resolved, and a previously accepted plan that
+  adds a general comment must be prepared again.
 
 ## [0.1.0] - 2026-10-20
 ### Added

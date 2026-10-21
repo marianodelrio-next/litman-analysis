@@ -272,7 +272,18 @@ because summary provenance depends on it.
 
 `list_comments` reads Drive comments (`comments.list`, `includeDeleted=false`)
 with `author`, `created_time`, `resolved`, `quoted_text` and `replies`;
-resolved comments are excluded unless `include_resolved` is true.
+resolved comments are excluded unless `include_resolved` is true. Each comment
+also carries `source` and `anchor`. For a Google Doc, `FileService` delegates
+to `CommentService.listed`, which additionally reads the native threads and the
+tabs' comment anchors through `DocsGateway.get_with_comments`
+(`commentsViewMode=COMMENTS_VIEW_MODE_INCLUDED`, suggestions inline). A native
+thread is listed as `source: "docs"` with the opaque ID `docs:<commentId>`,
+its `plainTextQuote` as `quoted_text`, and `anchor` holding its tab, current
+ranges and live text, or `null` when the anchored text no longer exists (never
+rebuilt from the stale quote). Drive comments keep their raw IDs and
+`source: "drive"`; a Drive comment whose raw ID equals a native thread's is
+shown once, as native. A failed native read is an error, never a Drive-only
+list.
 
 `dossier/file_changes.py` (`FileChangeService`) organizes dossier resources in
 one closed `file_changes` plan. `preview_file_changes` resolves 1–20
@@ -289,19 +300,51 @@ conversions use temporary files. Conflicts retain earlier completed actions,
 while Drive rate limits remain recoverable by repeating the accepted plan.
 
 `dossier/comments.py` (`CommentService`) previews and applies comment
-changes on one file in one closed `comment_changes` plan. `preview_comment_changes`
-resolves 1–10 `add`, `reply`, or `resolve` operations, refusing a file without
-`canComment` (`insufficient_capability`) or an unknown or deleted `comment_id`
-(`comment_not_found`), and stores in each action's metadata the newest
-`createdTime` Drive showed among the file's comments and replies
-(`created_after`), or `null`. Comments carry no marker, so `apply_comment_changes`
-resumes by adopting an existing comment or reply from the active account
-(`author.me`) with the same content and a `createdTime` later than
-`created_after`, instead of creating a second one; more than one such
-candidate is an `OperationConflict`. A `resolve` action that finds its comment
-already resolved completes without a call; otherwise it creates a reply with
-`action: "resolve"`. Comments are unanchored: Drive comment anchors are not
-reliably rendered in Google Docs.
+changes on one file in one closed `comment_changes` plan of 1–10 `add`,
+`reply`, or `resolve` operations. It has two backends, never mixed in one plan
+(`mixed_comment_backends`):
+
+- **Native Google Docs comments.** Every `add` and every operation on a
+  `docs:` thread. `add` takes exactly `op`, `content` and `anchor`; the anchor
+  is a case-sensitive literal of 1–1,000 characters inside one paragraph that
+  appears exactly once in a single-tab Google Doc, resolved with the same
+  `DocumentText` matching, UTF-16 indexes and pending-suggestion refusal as
+  document edits (`anchor_selection` in `dossier/documents.py`). A section is
+  commented by anchoring its title. Other file types, multi-tab documents,
+  `_LitMan` and files outside the tree are refused before a plan is saved. It
+  needs `canComment` and `canEdit` plus a `revisionId`, because the batch is
+  guarded by that revision: a commenter-only account cannot create native
+  comments. Content is limited to 2,048 UTF-8 bytes. The plan holds one
+  `docs_comment_batch` action with the resolved `insertComment` (range with
+  `tabId`) and `addCommentReply` requests (`post.commentAction: RESOLVE` for
+  `resolve`) and the preview revision in `expected_version`. The preview shows
+  content, quoted text, tab, range and context.
+- **Historical Drive comments.** `reply` and `resolve` on a raw Drive comment
+  ID, on any file type, keep the `canComment` check, the 4,096-character
+  limit and the `created_after` resume: an existing reply from the active
+  account (`author.me`) with the same content and a later `createdTime` is
+  adopted instead of creating a second one, and more than one candidate is an
+  `OperationConflict`. Drive `create_comment` is never called.
+
+`apply_comment_changes` rechecks membership and capabilities. A native batch
+is sent at most once: before sending, it persists an attempt marker with the
+native thread and post IDs and the newest `createTime` it saw; a `resolve` of
+an already resolved thread is dropped from the batch. It then saves the
+returned IDs and `commentUpdateState` and reads the document back. Each `add`
+is proved by its thread whose live anchor covers exactly the planned phrase;
+each reply by its post; each resolution by the thread's `RESOLVED` status.
+Missing IDs or a missing save state fall back to reconciliation: a new thread
+or post (not in the marker, not claimed by another operation) by the active
+account with the same content and a `createTime` not older than the marker.
+More candidates than identical operations, or a reconciled comment without
+its planned anchor (`comment_anchor_unverified`), are a conflict. With no
+proof, `ALL_FAILED_UNKNOWN_REASON` ends as recoverable `comment_save_failed`
+and anything else as recoverable `comment_write_uncertain`, both with
+`write_may_have_occurred: true`; repeating the acceptance only reconciles and
+never resends. A stale revision is a `document_changed` conflict; any other
+400 on the batch (`docs_request_rejected`) wrote nothing and clears the marker.
+A stored legacy plan with an unfinished unanchored `add` is refused whole with
+`comment_anchor_required` before any write; completed legacy actions replay.
 
 `adapters/sheets.py` (`SheetsGateway`) uses the same `drive`-scope credentials
 as Drive and Docs. A 403 with reason `accessNotConfigured` or

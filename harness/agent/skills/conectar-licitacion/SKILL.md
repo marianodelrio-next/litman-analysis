@@ -84,9 +84,24 @@ description: Conecta una licitación por el ID de su carpeta de Drive y guía a 
    **Comentarios.** Para añadir un comentario, responder a uno existente o
    resolverlo, prepara `preview_comment_changes` con hasta 10 operaciones
    (`add`, `reply`, `resolve`) y aplica sólo el `plan_id` que la persona
-   acepte con `apply_comment_changes`. Los comentarios no se anclan a un
-   fragmento del documento. Ante `comment_not_found`, el comentario ya no
-   existe: vuelve a listar con `list_comments`.
+   acepte con `apply_comment_changes`. Cada comentario nuevo (`add`) va
+   anclado en un Google Doc a un fragmento literal (`anchor`) que aparezca
+   una sola vez; para comentar una sección, usa el texto de su título. No
+   existen comentarios generales: si la persona no indica dónde, pregúntale
+   por el fragmento. En PDF, Word u otros archivos sólo se responde o
+   resuelve un comentario existente. Crear comentarios requiere permiso de
+   edición del documento. Para responder o resolver, usa el `id` que da
+   `list_comments` (`docs:...` para los de Google Docs); los de Google Docs y
+   los históricos de Drive van en planes distintos. Muestra en la vista
+   previa el comentario, el texto citado y su contexto. Ante
+   `anchor_not_unique`, pide un fragmento más largo o exacto. Ante
+   `comment_write_uncertain` o `comment_save_failed`, no prepares otro plan
+   todavía: di a la persona que puede que se haya guardado, que repetir la
+   aceptación sólo lo comprueba (nunca lo duplica) y que lo revise en Google
+   Docs. Ante `comment_anchor_required`, ese plan antiguo añadía un
+   comentario sin ancla: prepara uno nuevo con `anchor`. Ante
+   `comment_not_found`, el comentario ya no existe: vuelve a listar con
+   `list_comments`.
 
    **Hojas de cálculo de Google Sheets** de la licitación: para cambiar un
    rango o añadir filas, prepara `preview_sheet_edit` con operaciones cerradas

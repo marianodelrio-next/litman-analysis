@@ -77,7 +77,8 @@ como vista previa y sólo se aplica cuando la persona lo acepta.
 - `read_file`: lee cualquier archivo de la licitación: PDF, Word, texto,
   Markdown, CSV, Excel, Google Docs, Hojas de cálculo o Presentaciones.
   Ejemplo: "lee el Excel de costes" o "¿qué pone en la presentación?"
-- `list_comments`: muestra los comentarios de un archivo y sus respuestas.
+- `list_comments`: muestra los comentarios de un archivo y sus respuestas, y
+  en un Google Doc el fragmento al que está anclado cada uno.
   Ejemplo: "¿qué comentarios hay en la memoria técnica?"
 
 ## Cambios en archivos
@@ -123,10 +124,14 @@ como vista previa y sólo se aplica cuando la persona lo acepta.
 
 ## Comentarios
 
-- `preview_comment_changes`: prepara añadir un comentario, responder a uno
-  existente o resolverlo, hasta 10 a la vez.
+- `preview_comment_changes`: prepara, hasta 10 a la vez, comentarios nuevos
+  sobre una frase o el título de una sección de un Google Doc (requiere
+  permiso de edición), respuestas a uno existente o su resolución.
+  Ejemplo: "comenta en el título «Plazo de ejecución» que falta confirmarlo"
   Ejemplo: "responde al comentario de Ana diciendo que ya está corregido"
-- `apply_comment_changes`: aplica esos comentarios cuando los aceptas.
+- `apply_comment_changes`: aplica esos comentarios cuando los aceptas; sólo
+  da un comentario por creado cuando lo ve en el documento, y si no puede
+  comprobarlo te lo dice sin volver a enviarlo.
   Ejemplo: "sí, hazlo"
 
 ## Lo que no está en esta lista
