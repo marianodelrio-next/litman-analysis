@@ -1,0 +1,58 @@
+change: CHG-10
+design_digest: sha256:80ee75094a90ab3766aea4438760a7e3d9c4f034628211069a6581307df45370
+tasks:
+- id: CHG-10.1
+  title: Enforce anchored-only native comments with verified recovery and legacy access
+  depends_on: []
+  complexity: complex
+  review:
+  - quality
+  - conformance
+  scope:
+  - harness/src/litman_harness/adapters/docs.py
+  - harness/src/litman_harness/adapters/metadata.py
+  - harness/src/litman_harness/dossier/comments.py
+  - harness/src/litman_harness/dossier/documents.py
+  - harness/src/litman_harness/dossier/files.py
+  - harness/src/litman_harness/interfaces/assembly.py
+  - harness/src/litman_harness/interfaces/tools/files.py
+  - harness/tests/**
+  - harness/docs/**
+  - harness/agent/**
+  - CHANGELOG.md
+  acceptance:
+    AC-01: cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest -q tests/dossier/test_comments.py
+      tests/interfaces/test_tools.py tests/adapters/test_docs_adapter.py
+    AC-02: cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest -q tests/dossier/test_comments.py
+      tests/interfaces/test_assembly.py tests/adapters/test_docs_adapter.py
+    AC-03: cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest -q tests/dossier/test_comments.py
+      tests/adapters/test_docs_adapter.py
+    AC-04: cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest -q tests/dossier/test_comments.py
+      tests/dossier/test_files.py tests/interfaces/test_tools.py
+- id: CHG-10.2
+  title: Add highlighting and hyperlinks and verify the complete document workflow
+  depends_on:
+  - CHG-10.1
+  complexity: complex
+  review:
+  - quality
+  - conformance
+  scope:
+  - harness/src/litman_harness/dossier/documents.py
+  - harness/src/litman_harness/adapters/docs.py
+  - harness/src/litman_harness/interfaces/tools/documents.py
+  - harness/src/litman_harness/interfaces/tools/__init__.py
+  - harness/tests/**
+  - harness/docs/**
+  - harness/agent/**
+  - CHANGELOG.md
+  acceptance:
+    AC-05: cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest -q tests/dossier/test_documents.py
+      tests/interfaces/test_tools.py tests/adapters/test_docs_adapter.py
+    AC-06: cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest -q tests/dossier/test_documents.py
+      tests/interfaces/test_tools.py tests/adapters/test_docs_adapter.py
+    AC-07: cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest -q tests/dossier/test_documents.py
+      tests/interfaces/test_assembly.py
+    AC-08: Run the required full Harness and Core suites from each package and review
+      updated capability documentation and changelog.
+    AC-09: manual
