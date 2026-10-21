@@ -12,10 +12,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from hashlib import sha256
+import json
 from pathlib import Path
+import re
 import tempfile
 import unicodedata
 from typing import Any
+from urllib.parse import urlsplit
 
 from ..adapters.docs import DocsGateway
 from ..adapters.documents import DOCX_MIME
@@ -39,7 +42,16 @@ MARKDOWN_MIME = "text/markdown"
 PARAGRAPH_STYLES = ("NORMAL_TEXT", "TITLE", "SUBTITLE", "HEADING_1", "HEADING_2", "HEADING_3")
 LISTS = {"bullets": "BULLET_DISC_CIRCLE_SQUARE", "numbered": "NUMBERED_DECIMAL_ALPHA_ROMAN", "none": None}
 TEXT_FLAGS = ("bold", "italic", "underline")
-# Required fields of each closed operation; set_text_style also takes at least one of TEXT_FLAGS.
+# Nullable set_text_style fields: a value sets the highlight or the link, null removes it.
+TEXT_FIELDS = ("highlight_color", "link_url")
+# Docs ``TextStyle`` field of each set_text_style property.
+_STYLE_FIELDS = {"bold": "bold", "italic": "italic", "underline": "underline", "highlight_color": "backgroundColor",
+                 "link_url": "link"}
+MAX_URL_CHARS = 2_048
+_COLOR = re.compile(r"#[0-9A-Fa-f]{6}")
+LINK_NOTICE = ("Google Docs da al enlace su formato habitual (color y subrayado); al quitar el enlace puede no "
+               "recuperarse el formato anterior del texto.")
+# Required fields of each closed operation; set_text_style also takes at least one of TEXT_FLAGS or TEXT_FIELDS.
 OPERATIONS = {"replace_text": ("find", "replace", "occurrences"), "insert_after": ("anchor", "text"),
               "append": ("text",), "set_paragraph_style": ("anchor", "style"),
               "set_text_style": ("find", "occurrences"), "set_list": ("anchor", "list")}
@@ -71,6 +83,11 @@ class DocumentText:
     final_newline: int | None
     owner: list[int] = field(default_factory=list)  # paragraph number of each visible character
     paragraphs: list[tuple[int, int]] = field(default_factory=list)  # Docs start and end index of each paragraph
+    # Text style of each visible character (TEXT_FLAGS and TEXT_FIELDS) and the Docs TextStyle fields with a
+    # pending suggested change; named style of each paragraph.
+    styles: list[dict[str, Any]] = field(default_factory=list)
+    suggested: list[frozenset[str]] = field(default_factory=list)
+    named_styles: list[str | None] = field(default_factory=list)
 
     @classmethod
     def parse(cls, body: dict[str, Any]) -> "DocumentText":
@@ -82,7 +99,7 @@ class DocumentText:
         last = content[-1] if content else {}
         final_newline = last["endIndex"] - 1 if "paragraph" in last and isinstance(last.get("endIndex"), int) else None
         return cls("".join(builder.chars), builder.index, builder.deleted, builder.gaps, final_newline,
-                   builder.owner, builder.paragraphs)
+                   builder.owner, builder.paragraphs, builder.styles, builder.suggested, builder.named_styles)
 
     def end_index(self, offset: int) -> int:
         """Docs index just after the visible character before ``offset``."""
@@ -122,6 +139,16 @@ class DocumentText:
         """Visible text whose Docs index lies in ``[start, stop)``, e.g. the live text of a comment anchor."""
         return "".join(char for char, at in zip(self.text, self.index) if start <= at < stop)
 
+    def link_crosses(self, offset: int) -> bool:
+        """Whether one link continues across ``offset``: the characters on both sides carry the same target.
+
+        A link split into several runs with the same target is one link; a non-text break ends it.
+        """
+        if not 0 < offset < len(self.text) or self.gaps.get(offset) == "break":
+            return False
+        link = self.styles[offset]["link_url"]
+        return link is not None and link == self.styles[offset - 1]["link_url"]
+
     def context(self, begin: int, end: int) -> dict[str, Any]:
         return {"offset": begin, "text": self.text[begin:end],
                 "before": self.text[max(0, begin - CONTEXT_CHARS):begin],
@@ -138,6 +165,9 @@ class _TextBuilder:
         self.gaps: dict[int, str] = {}
         self.owner: list[int] = []
         self.paragraphs: list[tuple[int, int]] = []
+        self.styles: list[dict[str, Any]] = []
+        self.suggested: list[frozenset[str]] = []
+        self.named_styles: list[str | None] = []
         self.expected: int | None = None
         self.pending: str | None = None
 
@@ -147,6 +177,7 @@ class _TextBuilder:
                 items = element["paragraph"].get("elements") or []
                 if items:
                     self.paragraphs.append((items[0]["startIndex"], items[-1]["endIndex"]))
+                    self.named_styles.append((element["paragraph"].get("paragraphStyle") or {}).get("namedStyleType"))
                 for item in items:
                     run = item.get("textRun")
                     if run is None:
@@ -154,7 +185,8 @@ class _TextBuilder:
                     elif run.get("suggestedInsertionIds"):
                         self.gap("suggestion")
                     else:
-                        self.run(item["startIndex"], run.get("content") or "", bool(run.get("suggestedDeletionIds")))
+                        self.run(item["startIndex"], run.get("content") or "", bool(run.get("suggestedDeletionIds")),
+                                 run_style(run.get("textStyle") or {}), _suggested_fields(run))
             elif "table" in element:
                 self.gap("break")
                 for row in element["table"].get("tableRows") or []:
@@ -168,7 +200,7 @@ class _TextBuilder:
         if self.pending != "suggestion":
             self.pending = kind
 
-    def run(self, start: int, text: str, deleted: bool) -> None:
+    def run(self, start: int, text: str, deleted: bool, style: dict[str, Any], suggested: frozenset[str]) -> None:
         position = start
         for char in text:
             offset = len(self.chars)
@@ -178,8 +210,34 @@ class _TextBuilder:
             self.index.append(position)
             self.deleted.append(deleted)
             self.owner.append(len(self.paragraphs) - 1)
+            self.styles.append(style)
+            self.suggested.append(suggested)
             position += utf16_units(char)
             self.expected, self.pending = position, None
+
+
+def run_style(style: dict[str, Any]) -> dict[str, Any]:
+    """A run's ``TextStyle`` as set_text_style values: flags, highlight ``#RRGGBB`` and link (``None`` when absent).
+
+    An empty or absent ``backgroundColor`` is transparent; a link to a bookmark, heading or tab is kept as a
+    JSON marker so that it still counts as a link.
+    """
+    rgb = ((style.get("backgroundColor") or {}).get("color") or {}).get("rgbColor")
+    link = style.get("link") or None
+    if link is not None:
+        link = link["url"] if isinstance(link.get("url"), str) else json.dumps(link, sort_keys=True)
+    return {**{flag: bool(style.get(flag)) for flag in TEXT_FLAGS},
+            "highlight_color": None if rgb is None else "#" + "".join(
+                f"{round(float(rgb.get(channel) or 0) * 255):02X}" for channel in ("red", "green", "blue")),
+            "link_url": link}
+
+
+def _suggested_fields(run: dict[str, Any]) -> frozenset[str]:
+    """Docs TextStyle fields with a pending suggested change in this run (``boldSuggested`` → ``bold``)."""
+    return frozenset(name.removesuffix("Suggested")
+                     for change in (run.get("suggestedTextStyleChanges") or {}).values()
+                     for name, value in ((change or {}).get("textStyleSuggestionState") or {}).items()
+                     if value is True and name.endswith("Suggested"))
 
 
 @dataclass(frozen=True)
@@ -240,12 +298,13 @@ class DocumentService:
         if not isinstance(revision, str) or not revision or not item.capabilities.get("canEdit"):
             raise HarnessError("insufficient_capability", "La cuenta no puede editar este documento de Google Docs",
                                details={"document_id": item.id})
-        edits, previews = planned_edits(document, clean)
+        edits, previews, checks = planned_edits(document, clean)
         expected = simulated_text(document.text, edits)
         requests = [request for edit in sorted(edits, key=lambda e: e.key, reverse=True) for request in edit.requests]
+        style_only = clean[0]["op"] in STYLE_OPERATIONS
         action = PlanAction("edit_document", item.id, item.name, None, expected_version=revision, metadata={
             "requests": requests, "operations": previews, "expected_sha256": text_sha256(expected),
-            "expected_length": len(expected), "style_only": clean[0]["op"] in STYLE_OPERATIONS})
+            "expected_length": len(expected), "style_only": style_only, **({"checks": checks} if style_only else {})})
         plan = Plan("document_edit", root.id, account, (action,), {})
         self.dossier.store().save(plan)
         return {**plan.json(), "document_id": item.id, "revision_id": revision, "operations": previews}
@@ -262,17 +321,26 @@ class DocumentService:
         if run.output(action).get("sent"):
             # The previous attempt may have written and lost the answer: the expected body proves it.
             raw, _, document = self._read(item.id)
-            if text_sha256(document.text) == action.metadata["expected_sha256"]:
-                revision = raw.get("revisionId")
-                if action.metadata.get("style_only"):
-                    # A style-only plan leaves the text as it was, so the text proves nothing: styles are absolute,
-                    # and the unchanged body means resending them on the current revision cannot lose an edit.
-                    revision = self._batch_update(item.id, action.metadata["requests"], revision)
+            revision = raw.get("revisionId")
+            unchanged = text_sha256(document.text) == action.metadata["expected_sha256"]
+            if not action.metadata.get("style_only") and unchanged:
                 run.complete(action, {"revision_id": revision, "resumed": True})
                 return self._edit_result(run, item, revision)
             if action.metadata.get("style_only"):
-                raise OperationConflict("El texto del documento cambió desde la vista previa",
-                                        details={"code": "document_changed", "document_id": item.id})
+                # The unchanged text proves nothing about styles: the requested values read back prove the write;
+                # otherwise only the preview's own revision proves that nothing changed since, so the batch is
+                # resent on it and never on a newer one that may hold someone's format change.
+                checks = action.metadata.get("checks")  # absent in plans stored before style checks existed
+                if unchanged and checks and all(style_holds(document, check, "expected") for check in checks):
+                    run.complete(action, {"revision_id": revision, "resumed": True})
+                    return self._edit_result(run, item, revision)
+                if not (unchanged and revision == action.expected_version
+                        and all(style_holds(document, check, "before") for check in checks or ()
+                                if not check.get("unverifiable"))):
+                    raise OperationConflict("El documento cambió desde la vista previa y no se puede comprobar si "
+                                            "el formato se aplicó; revíselo en Google Docs y prepare un plan nuevo",
+                                            details={"code": "document_changed", "document_id": item.id,
+                                                     "write_may_have_occurred": True})
         run.note(action, {"sent": True})
         revision = self._batch_update(item.id, action.metadata["requests"], action.expected_version)
         run.complete(action, {"revision_id": revision})
@@ -495,6 +563,28 @@ def _checked_text(value: Any, name: str, index: int | None, *, minimum: int, max
     return value
 
 
+def _checked_url(value: Any, index: int) -> str | None:
+    """An absolute HTTP(S) URL with a host, no user info, spaces or control characters; ``None`` removes the link.
+
+    Only its form is checked: the destination is never fetched.
+    """
+    if value is None:
+        return None
+    where = {"operation": index, "field": "link_url"}
+    if not isinstance(value, str) or not 1 <= len(value) <= MAX_URL_CHARS:
+        raise _invalid(f"link_url debe ser una URL de 1 a {MAX_URL_CHARS} caracteres o null", **where)
+    if any(char.isspace() or char == "\\" or unicodedata.category(char) == "Cc" for char in value):
+        raise _invalid("link_url no puede contener espacios, barras invertidas ni caracteres de control", **where)
+    try:
+        parts = urlsplit(value)
+        parts.port
+    except ValueError:
+        raise _invalid("link_url no es una URL válida", **where) from None
+    if parts.scheme not in ("http", "https") or not parts.hostname or "@" in parts.netloc:
+        raise _invalid("link_url debe ser una URL absoluta http o https con dominio y sin usuario", **where)
+    return value
+
+
 def validated_operations(operations: Any) -> list[dict[str, Any]]:
     """1–20 closed operations with exact fields; checked here because transports validate only top-level types."""
     if not isinstance(operations, list) or not 1 <= len(operations) <= MAX_OPERATIONS:
@@ -505,15 +595,22 @@ def validated_operations(operations: Any) -> list[dict[str, Any]]:
         if kind not in OPERATIONS:
             raise _invalid("Operación no admitida", operation=index, allowed=list(OPERATIONS))
         fields = OPERATIONS[kind]
-        flags = TEXT_FLAGS if kind == "set_text_style" else ()
+        flags = (*TEXT_FLAGS, *TEXT_FIELDS) if kind == "set_text_style" else ()
         given = set(operation) - {"op"}
         if not set(fields) <= given <= {*fields, *flags} or (flags and not given & set(flags)):
             raise _invalid(f"La operación {kind} lleva exactamente los campos op, " + ", ".join(fields)
                            + (" y al menos uno de " + ", ".join(flags) if flags else ""),
                            operation=index, fields=[*fields, *flags])
+        values = {}
         for name in [*fields, *sorted(given & set(flags))]:
-            value = operation[name]
-            if name == "occurrences":
+            value = values[name] = operation[name]
+            if name == "highlight_color":
+                if value is not None and not (isinstance(value, str) and _COLOR.fullmatch(value)):
+                    raise _invalid("highlight_color debe ser un color #RRGGBB o null", operation=index, field=name)
+                values[name] = value and value.upper()
+            elif name == "link_url":
+                values[name] = _checked_url(value, index)
+            elif name == "occurrences":
                 if not isinstance(value, int) or isinstance(value, bool) or value < 1:
                     raise _invalid("occurrences debe ser un entero mayor o igual que 1", operation=index)
             elif name in ("find", "anchor"):
@@ -528,17 +625,23 @@ def validated_operations(operations: Any) -> list[dict[str, Any]]:
             else:
                 _checked_text(value, name, index, minimum=0 if name == "replace" else 1, maximum=MAX_TEXT_CHARS,
                               newlines=True)
-        clean.append({"op": kind, **{name: operation[name] for name in [*fields, *flags] if name in operation}})
+        clean.append({"op": kind, **{name: values[name] for name in [*fields, *flags] if name in values}})
     if len({item["op"] in STYLE_OPERATIONS for item in clean}) > 1:
         raise HarnessError("mixed_operations", "Las operaciones de formato no se mezclan con las de texto en un "
                            "mismo plan; prepare un plan para cada tipo")
     return clean
 
 
-def planned_edits(document: DocumentText, operations: list[dict[str, Any]]) -> tuple[list[_Edit], list[dict]]:
-    """Index-based edits and, per operation, the matched spans with context; refuses ambiguous plans."""
+def planned_edits(document: DocumentText,
+                  operations: list[dict[str, Any]]) -> tuple[list[_Edit], list[dict], list[dict]]:
+    """Index-based edits, per operation the matched spans with context, and the checks of each style.
+
+    Refuses ambiguous plans.  A check states, by visible offset, a style property's value before the plan
+    and the value the plan sets; ``set_list`` has no check, because its list kind is not read back.
+    """
     edits: list[_Edit] = []
     previews: list[dict[str, Any]] = []
+    checks: list[dict[str, Any]] = []
     spans: list[tuple[int, int, int]] = []
     paragraphs: dict[tuple[str, int], int] = {}
     for index, operation in enumerate(operations):
@@ -549,14 +652,17 @@ def planned_edits(document: DocumentText, operations: list[dict[str, Any]]) -> t
                 raise HarnessError("occurrences_mismatch", "El número de apariciones no coincide con el documento",
                                    details={"operation": index, "expected": operation["occurrences"],
                                             "actual": len(found)})
+            matches = []
             for begin, end in found:
                 _refuse_suggestions(document, begin, end, index)
                 start, stop = document.index[begin], document.end_index(end)
                 if kind == "set_text_style":
-                    style = {flag: operation[flag] for flag in TEXT_FLAGS if flag in operation}
+                    match, expected = _text_style_check(document, operation, begin, end, index)
+                    matches.append(match)
+                    checks.append({"begin": begin, "end": end, "expected": expected,
+                                   "before": _style_digest(document, begin, end, expected)})
                     edits.append(_Edit(start, _RANK[kind], index, begin, begin, "", ({"updateTextStyle": {
-                        "range": {"startIndex": start, "endIndex": stop}, "textStyle": style,
-                        "fields": ",".join(style)}},)))
+                        "range": {"startIndex": start, "endIndex": stop}, **_text_style_request(operation)}},)))
                     spans.append((begin, end, index))
                     continue
                 requests: tuple[dict[str, Any], ...] = (
@@ -578,6 +684,11 @@ def planned_edits(document: DocumentText, operations: list[dict[str, Any]]) -> t
                     raise HarnessError("overlapping_operations", "Dos operaciones dan formato al mismo párrafo",
                                        details={"operations": sorted({paragraphs[kind, paragraph["start"]], index})})
                 paragraphs[kind, paragraph["start"]] = index
+                if kind == "set_paragraph_style":
+                    checks.append({"paragraph": begin, "expected": operation["style"],
+                                   "before": document.named_styles[document.owner[begin]]})
+                else:
+                    checks.append({"paragraph": begin, "expected": None, "unverifiable": "set_list"})
                 edits.append(_Edit(paragraph["start"], _RANK[kind], index, begin, begin, "", (request,)))
                 previews.append({**operation, "matches": [document.context(begin, end)],
                                  "paragraph": paragraph["text"]})
@@ -595,13 +706,87 @@ def planned_edits(document: DocumentText, operations: list[dict[str, Any]]) -> t
             edits.append(_Edit(position, _RANK[kind], index, offset, offset, operation["text"],
                                ({"insertText": {"location": {"index": position}, "text": operation["text"]}},)))
             found = [(offset, offset)]
+        if kind == "set_text_style":
+            notice = {"notice": LINK_NOTICE} if "link_url" in operation else {}
+            previews.append({**operation, "matches": matches, **notice})
+            continue
         previews.append({**operation, "matches": [document.context(begin, end) for begin, end in found]})
     spans.sort()
     for (_, previous_end, first), (begin, _, second) in zip(spans, spans[1:]):
         if begin < previous_end:
             raise HarnessError("overlapping_operations", "Dos operaciones afectan al mismo texto",
                                details={"operations": sorted({first, second})})
-    return edits, previews
+    return edits, previews, checks
+
+
+def _text_style_request(operation: dict[str, Any]) -> dict[str, Any]:
+    """``textStyle`` and a ``fields`` mask with exactly the requested properties; null clears the highlight or link.
+
+    A cleared highlight is an empty ``OptionalColor`` (transparent, not white); a cleared link is a masked field
+    left out of ``textStyle``.
+    """
+    style: dict[str, Any] = {}
+    fields = []
+    for name, field_name in _STYLE_FIELDS.items():
+        if name not in operation:
+            continue
+        fields.append(field_name)
+        value = operation[name]
+        if name == "highlight_color":
+            style[field_name] = {} if value is None else {"color": {"rgbColor": {
+                channel: int(value[1 + 2 * n:3 + 2 * n], 16) / 255
+                for n, channel in enumerate(("red", "green", "blue"))}}}
+        elif name == "link_url":
+            if value is not None:
+                style[field_name] = {"url": value}
+        else:
+            style[field_name] = value
+    return {"textStyle": style, "fields": ",".join(fields)}
+
+
+def _text_style_check(document: DocumentText, operation: dict[str, Any], begin: int, end: int,
+                      index: int) -> tuple[dict[str, Any], dict[str, Any]]:
+    """The preview of one set_text_style match and the property values it sets, after refusing unsafe spans.
+
+    Refuses a pending suggested change of a requested property (``pending_suggestions``) and, for a link,
+    a span that cuts through an existing link (``partial_link_overlap``): Docs would repoint or split that
+    whole link, beyond the accepted text.
+    """
+    expected = {name: operation[name] for name in _STYLE_FIELDS if name in operation}
+    requested = {_STYLE_FIELDS[name] for name in expected}
+    if any(requested & document.suggested[offset] for offset in range(begin, end)):
+        raise HarnessError("pending_suggestions", "El texto tiene un cambio de formato sugerido pendiente; acéptelo "
+                           "o recházelo en Google Docs antes de darle formato", details={"operation": index})
+    if "link_url" in expected and (document.link_crosses(begin) or document.link_crosses(end)):
+        raise HarnessError("partial_link_overlap", "El texto corta un enlace existente; indique en find el texto "
+                           "completo del enlace", details={"operation": index, **document.context(begin, end)})
+    match = document.context(begin, end)
+    before = {}
+    for name in TEXT_FIELDS:
+        if name in expected:
+            values = {document.styles[offset][name] for offset in range(begin, end)}
+            before[name] = values.pop() if len(values) == 1 else "mixed"
+    if before:
+        match["before"] = before
+    return match, expected
+
+
+def _style_digest(document: DocumentText, begin: int, end: int, names: dict[str, Any]) -> str:
+    """Hash of the given style properties of every character in ``[begin, end)``."""
+    values = [[document.styles[offset][name] for name in sorted(names)] for offset in range(begin, end)]
+    return text_sha256(json.dumps(values))
+
+
+def style_holds(document: DocumentText, check: dict[str, Any], state: str) -> bool:
+    """Whether the document shows a check's ``before`` or ``expected`` state; an unverifiable check never does."""
+    if check.get("unverifiable"):
+        return False
+    if "paragraph" in check:
+        return document.named_styles[document.owner[check["paragraph"]]] == check[state]
+    if state == "before":
+        return _style_digest(document, check["begin"], check["end"], check["expected"]) == check["before"]
+    return all(document.styles[offset][name] == value for offset in range(check["begin"], check["end"])
+               for name, value in check["expected"].items())
 
 
 def _paragraph_request(document: DocumentText, operation: dict[str, Any], offset: int,

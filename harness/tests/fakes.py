@@ -404,8 +404,11 @@ class FakeDocs:
     one or two.  Only ``insertText``, ``deleteContentRange``, ``updateParagraphStyle``,
     ``updateTextStyle``, ``createParagraphBullets`` and ``deleteParagraphBullets`` by
     index are implemented, and every write changes ``revisionId``.  A text
-    character carries its text style flags and a paragraph's final newline carries
-    its named style and list kind (see ``paragraph_style`` and ``text_style``).
+    character carries its text style (flags, ``background`` as ``#RRGGBB``, ``link``
+    URL and a pending ``suggested`` style property) and a
+    paragraph's final newline carries its named style and list kind (see
+    ``paragraph_style``, ``text_style`` and ``style_outside``).  Runs are split where
+    the text style changes and rendered with ``textStyle`` as Docs returns it.
     """
 
     def __init__(self):
@@ -580,8 +583,9 @@ class FakeDocs:
             elif kind == "deleteParagraphBullets":
                 _style_paragraphs(tokens, body["range"], "list", "none")
             elif kind == "updateTextStyle":
-                assert set(body["fields"].split(",")) == set(body["textStyle"]), "fields debe limitarse a lo pedido"
-                _style_text(tokens, body["range"], body["textStyle"])
+                fields = body["fields"].split(",")
+                assert set(body["textStyle"]) <= set(fields) <= set(_TEXT_STYLE), "fields debe limitarse a lo pedido"
+                _style_text(tokens, body["range"], body["textStyle"], fields)
             else:
                 raise AssertionError(f"petición no admitida: {kind}")
         self._write(document_id, tokens)
@@ -624,6 +628,19 @@ class FakeDocs:
         styles = {tuple(sorted(t[3])) for t in tokens[begin:begin + len(snippet)]}
         assert len(styles) == 1, "el fragmento tiene formatos distintos"
         return dict(styles.pop())
+
+    def style_outside(self, document_id: str, snippet: str, nth: int = 0, **attributes) -> None:
+        """Simulate a person formatting the ``nth`` occurrence of ``snippet``; a ``None`` value removes it."""
+        tokens = list(self.documents[document_id]["tokens"])
+        visible = [position for position, token in enumerate(tokens) if token[0] == "char" and token[2] != "insert"]
+        text = "".join(tokens[position][1] for position in visible)
+        begin = -1
+        for _ in range(nth + 1):
+            begin = text.index(snippet, begin + 1)
+        for position in visible[begin:begin + len(snippet)]:
+            for name, value in attributes.items():
+                tokens[position] = _with_attribute(tokens[position], name, value)
+        self._write(document_id, tokens)
 
     def plain_text(self, document_id: str) -> str:
         """Every character not carrying a suggested insertion, in token order."""
@@ -673,6 +690,8 @@ def _chars(text: str, suggestion: str | None = None) -> list:
 
 def _with_attribute(token: tuple, name: str, value) -> tuple:
     attributes = {**dict(token[3]), name: value}
+    if value is None:
+        del attributes[name]
     return (*token[:3], tuple(sorted(attributes.items())))
 
 
@@ -690,14 +709,56 @@ def _style_paragraphs(tokens: list, range_: dict, name: str, value) -> None:
         at += width
 
 
-def _style_text(tokens: list, range_: dict, style: dict) -> None:
+# Docs ``TextStyle`` field → character attribute; a field in the mask but absent from the style is cleared.
+_TEXT_STYLE = {"bold": "bold", "italic": "italic", "underline": "underline", "backgroundColor": "background",
+               "link": "link"}
+_PARAGRAPH_ATTRIBUTES = ("named_style", "list")
+
+
+def _style_text(tokens: list, range_: dict, style: dict, fields: list) -> None:
+    attributes = {}
+    for field in fields:
+        value = style.get(field)
+        if field == "backgroundColor" and value is not None:
+            rgb = (value.get("color") or {}).get("rgbColor")
+            if rgb is None:
+                assert value == {}, "un color vacío es transparente"
+                value = None  # transparent: the character no longer carries a highlight
+            else:
+                assert set(rgb) <= {"red", "green", "blue"}
+                assert all(isinstance(channel, float) and 0 <= channel <= 1 for channel in rgb.values())
+                value = "#" + "".join(f"{round(rgb.get(name, 0.0) * 255):02X}" for name in ("red", "green", "blue"))
+        elif field == "link" and value is not None:
+            assert set(value) == {"url"}
+            value = value["url"]
+        attributes[_TEXT_STYLE[field]] = value
     at = 0
     for position, token in enumerate(tokens):
         if token[0] == "char" and range_["startIndex"] <= at < range_["endIndex"]:
-            for name, value in style.items():
+            for name, value in attributes.items():
                 token = _with_attribute(token, name, value)
             tokens[position] = token
         at += _width(token)
+
+
+def _text_attributes(token: tuple) -> tuple:
+    return tuple(item for item in token[3] if item[0] not in _PARAGRAPH_ATTRIBUTES)
+
+
+def _text_style(attributes: tuple) -> dict:
+    """The ``textStyle`` Docs returns: zero color channels are omitted, as in proto JSON."""
+    style = {}
+    for name, value in attributes:
+        if name == "background":
+            rgb = {channel: int(value[1 + 2 * n:3 + 2 * n], 16) / 255
+                   for n, channel in enumerate(("red", "green", "blue"))}
+            style["backgroundColor"] = {"color": {"rgbColor": {channel: amount for channel, amount in rgb.items()
+                                                               if amount}}}
+        elif name == "link":
+            style["link"] = {"url": value}
+        elif name != "suggested":
+            style[name] = value
+    return style
 
 
 def _width(token) -> int:
@@ -733,20 +794,27 @@ def _render(tokens: list) -> list:
                                  "inlineObjectElement": {"inlineObjectId": "kix.obj"}})
                 position += 1
                 continue
-            begin, suggestion = position, token[2]
+            begin, suggestion, attributes = position, token[2], _text_attributes(token)
             while (position < len(tokens) and tokens[position][0] == "char" and tokens[position][2] == suggestion
+                   and _text_attributes(tokens[position]) == attributes
                    and (position == begin or tokens[position - 1][1] != "\n")):
                 position += 1
-            run = {"content": "".join(t[1] for t in tokens[begin:position])}
+            run = {"content": "".join(t[1] for t in tokens[begin:position]), "textStyle": _text_style(attributes)}
             if suggestion == "insert":
                 run["suggestedInsertionIds"] = ["suggest.1"]
             elif suggestion == "delete":
                 run["suggestedDeletionIds"] = ["suggest.2"]
+            suggested = dict(attributes).get("suggested")
+            if suggested:
+                run["suggestedTextStyleChanges"] = {"suggest.3": {
+                    "textStyle": {}, "textStyleSuggestionState": {f"{suggested}Suggested": True}}}
             end = starts[position] if position < len(tokens) else at
             elements.append({"startIndex": starts[begin], "endIndex": end, "textRun": run})
             if tokens[position - 1][1] == "\n":
                 end = starts[position] if position < len(tokens) else at
-                return {"startIndex": starts[first], "endIndex": end, "paragraph": {"elements": elements}}, position
+                style = {"namedStyleType": dict(tokens[position - 1][3]).get("named_style", "NORMAL_TEXT")}
+                return {"startIndex": starts[first], "endIndex": end,
+                        "paragraph": {"elements": elements, "paragraphStyle": style}}, position
 
     while position < len(tokens):
         kind = tokens[position][0]
