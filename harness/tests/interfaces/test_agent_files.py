@@ -130,6 +130,11 @@ def test_connect_skill_no_longer_excludes_comments_and_names_the_comment_operati
     for name in ("add", "reply", "resolve"):
         assert f"`{name}`" in flat
     assert "comment_not_found" in flat
+    # New comments are anchored only; uncertainty is reported, never resent.
+    for name in ("anchor", "comment_write_uncertain", "comment_save_failed", "comment_anchor_required",
+                 "anchor_not_unique"):
+        assert f"`{name}`" in flat
+    assert "No existen comentarios generales" in flat and "no se anclan" not in flat
 
 
 def test_help_skill_explains_every_operation_with_an_example():

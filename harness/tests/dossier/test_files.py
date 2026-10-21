@@ -351,11 +351,28 @@ def test_list_comments_returns_open_comments_with_replies_and_the_content_note(t
                                           thread("c2", "Cerrado", resolved=True)]
     result = setup.files.list_comments("root", "doc")
     assert result["comments"] == [{
-        "id": "c1", "content": "Revisar plazo", "author": "Ana", "created_time": "2026-10-02T09:00:00.000Z",
-        "resolved": False, "quoted_text": "12 meses",
+        "id": "c1", "source": "drive", "content": "Revisar plazo", "author": "Ana",
+        "created_time": "2026-10-02T09:00:00.000Z", "resolved": False, "quoted_text": "12 meses", "anchor": None,
         "replies": [{"id": "r1", "content": "Hecho", "author": "Luis", "created_time": "2026-10-03T09:00:00.000Z",
                      "action": "resolve"}]}]
     assert result["note"] == CONTENT_NOTE and result["writes"] is False and result["include_resolved"] is False
+
+
+def test_list_comments_of_a_google_doc_adds_native_threads_with_routable_ids_and_anchors(tmp_path: Path):
+    setup = Setup(tmp_path)
+    setup.drive.comment_threads["doc"] = [thread("c1", "General antiguo")]
+    setup.docs.add_thread("doc", "n1", "Revisar", snippet="Segunda", replies=[
+        {"postId": "p1", "content": "Hecho", "createTime": "2026-10-03T09:00:00Z",
+         "author": {"displayName": "Luis"}, "commentAction": "RESOLVE"}], status="RESOLVED")
+    setup.docs.add_thread("doc", "n2", "Abierto", snippet="Primera")
+    open_only = setup.files.list_comments("root", "doc")["comments"]
+    assert [(item["id"], item["source"]) for item in open_only] == [("docs:n2", "docs"), ("c1", "drive")]
+    everything = setup.files.list_comments("root", "doc", include_resolved=True)["comments"]
+    resolved = everything[0]
+    assert resolved["id"] == "docs:n1" and resolved["resolved"] is True and resolved["quoted_text"] == "Segunda"
+    assert resolved["anchor"]["text"] == "Segunda" and resolved["anchor"]["tab_id"] == "t.0"
+    assert resolved["replies"] == [{"id": "p1", "content": "Hecho", "author": "Luis",
+                                    "created_time": "2026-10-03T09:00:00Z", "action": "resolve"}]
 
 
 def test_list_comments_includes_resolved_comments_only_when_asked(tmp_path: Path):

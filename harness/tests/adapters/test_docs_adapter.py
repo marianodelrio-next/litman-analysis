@@ -87,6 +87,53 @@ def test_gateway_calls_match_the_real_docs_v1_discovery_document():
     assert update_method == "POST" and update_uri.split("?")[0].endswith("/v1/documents/doc-1:batchUpdate")
 
 
+def test_native_comment_calls_match_the_real_docs_v1_discovery_document():
+    """Anchored insertion, reply and resolution, and the comment read, as the comment service builds them."""
+    requests = [{"insertComment": {"range": {"startIndex": 5, "endIndex": 13, "tabId": "t.0"},
+                                   "content": "Revisar 😀"}},
+                {"addCommentReply": {"commentId": "kix.1", "post": {"content": "De acuerdo"}}},
+                {"addCommentReply": {"commentId": "kix.1", "post": {"commentAction": "RESOLVE"}}}]
+    response = {"documentId": "doc-1", "commentUpdateState": "ALL_SAVED",
+                "replies": [{"insertComment": {"commentThread": {"commentId": "kix.2", "anchorId": "a.2"}}},
+                            {"addCommentReply": {"post": {"postId": "p.1"}}}, {"addCommentReply": {}}],
+                "writeControl": {"requiredRevisionId": "rev-1"}}
+    gateway, http = _gateway([({"status": "200"}, json.dumps({"revisionId": "rev-1", "comments": []})),
+                              ({"status": "200"}, "echo_request_body"),
+                              ({"status": "200"}, json.dumps(response))])
+    assert gateway.get_with_comments("doc-1") == {"revisionId": "rev-1", "comments": []}
+    body = gateway.batch_update_comments("doc-1", requests, "rev-1")
+    schemas = _discovery()["schemas"]
+    _conforms(schemas, "BatchUpdateDocumentRequest", body)
+    assert gateway.batch_update_comments("doc-1", requests, "rev-1") == response
+    _conforms(schemas, "BatchUpdateDocumentResponse", response)
+    assert set(schemas["Post"]["properties"]["commentAction"]["enum"]) >= {"RESOLVE"}
+    assert set(schemas["BatchUpdateDocumentResponse"]["properties"]["commentUpdateState"]["enum"]) >= {
+        "ALL_SAVED", "ALL_FAILED_UNKNOWN_REASON"}
+    assert {"commentAnchors", "body"} <= set(schemas["DocumentTab"]["properties"])
+    assert {"anchorId", "commentId", "headPost", "plainTextQuote", "replies", "status"} <= set(
+        schemas["CommentThread"]["properties"])
+    get_uri = http.request_sequence[0][0]
+    assert "commentsViewMode=COMMENTS_VIEW_MODE_INCLUDED" in get_uri
+    assert "suggestionsViewMode=SUGGESTIONS_INLINE" in get_uri and "includeTabsContent=true" in get_uri
+    assert "commentAnchors" in get_uri and "comments" in get_uri
+
+
+def test_a_400_on_a_comment_batch_is_document_changed_only_when_it_blames_the_revision():
+    stale = json.dumps({"error": {"code": 400, "status": "FAILED_PRECONDITION", "message": "stale"}})
+    named = json.dumps({"error": {"code": 400, "status": "INVALID_ARGUMENT",
+                                  "message": "The required revision ID does not match"}})
+    invalid = json.dumps({"error": {"code": 400, "status": "INVALID_ARGUMENT", "message": "Invalid range"}})
+    gateway, _ = _gateway([({"status": "400"}, stale), ({"status": "400"}, named), ({"status": "400"}, invalid),
+                           ({"status": "400"}, "not json")])
+    codes = []
+    for _ in range(4):
+        with pytest.raises(HarnessError) as raised:
+            gateway.batch_update_comments("doc", [], "rev")
+        codes.append(raised.value.code)
+        assert raised.value.details == {"http_status": 400}
+    assert codes == ["document_changed", "document_changed", "docs_request_rejected", "docs_request_rejected"]
+
+
 @pytest.mark.parametrize("payload", [_DISABLED_ERRORS, _DISABLED_DETAILS])
 @pytest.mark.parametrize("call", ["get", "batch_update"])
 def test_disabled_docs_api_is_a_stable_error_with_a_spanish_admin_message(payload, call):

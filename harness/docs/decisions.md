@@ -182,6 +182,10 @@ silently changing the user's LitMan assistant, or vice versa.
 
 ## Comments are unanchored and resumed by author, content, and time
 
+**Superseded (2026-10-21, CHG-10)** by "New comments are native, anchored
+Google Docs comments" below; the resume rule still applies to replies to
+historical Drive comments.
+
 `preview_comment_changes`/`apply_comment_changes` add, reply to, or resolve
 Drive comments without an anchor to a span of the document: Drive comment
 anchors are not reliably rendered back in Google Docs, so an anchored comment
@@ -192,3 +196,23 @@ or reply from the active account (`author.me`) with the same content and a
 than creating a duplicate. Two identical comments written by the same person
 after the preview remain genuinely ambiguous and are reported as a conflict,
 not silently merged.
+
+## New comments are native, anchored Google Docs comments
+
+Since 2026-10-21 (CHG-10) every new comment is a native Google Docs comment
+(`insertComment`) anchored to one exact, unique phrase of a single-tab Google
+Doc, such as a section title; general comments are never created, and new
+comments on other file types are refused. Drive custom anchors are not rendered
+as text anchors by Workspace editors, while native Docs comments are, and they
+can be read back with their live anchor. Native operations travel in one
+`documents.batchUpdate` guarded by the preview revision, so they need editor
+access; commenter-only access is out of scope because it would need a separate
+concurrency design. Google offers no idempotency key for comment insertion, so
+an operation is reported only after a read-back proves it; after a sent
+attempt without proof the safe outcome is an explicit, recoverable uncertainty
+(`comment_write_uncertain`, `write_may_have_occurred`), never an automatic
+reinsertion. Historical Drive comments stay readable, replyable and resolvable
+by raw ID, native threads are addressed as `docs:<id>`, and no cross-API ID
+equivalence is assumed beyond showing an identical raw ID once. Existing
+comments are neither deleted nor migrated, and an accepted plan with an
+unfinished unanchored `add` is refused rather than rewritten.

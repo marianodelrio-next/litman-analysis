@@ -71,11 +71,11 @@ enums, and rejection of extra properties; invalid input returns
 | `search_in_dossier` | query | Find files by accent- and case-insensitive name over the tree walk, at most 50 with `path` and `truncated`. |
 | `get_file_info` | query | Metadata, `path` and the account's `can_edit`, `can_rename`, `can_move`, `can_trash`, `can_copy`, `can_download`, `can_comment` for one file of the tree. |
 | `read_file` | query | Page through the text of any dossier file: PDF, DOCX, text, Markdown, CSV, XLSX, Google Docs, Sheets or Slides. |
-| `list_comments` | query | List a file's comments with replies; resolved ones only with `include_resolved`. |
+| `list_comments` | query | List a file's comments with replies; resolved ones only with `include_resolved`. Google Docs add native threads (`source: docs`, ID `docs:<id>`, current `anchor`) to historical Drive comments (`source: drive`). |
 | `preview_file_changes` | query | Resolve 1–20 protected folder/file operations (create folder, rename, move, copy, trash, export, convert) and store the accepted plan. |
 | `apply_file_changes` | mutation | Apply or resume the accepted file-change plan; Drive trash is reversible and no action calls `files.delete`. |
-| `preview_comment_changes` | query | Resolve 1–10 comment operations on one file (`add`, `reply`, `resolve`) and store the accepted plan. |
-| `apply_comment_changes` | mutation | Apply or resume the accepted comment-change plan, adopting a matching comment or reply from the active account instead of duplicating it. |
+| `preview_comment_changes` | query | Resolve 1–10 comment operations on one file (`add` with a unique exact `anchor` in a single-tab Google Doc, `reply`, `resolve`) and store the accepted plan. New comments need edit access; native and historical Drive threads go in separate plans. |
+| `apply_comment_changes` | mutation | Apply the accepted comment-change plan: native Docs operations are sent once on the preview revision and reported only after a read-back proves them; historical Drive replies resume by adopting a matching reply from the active account. |
 | `read_google_doc` | query | Page through the body text of a Google Doc in the dossier tree, outside `_LitMan`, with its `revision_id`. |
 | `preview_document_edit` | query | Plan 1–20 closed operations on a dossier Google Doc (text edits, or paragraph, text and list styles; never both in one plan) and show each matched span with context. |
 | `apply_document_edit` | mutation | Send the accepted edit as one batch guarded by the preview's revision. |
@@ -193,6 +193,20 @@ prepare a new preview. An interrupted edit or creation is resumed by repeating
 the same acceptance; it never sends a second edit batch or writes a new
 document's text twice.
 
+Comment plans on Google Docs never resend a native batch once it was sent.
+`comment_write_uncertain` and `comment_save_failed` carry
+`write_may_have_occurred: true` and the `operation_id`: Google may have saved
+some or all of the comments, but LitMan could not prove it. Repeating the same
+acceptance only reads the document again and completes the operation if every
+effect is now visible; it never inserts a second comment. If it stays
+uncertain, a person must look at the document in Google Docs before preparing a
+new plan, otherwise a comment may be duplicated. A `conflict` with
+`document_changed` wrote nothing; `comment_anchor_unverified` means a comment
+exists but not on the planned phrase and must be inspected. A legacy plan that
+returns `comment_anchor_required` was accepted before anchors were required:
+nothing of it is written, and a new plan with an `anchor` for each `add` is
+needed. Existing comments are never deleted or migrated.
+
 A sheet edit action that returns `conflict` with `sheet_changed` wrote nothing
 for that range: its current values no longer match either the preview's
 values or its expected result. Earlier actions of the same plan stay written;
@@ -226,6 +240,12 @@ Still pending:
    Docs, that `revisionId` is returned to an editor, the exact payloads of a
    disabled API and of a stale revision, and that `diagnose` reports
    `docs_api` correctly before and after enabling the API.
+5. In an authorized disposable Google Doc, confirm that native anchored
+   comments are visible on the intended phrase and section title, that
+   `list_comments` reads, replies to and resolves them alongside a historical
+   Drive comment without duplicate views, and record the exact 400 payload of a
+   stale revision on a comment batch (the adapter treats `FAILED_PRECONDITION`
+   or a message naming the revision as `document_changed`).
 
 The [Windows Codex app validation guide](../../docs/windows-codex-validation.md)
 owns the detailed checklist, including the long-MCP-call timeout check. It is

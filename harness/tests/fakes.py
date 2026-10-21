@@ -1,6 +1,7 @@
 """Deterministic Drive, shared-state and Core doubles shared by the harness tests."""
 from __future__ import annotations
 
+import copy
 from dataclasses import replace
 import hashlib
 import json
@@ -412,6 +413,17 @@ class FakeDocs:
         self.gets: list[str] = []
         self.batches: list[tuple[str, list[dict], str]] = []
         self.lose_answer: set[str] = set()  # document IDs whose next batch "times out" after being applied
+        # Native comments: threads (``CommentThread`` JSON) and the first tab's anchors, per document.
+        self.threads: dict[str, list[dict]] = {}
+        self.anchors: dict[str, dict[str, dict]] = {}
+        self.comment_batches: list[tuple[str, list[dict], str]] = []
+        # Document ID → fault of its next comment batch: "failed" (nothing saved, ALL_FAILED_UNKNOWN_REASON),
+        # "saved_but_failed" (saved, yet reported ALL_FAILED_UNKNOWN_REASON), "no_state" (saved, no
+        # commentUpdateState), "no_ids" (saved, empty replies), "lost" (saved, answer lost), "lost_unsaved"
+        # (nothing saved, answer lost) or "rejected" (a 400 that blames the requests: nothing saved).
+        self.comment_fault: dict[str, str] = {}
+        self.failing_comment_reads = 0  # the next N get_with_comments calls fail as a server error
+        self._comment_counter = 0
 
     def add(self, document_id: str, blocks: list, *, tabs: int = 1, child_tabs: int = 0,
             revision: str | None = "rev-1") -> None:
@@ -452,6 +464,93 @@ class FakeDocs:
         if document["revision"] is not None:
             raw["revisionId"] = document["revision"]
         return raw
+
+    def get_with_comments(self, document_id):
+        if self.failing_comment_reads:
+            self.failing_comment_reads -= 1
+            raise HarnessError("docs_error", "Google Docs rechazó la solicitud", details={"http_status": 503})
+        raw = self.get(document_id)
+        raw["comments"] = copy.deepcopy(self.threads.get(document_id, []))
+        raw["tabs"][0]["documentTab"]["commentAnchors"] = copy.deepcopy(self.anchors.get(document_id, {}))
+        return raw
+
+    def add_thread(self, document_id: str, comment_id: str, content: str, *, snippet: str | None = None,
+                   status: str = "OPEN", me: bool = False, created: str = "2026-10-01T09:00:00Z",
+                   replies: list[dict] | None = None) -> dict:
+        """A native thread, anchored to the first occurrence of ``snippet`` when given."""
+        anchor_id = None
+        if snippet is not None:
+            text = self.plain_text(document_id)
+            start = _docs_index(self.documents[document_id]["tokens"], text.index(snippet))
+            anchor_id = f"kix.anchor-{comment_id}"
+            self.anchors.setdefault(document_id, {})[anchor_id] = {
+                "anchorId": anchor_id, "ranges": [{"startIndex": start, "endIndex": start + _utf16(snippet),
+                                                   "tabId": "t.0"}]}
+        thread = {"commentId": comment_id, "headPost": _post(f"{comment_id}-head", content, me, created),
+                  "replies": list(replies or []), "status": status}
+        if anchor_id:
+            thread.update(anchorId=anchor_id, plainTextQuote=snippet)
+        self.threads.setdefault(document_id, []).append(thread)
+        return thread
+
+    def batch_update_comments(self, document_id, requests, required_revision_id):
+        self.comment_batches.append((document_id, requests, required_revision_id))
+        document = self.documents[document_id]
+        if required_revision_id != document["revision"]:
+            raise HarnessError("document_changed", "El documento cambió", details={"http_status": 400})
+        fault = self.comment_fault.pop(document_id, None)
+        if fault == "rejected":
+            raise HarnessError("docs_request_rejected", "Rechazada", details={"http_status": 400})
+        replies = []
+        saved = fault not in ("failed", "lost_unsaved")
+        for request in requests:
+            (kind, body), = request.items()
+            if kind == "insertComment":
+                assert set(body) == {"range", "content"}, "insertComment sólo lleva range y content"
+                assert len(body["content"].encode("utf-8")) <= 2048
+                span = body["range"]
+                assert span.get("tabId", "t.0") == "t.0" and set(span) <= {"startIndex", "endIndex", "tabId"}
+                _position(document["tokens"], span["startIndex"])
+                _position(document["tokens"], span["endIndex"])
+                self._comment_counter += 1
+                comment_id = f"kix.native-{self._comment_counter}"
+                anchor_id = f"kix.anchor-{self._comment_counter}"
+                thread = {"commentId": comment_id, "anchorId": anchor_id, "status": "OPEN", "replies": [],
+                          "plainTextQuote": _span_text(document["tokens"], span),
+                          "headPost": _post(f"{comment_id}-head", body["content"], True, self._stamp())}
+                if saved:
+                    self.threads.setdefault(document_id, []).append(thread)
+                    self.anchors.setdefault(document_id, {})[anchor_id] = {
+                        "anchorId": anchor_id, "ranges": [{**span, "tabId": "t.0"}]}
+                replies.append({"insertComment": {"commentThread": copy.deepcopy(thread)}})
+            elif kind == "addCommentReply":
+                assert set(body) == {"commentId", "post"}
+                assert set(body["post"]) <= {"content", "commentAction"}
+                thread = next(t for t in self.threads[document_id] if t["commentId"] == body["commentId"])
+                self._comment_counter += 1
+                post = _post(f"post-{self._comment_counter}", body["post"].get("content", ""), True, self._stamp())
+                if body["post"].get("commentAction"):
+                    post["commentAction"] = body["post"]["commentAction"]
+                if saved:
+                    thread["replies"].append(post)
+                    if post.get("commentAction") == "RESOLVE":
+                        thread["status"] = "RESOLVED"
+                replies.append({"addCommentReply": {"post": copy.deepcopy(post)}})
+            else:
+                raise AssertionError(f"petición de comentario no admitida: {kind}")
+        if fault in ("lost", "lost_unsaved"):
+            raise RuntimeError("timeout simulado tras enviar los comentarios")
+        response = {"documentId": document_id, "replies": [] if fault == "no_ids" else replies,
+                    "commentUpdateState": "ALL_SAVED" if saved else "ALL_FAILED_UNKNOWN_REASON",
+                    "writeControl": {"requiredRevisionId": document["revision"]}}
+        if fault == "saved_but_failed":
+            response["commentUpdateState"] = "ALL_FAILED_UNKNOWN_REASON"
+        if fault == "no_state":
+            del response["commentUpdateState"]
+        return response
+
+    def _stamp(self) -> str:
+        return f"2026-10-21T10:00:{self._comment_counter:02d}Z"
 
     def batch_update(self, document_id, requests, required_revision_id):
         self.batches.append((document_id, requests, required_revision_id))
@@ -535,6 +634,36 @@ class FakeDocs:
         document = self.documents[document_id]
         document["version"] += 1
         document.update(tokens=tokens, revision=f"rev-{document['version']}")
+
+
+def _post(post_id: str, content: str, me: bool, created: str) -> dict:
+    return {"postId": post_id, "content": content, "createTime": created,
+            "author": {"displayName": "Yo" if me else "Ana", "me": me}}
+
+
+def _utf16(text: str) -> int:
+    return len(text.encode("utf-16-le")) // 2
+
+
+def _docs_index(tokens: list, char_offset: int) -> int:
+    """Docs index of the ``char_offset``-th visible character (suggested insertions excluded)."""
+    at, seen = 0, 0
+    for token in tokens:
+        if token[0] == "char" and token[2] != "insert":
+            if seen == char_offset:
+                return at
+            seen += 1
+        at += _width(token)
+    raise AssertionError("desplazamiento fuera del documento")
+
+
+def _span_text(tokens: list, range_: dict) -> str:
+    at, text = 0, []
+    for token in tokens:
+        if token[0] == "char" and range_["startIndex"] <= at < range_["endIndex"]:
+            text.append(token[1])
+        at += _width(token)
+    return "".join(text)
 
 
 def _chars(text: str, suggestion: str | None = None) -> list:

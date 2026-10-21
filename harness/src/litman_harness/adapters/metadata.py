@@ -81,7 +81,13 @@ class MetadataDocsGateway:
     def get(self, *args):
         raise HarnessError("read_only_adapter", "El adaptador de metadatos no puede leer documentos de Google Docs")
 
+    def get_with_comments(self, *args):
+        raise HarnessError("read_only_adapter", "El adaptador de metadatos no puede leer documentos de Google Docs")
+
     def batch_update(self, *args):
+        raise HarnessError("read_only_adapter", "El adaptador de metadatos no puede escribir")
+
+    def batch_update_comments(self, *args):
         raise HarnessError("read_only_adapter", "El adaptador de metadatos no puede escribir")
 
 

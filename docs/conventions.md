@@ -66,3 +66,8 @@ it does not replace or repeat those instructions.
   plan-local nonce in one of those four hashed fields — `comment_changes`
   uses the action's index as `parent_id`, keeping the real target ID in
   `metadata`. (2026-10-20, CHG-0007-06, quality review)
+- `swfactory task verify` runs each acceptance command without a shell, so a
+  command such as `cd harness && uv run pytest …` is reported `not_run`
+  (`No such file or directory: 'cd'`). Write acceptance commands the way
+  `[checks]` does, for example `bash -lc 'cd harness && …'` or
+  `uv --directory harness run pytest …`. (2026-10-21, CHG-10.1)

@@ -13,6 +13,7 @@ from typing import Any
 from ..adapters.documents import DOCX_MIME, PDF_MIME, extract_text
 from ..adapters.sheets import FORMATTED_VALUE, SheetsGateway
 from ..errors import HarnessError
+from .comments import CommentService
 from .documents import CONTENT_NOTE, DocumentService
 from .manifest import Manifest
 from .membership import belongs_to_root, in_litman
@@ -77,11 +78,13 @@ def _quoted_range(title: str) -> str:
 
 
 class FileService:
-    def __init__(self, dossier: ExpedienteService, documents: DocumentService, sheets: SheetsGateway):
+    def __init__(self, dossier: ExpedienteService, documents: DocumentService, sheets: SheetsGateway,
+                 comments: CommentService | None = None):
         self.dossier = dossier
         self.drive = dossier.drive
         self.documents = documents
         self.sheets = sheets
+        self.comments = comments or CommentService(dossier, documents)
 
     # -- navigation ------------------------------------------------------------------------------
 
@@ -146,8 +149,7 @@ class FileService:
         if item.mime_type == FOLDER_MIME:
             raise HarnessError("unsupported_document", "Una carpeta no tiene comentarios",
                                details={"mime_type": item.mime_type})
-        comments = [_comment(raw) for raw in self.drive.comments(item.id)
-                    if include_resolved or not raw.get("resolved")]
+        comments = self.comments.listed(item, include_resolved)
         return {"folder_id": root.id, "file_id": item.id, "name": item.name, "include_resolved": include_resolved,
                 "comments": comments, "note": CONTENT_NOTE, "writes": False}
 
@@ -263,18 +265,3 @@ def _workbook_text(path: Path) -> str:
         return "\n".join(sections)
     finally:
         workbook.close()
-
-
-def _comment(raw: dict[str, Any]) -> dict[str, Any]:
-    quoted = raw.get("quotedFileContent")
-    return {"id": raw.get("id"), "content": raw.get("content"), "author": _author(raw),
-            "created_time": raw.get("createdTime"), "resolved": bool(raw.get("resolved")),
-            "quoted_text": quoted.get("value") if isinstance(quoted, dict) else None,
-            "replies": [{"id": reply.get("id"), "content": reply.get("content"), "author": _author(reply),
-                         "created_time": reply.get("createdTime"), "action": reply.get("action")}
-                        for reply in raw.get("replies") or [] if not reply.get("deleted")]}
-
-
-def _author(raw: dict[str, Any]) -> str | None:
-    author = raw.get("author")
-    return author.get("displayName") if isinstance(author, dict) else None
