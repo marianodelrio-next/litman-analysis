@@ -465,21 +465,119 @@ def test_style_apply_rechecks_membership_and_a_changed_document_is_a_conflict(tm
     assert result["writes"] is False and setup.text().startswith("Nuevo Memoria")
 
 
-def test_style_plan_whose_answer_was_lost_is_resent_with_the_current_revision(tmp_path: Path):
+def test_style_plan_whose_answer_was_lost_is_completed_from_the_styles_read_back_without_a_second_batch(
+        tmp_path: Path):
     setup = Setup(tmp_path)
     preview = setup.preview([{"op": "set_paragraph_style", "anchor": "Fin", "style": "HEADING_3"},
-                             {"op": "set_text_style", "find": "Fin", "occurrences": 1, "bold": True}])
+                             {"op": "set_text_style", "find": "Fin", "occurrences": 1, "bold": True,
+                              "highlight_color": "#ffff00", "link_url": "https://example.org/fin"}])
     setup.docs.lose_answer.add("offer-doc")
     assert error(lambda: setup.documents.apply_edit(preview["plan_id"])).code == "operation_interrupted"
     assert setup.docs.documents["offer-doc"]["revision"] == "rev-2"
     result = setup.documents.apply_edit(preview["plan_id"])
-    assert result["status"] == "succeeded" and result["revision_id"] == "rev-3"
-    assert [batch[2] for batch in setup.docs.batches] == ["rev-1", "rev-2"]
-    assert setup.docs.batches[0][1] == setup.docs.batches[1][1]
+    assert result["status"] == "succeeded" and result["revision_id"] == "rev-2"
+    assert setup.store.record("person-1", preview["operation_id"]).status == OperationStatus.SUCCEEDED
+    assert [batch[2] for batch in setup.docs.batches] == ["rev-1"]
     assert setup.docs.paragraph_style("offer-doc", "Fin") == ("HEADING_3", "none")
-    assert setup.docs.text_style("offer-doc", "Fin") == {"bold": True}
+    assert setup.docs.text_style("offer-doc", "Fin") == {"bold": True, "background": "#FFFF00",
+                                                         "link": "https://example.org/fin"}
     replayed = setup.documents.apply_edit(preview["plan_id"])
-    assert replayed["replayed"] is True and len(setup.docs.batches) == 2
+    assert replayed["replayed"] is True and len(setup.docs.batches) == 1
+
+
+def test_style_plan_interrupted_before_the_write_is_resent_on_the_preview_revision(tmp_path: Path):
+    setup = Setup(tmp_path)
+    preview = setup.preview([{"op": "set_text_style", "find": "Fin", "occurrences": 1, "highlight_color": "#00FF00"}])
+    calls = []
+    original = setup.docs.batch_update
+
+    def fails_once(*args):
+        calls.append(args)
+        if len(calls) == 1:
+            raise RuntimeError("red caída antes de llegar a Google")
+        return original(*args)
+
+    setup.docs.batch_update = fails_once
+    assert error(lambda: setup.documents.apply_edit(preview["plan_id"])).code == "operation_interrupted"
+    result = setup.documents.apply_edit(preview["plan_id"])
+    assert result["status"] == "succeeded" and [call[2] for call in calls] == ["rev-1", "rev-1"]
+    assert setup.docs.text_style("offer-doc", "Fin") == {"background": "#00FF00"}
+
+
+@pytest.mark.parametrize("change", [
+    {"background": "#FF0000"},  # someone highlighted the text in another color
+    {"link": "https://otro.example/"},  # someone linked it elsewhere
+    {"italic": True},  # a property the plan does not set: the revision still moved
+])
+def test_style_plan_not_written_whose_document_then_changed_format_only_is_a_conflict_without_resending(
+        tmp_path: Path, change):
+    setup = Setup(tmp_path)
+    before = setup.text()
+    preview = setup.preview([{"op": "set_text_style", "find": "Fin", "occurrences": 1, "highlight_color": "#FFFF00",
+                              "link_url": "https://example.org/"}])
+    original = setup.docs.batch_update
+
+    def lost_before_writing(*args):
+        setup.docs.batch_update = original
+        raise RuntimeError("respuesta perdida sin escribir")
+
+    setup.docs.batch_update = lost_before_writing
+    assert error(lambda: setup.documents.apply_edit(preview["plan_id"])).code == "operation_interrupted"
+    setup.docs.style_outside("offer-doc", "Fin", **change)
+    result = setup.documents.apply_edit(preview["plan_id"])
+    assert result["status"] == "conflict" and result["writes"] is False
+    assert result["conflict"]["code"] == "document_changed" and result["conflict"]["write_may_have_occurred"] is True
+    assert setup.docs.batches == [] and setup.text() == before
+    assert setup.docs.text_style("offer-doc", "Fin") == change
+
+
+def test_style_plan_written_then_reformatted_by_someone_is_a_conflict_that_keeps_their_format(tmp_path: Path):
+    setup = Setup(tmp_path)
+    preview = setup.preview([{"op": "set_text_style", "find": "Fin", "occurrences": 1, "highlight_color": "#FFFF00"}])
+    setup.docs.lose_answer.add("offer-doc")
+    assert error(lambda: setup.documents.apply_edit(preview["plan_id"])).code == "operation_interrupted"
+    setup.docs.style_outside("offer-doc", "Fin", background="#0000FF")
+    result = setup.documents.apply_edit(preview["plan_id"])
+    assert result["status"] == "conflict" and result["conflict"]["write_may_have_occurred"] is True
+    assert len(setup.docs.batches) == 1 and setup.docs.text_style("offer-doc", "Fin") == {"background": "#0000FF"}
+
+
+def test_style_plan_with_a_list_whose_answer_was_lost_is_a_conflict_because_lists_are_not_read_back(
+        tmp_path: Path):
+    setup = Setup(tmp_path)
+    preview = setup.preview([{"op": "set_list", "anchor": "Fin", "list": "bullets"}])
+    setup.docs.lose_answer.add("offer-doc")
+    assert error(lambda: setup.documents.apply_edit(preview["plan_id"])).code == "operation_interrupted"
+    result = setup.documents.apply_edit(preview["plan_id"])
+    assert result["status"] == "conflict" and result["conflict"]["write_may_have_occurred"] is True
+    assert len(setup.docs.batches) == 1
+
+
+def test_style_plan_stored_without_checks_is_resent_only_on_its_preview_revision(tmp_path: Path):
+    """A plan stored before style checks existed: no read-back, and never a resend on a newer revision."""
+    setup = Setup(tmp_path)
+    for lose in (False, True):
+        preview = setup.preview([{"op": "set_text_style", "find": "Fin", "occurrences": 1, "bold": lose}])
+        plan = setup.store.load("person-1", preview["plan_id"])
+        metadata = {key: value for key, value in plan.actions[0].metadata.items() if key != "checks"}
+        plan_id = setup.store.save(replace(plan, actions=(replace(plan.actions[0], metadata=metadata),)))
+        assert "checks" not in setup.store.load("person-1", plan_id).actions[0].metadata
+        original = setup.docs.batch_update
+
+        def interrupted(*args, lose=lose):
+            setup.docs.batch_update = original
+            if lose:
+                original(*args)
+            raise RuntimeError("respuesta perdida")
+
+        setup.docs.batch_update = interrupted
+        assert error(lambda: setup.documents.apply_edit(plan_id)).code == "operation_interrupted"
+        result = setup.documents.apply_edit(plan_id)
+        if lose:
+            assert result["status"] == "conflict" and result["conflict"]["code"] == "document_changed"
+        else:
+            assert result["status"] == "succeeded"
+    assert [batch[2] for batch in setup.docs.batches] == ["rev-1", "rev-2"]
 
 
 def test_style_plan_whose_answer_was_lost_and_whose_text_then_changed_is_a_conflict(tmp_path: Path):
@@ -491,6 +589,201 @@ def test_style_plan_whose_answer_was_lost_and_whose_text_then_changed_is_a_confl
     result = setup.documents.apply_edit(preview["plan_id"])
     assert result["status"] == "conflict" and result["conflict"]["code"] == "document_changed"
     assert len(setup.docs.batches) == 1
+
+
+# -- highlighting and links ------------------------------------------------------------------------
+
+def test_highlight_is_set_changed_and_cleared_on_exactly_the_matches_without_touching_other_styles(tmp_path: Path):
+    setup = Setup(tmp_path)
+    before = setup.text()
+    setup.docs.style_outside("offer-doc", "Plazo: 12", bold=True)
+    first = setup.preview([{"op": "set_text_style", "find": "Plazo", "occurrences": 2, "highlight_color": "#ffff00"}])
+    assert first["operations"][0]["highlight_color"] == "#FFFF00"
+    assert [match["before"] for match in first["operations"][0]["matches"]] == [{"highlight_color": None}] * 2
+    setup.documents.apply_edit(first["plan_id"])
+    request = setup.docs.batches[0][1][0]["updateTextStyle"]
+    assert request["fields"] == "backgroundColor"
+    assert request["textStyle"] == {"backgroundColor": {"color": {"rgbColor": {"red": 1.0, "green": 1.0,
+                                                                                 "blue": 0.0}}}}
+    assert setup.docs.text_style("offer-doc", "Plazo", 0) == {"bold": True, "background": "#FFFF00"}
+    assert setup.docs.text_style("offer-doc", "Plazo", 1) == {"background": "#FFFF00"}
+    assert setup.docs.text_style("offer-doc", ": 12") == {"bold": True}
+    assert setup.docs.text_style("offer-doc", " ampliable") == {}
+    second = setup.preview([{"op": "set_text_style", "find": "Plazo", "occurrences": 2, "highlight_color": "#1A2B3C"}])
+    assert second["operations"][0]["matches"][0]["before"] == {"highlight_color": "#FFFF00"}
+    setup.documents.apply_edit(second["plan_id"])
+    assert setup.docs.text_style("offer-doc", "Plazo", 1) == {"background": "#1A2B3C"}
+    third = setup.preview([{"op": "set_text_style", "find": "Plazo", "occurrences": 2, "highlight_color": None}])
+    setup.documents.apply_edit(third["plan_id"])
+    cleared = setup.docs.batches[2][1][0]["updateTextStyle"]
+    assert cleared["textStyle"] == {"backgroundColor": {}} and cleared["fields"] == "backgroundColor"
+    assert setup.docs.text_style("offer-doc", "Plazo", 0) == {"bold": True}
+    assert setup.docs.text_style("offer-doc", "Plazo", 1) == {}
+    assert setup.text() == before
+
+
+def test_link_is_added_changed_and_removed_with_the_complete_url_and_the_formatting_notice(tmp_path: Path):
+    setup = Setup(tmp_path)
+    before = setup.text()
+    url = "https://example.org/especificaciones?lote=1&v=2#anexo"
+    first = setup.preview([{"op": "set_text_style", "find": "Memoria técnica", "occurrences": 1, "link_url": url}])
+    operation = first["operations"][0]
+    assert operation["link_url"] == url and "formato habitual" in operation["notice"]
+    assert operation["matches"][0]["before"] == {"link_url": None}
+    setup.documents.apply_edit(first["plan_id"])
+    request = setup.docs.batches[0][1][0]["updateTextStyle"]
+    assert request["textStyle"] == {"link": {"url": url}} and request["fields"] == "link"
+    assert setup.docs.text_style("offer-doc", "Memoria técnica") == {"link": url}
+    second = setup.preview([{"op": "set_text_style", "find": "Memoria técnica", "occurrences": 1,
+                             "link_url": "http://drive.example/d/1"}])
+    assert second["operations"][0]["matches"][0]["before"] == {"link_url": url}
+    setup.documents.apply_edit(second["plan_id"])
+    assert setup.docs.text_style("offer-doc", "Memoria técnica") == {"link": "http://drive.example/d/1"}
+    third = setup.preview([{"op": "set_text_style", "find": "Memoria técnica", "occurrences": 1, "link_url": None}])
+    assert third["operations"][0]["link_url"] is None and "notice" in third["operations"][0]
+    setup.documents.apply_edit(third["plan_id"])
+    removed = setup.docs.batches[2][1][0]["updateTextStyle"]
+    assert removed["textStyle"] == {} and removed["fields"] == "link"
+    assert setup.docs.text_style("offer-doc", "Memoria técnica") == {}
+    assert setup.text() == before
+
+
+def test_flags_highlight_and_link_go_together_in_one_request_with_an_exact_mask(tmp_path: Path):
+    setup = Setup(tmp_path)
+    preview = setup.preview([{"op": "set_text_style", "find": "Fin", "occurrences": 1, "italic": True,
+                              "link_url": "https://example.org/", "highlight_color": "#00ff00"}])
+    request = setup.store.load("person-1", preview["plan_id"]).actions[0].metadata["requests"][0]["updateTextStyle"]
+    assert request["fields"] == "italic,backgroundColor,link"
+    setup.documents.apply_edit(preview["plan_id"])
+    assert setup.docs.text_style("offer-doc", "Fin") == {"italic": True, "background": "#00FF00",
+                                                         "link": "https://example.org/"}
+
+
+def test_mixed_before_values_are_reported_as_mixed(tmp_path: Path):
+    setup = Setup(tmp_path)
+    setup.docs.style_outside("offer-doc", "Pla", 1, background="#FFFF00")
+    preview = setup.preview([{"op": "set_text_style", "find": "Plazo", "occurrences": 2, "highlight_color": None}])
+    assert [match["before"] for match in preview["operations"][0]["matches"]] == [
+        {"highlight_color": None}, {"highlight_color": "mixed"}]
+
+
+@pytest.mark.parametrize("find, code", [
+    ("Plazo:", "partial_link_overlap"),  # the link continues after the span
+    ("12 meses", "partial_link_overlap"),  # the link starts before the span
+    ("Plazo: 12 meses", None),  # the whole link, split into runs with different flags
+    ("Plazo: 12 meses. Plazo", None),  # the span contains the whole link
+])
+@pytest.mark.parametrize("url", ["https://example.org/nuevo", None])
+def test_a_link_change_must_cover_the_whole_existing_link(tmp_path: Path, find, code, url):
+    setup = Setup(tmp_path)
+    setup.docs.style_outside("offer-doc", "Plazo: 12 meses", link="https://example.org/plazo")
+    setup.docs.style_outside("offer-doc", "12", bold=True)
+    operation = {"op": "set_text_style", "find": find, "occurrences": 1, "link_url": url}
+    if code:
+        raised = error(lambda: setup.preview([operation]))
+        assert raised.code == code and raised.details["operation"] == 0 and raised.details["text"] == find
+        assert setup.plans() == []
+    else:
+        setup.documents.apply_edit(setup.preview([operation])["plan_id"])
+        assert setup.docs.text_style("offer-doc", "Plazo:") == ({"link": url} if url else {})
+
+
+def test_highlight_does_not_need_the_whole_link_and_adjacent_links_are_not_one_link(tmp_path: Path):
+    setup = Setup(tmp_path)
+    setup.docs.style_outside("offer-doc", "Plazo: 12 meses", link="https://example.org/plazo")
+    setup.docs.style_outside("offer-doc", "Plazo ampliable", link="https://example.org/otro")
+    assert setup.preview([{"op": "set_text_style", "find": "12", "occurrences": 1, "highlight_color": "#FFFF00"}])
+    # ". " has no link between the two links: each one is whole.
+    assert setup.preview([{"op": "set_text_style", "find": "Plazo ampliable", "occurrences": 1,
+                           "link_url": None}])
+    setup.docs.add("offer-doc", ["ab|cd"])
+    setup.docs.style_outside("offer-doc", "ab", link="https://example.org/a")
+    setup.docs.style_outside("offer-doc", "cd", link="https://example.org/b")
+    setup.docs.style_outside("offer-doc", "|", link="https://example.org/b")
+    assert setup.preview([{"op": "set_text_style", "find": "ab", "occurrences": 1, "link_url": None}])
+    assert error(lambda: setup.preview([{"op": "set_text_style", "find": "|c", "occurrences": 1, "link_url": None}])
+                 ).code == "partial_link_overlap"
+
+
+def test_a_link_is_not_cut_at_a_hidden_suggested_insertion(tmp_path: Path):
+    setup = Setup(tmp_path)
+    setup.docs.add("offer-doc", [["AB", ("C", "insert"), "D fin"]])
+    setup.docs.style_outside("offer-doc", "ABD", link="https://example.org/")
+    raised = error(lambda: setup.preview([{"op": "set_text_style", "find": "AB", "occurrences": 1,
+                                           "link_url": None}]))
+    assert raised.code in ("partial_link_overlap", "pending_suggestions")
+    document = DocumentText.parse(setup.docs.get("offer-doc")["tabs"][0]["documentTab"]["body"])
+    assert document.link_crosses(2) and document.gaps[2] == "suggestion"
+
+
+@pytest.mark.parametrize("suggested, operation, refused", [
+    ("backgroundColor", {"highlight_color": "#FFFF00"}, True),
+    ("link", {"link_url": None}, True),
+    ("bold", {"bold": True}, True),
+    ("bold", {"highlight_color": "#FFFF00"}, False),
+    ("link", {"highlight_color": None}, False),
+])
+def test_pending_suggested_style_changes_of_a_requested_property_are_refused(tmp_path: Path, suggested, operation,
+                                                                             refused):
+    setup = Setup(tmp_path)
+    setup.docs.style_outside("offer-doc", "Fin", suggested=suggested)
+    call = lambda: setup.preview([{"op": "set_text_style", "find": "Fin", "occurrences": 1, **operation}])
+    if refused:
+        assert error(call).code == "pending_suggestions" and setup.plans() == []
+    else:
+        assert call()["operations"]
+
+
+@pytest.mark.parametrize("field, value", [
+    ("highlight_color", "yellow"), ("highlight_color", "#FFF"), ("highlight_color", "FFFF00"),
+    ("highlight_color", "#FFFF0G"), ("highlight_color", "#FFFF000"), ("highlight_color", 16776960),
+    ("highlight_color", True), ("highlight_color", ""),
+    ("link_url", ""), ("link_url", "example.org"), ("link_url", "/relative"), ("link_url", "ftp://example.org"),
+    ("link_url", "javascript:alert(1)"), ("link_url", "mailto:a@example.org"), ("link_url", "https://"),
+    ("link_url", "https://user:pw@example.org/"), ("link_url", "https://example.org/a b"),
+    ("link_url", "https://example.org/\nx"), ("link_url", "https://example.org/\x7f"),
+    ("link_url", "https:\\\\example.org"), ("link_url", "https://example.org:99999/"),
+    ("link_url", "https://example.org/" + "a" * 2_030), ("link_url", 3), ("link_url", False),
+    ("link_url", {"url": "https://example.org"}),
+])
+def test_invalid_highlight_colors_and_urls_store_no_plan(tmp_path: Path, field, value):
+    setup = Setup(tmp_path)
+    raised = error(lambda: setup.preview([{"op": "set_text_style", "find": "Fin", "occurrences": 1, field: value}]))
+    assert raised.code == "invalid_request" and raised.details == {"operation": 0, "field": field}
+    assert setup.plans() == [] and setup.docs.batches == []
+
+
+def test_valid_urls_are_kept_as_given_and_may_be_long_or_point_to_drive(tmp_path: Path):
+    setup = Setup(tmp_path)
+    for url in ("HTTPS://Example.org/Path", "https://docs.google.com/document/d/abc/edit",
+                "https://example.org/" + "a" * (2_048 - 20), "http://[::1]:8080/x", "https://ejemplo.es/año"):
+        preview = setup.preview([{"op": "set_text_style", "find": "Fin", "occurrences": 1, "link_url": url}])
+        assert preview["operations"][0]["link_url"] == url
+
+
+def test_text_model_reads_highlights_links_suggested_styles_and_named_styles():
+    body = {"content": [{"endIndex": 1, "sectionBreak": {}}, {"startIndex": 1, "endIndex": 9, "paragraph": {
+        "paragraphStyle": {"namedStyleType": "HEADING_2"},
+        "elements": [
+            {"startIndex": 1, "endIndex": 3, "textRun": {"content": "😀", "textStyle": {
+                "bold": True, "backgroundColor": {"color": {"rgbColor": {"red": 1, "blue": 0.2}}}}}},
+            {"startIndex": 3, "endIndex": 4, "textRun": {"content": "a", "textStyle": {
+                "backgroundColor": {"color": {"rgbColor": {}}}, "link": {"bookmarkId": "id.1"}}}},
+            {"startIndex": 4, "endIndex": 5, "textRun": {"content": "b", "textStyle": {"backgroundColor": {}}}},
+            {"startIndex": 5, "endIndex": 6, "textRun": {"content": "c", "textStyle": {"link": {"url": "https://x.es"}},
+                                                          "suggestedTextStyleChanges": {"s.1": {
+                                                              "textStyleSuggestionState": {"linkSuggested": True,
+                                                                                           "boldSuggested": False}}}}},
+            {"startIndex": 6, "endIndex": 9, "textRun": {"content": "de\n"}}]}}]}
+    document = DocumentText.parse(body)
+    assert document.text == "😀abcde\n" and document.named_styles == ["HEADING_2"]
+    assert document.styles[0] == {"bold": True, "italic": False, "underline": False, "highlight_color": "#FF0033",
+                                  "link_url": None}
+    assert document.styles[1]["highlight_color"] == "#000000"
+    assert document.styles[1]["link_url"] == '{"bookmarkId": "id.1"}'
+    assert document.styles[2]["highlight_color"] is None and document.styles[4]["highlight_color"] is None
+    assert document.styles[3]["link_url"] == "https://x.es" and document.suggested[3] == {"link"}
+    assert document.suggested[2] == frozenset() and not document.link_crosses(2)
 
 
 # -- document creation -----------------------------------------------------------------------------

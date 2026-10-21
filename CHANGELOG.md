@@ -23,6 +23,21 @@ LitMan is published as a single product version, shared by Core and Harness; see
   and can still be replied to and resolved, and a previously accepted plan that
   adds a general comment must be prepared again.
 
+### Added
+
+- Highlight text in dossier Google Docs with a chosen color, change the color
+  or remove it, and add, change or remove a web link on existing text, through
+  the same preview and acceptance as other format changes. The preview shows
+  the current highlight or link and the complete new address; Google Docs
+  gives links their usual appearance. A link change must cover a whole
+  existing link.
+
+### Fixed
+
+- A format change whose confirmation was lost is no longer sent again over
+  someone else's later format change: LitMan completes it when the requested
+  format is visible and otherwise asks you to check the document.
+
 ## [0.1.0] - 2026-10-20
 ### Added
 

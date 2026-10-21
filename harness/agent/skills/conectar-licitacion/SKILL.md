@@ -68,17 +68,25 @@ description: Conecta una licitación por el ID de su carpeta de Drive y guía a 
    Para cambiar su texto, prepara `preview_document_edit` con operaciones
    cerradas (`replace_text`, `insert_after`, `append`); para dar formato,
    con `set_paragraph_style` (título, subtítulo, encabezados 1 a 3 o texto
-   normal), `set_text_style` (negrita, cursiva, subrayado) o `set_list`
-   (viñetas, numerada o ninguna). Un plan lleva sólo operaciones de texto o
-   sólo de formato: no se mezclan. Para crear uno nuevo,
+   normal), `set_text_style` (negrita, cursiva, subrayado, resaltado con
+   `highlight_color` `#RRGGBB` y enlace con `link_url`, una URL `http(s)`
+   completa; `null` quita el resaltado o el enlace) o `set_list` (viñetas,
+   numerada o ninguna). Un plan lleva sólo operaciones de texto o sólo de
+   formato: no se mezclan. Al poner, cambiar o quitar un enlace, `find` debe
+   abarcar el enlace existente entero (`partial_link_overlap`); muestra a la
+   persona la URL completa y el aviso de que Google Docs da al enlace su
+   formato habitual. Para crear uno nuevo,
    `preview_document_creation` con `text`, con `markdown` (títulos, listas,
    negrita y cursiva pasan a formato de Google Docs) o con el `source_file_id`
    de un DOCX de la licitación (un DOCX se edita creando antes su Google Doc).
    Muestra la vista previa (cada cambio con su contexto) y aplica con
    `apply_document_edit`/`apply_document_creation` sólo el `plan_id` que la
    persona acepte. Ante `document_changed`, vuelve a leer y prepara un plan
-   nuevo; ante `docs_api_disabled`, explica que el administrador debe
-   habilitar la Google Docs API. Tablas e imágenes quedan fuera: díselo a la
+   nuevo; si además trae `write_may_have_occurred`, el formato pudo aplicarse
+   o no: pide a la persona que lo revise en Google Docs antes. Ante
+   `docs_request_rejected`, Google rechazó el cambio sin aplicarlo (por
+   ejemplo, una URL que no admite); ante `docs_api_disabled`, explica que el
+   administrador debe habilitar la Google Docs API. Tablas e imágenes quedan fuera: díselo a la
    persona.
 
    **Comentarios.** Para añadir un comentario, responder a uno existente o

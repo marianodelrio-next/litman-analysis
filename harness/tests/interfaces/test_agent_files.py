@@ -119,6 +119,15 @@ def test_connect_skill_no_longer_excludes_formatting_and_names_the_style_operati
     assert "Formato, tablas" not in flat and "Tablas, imágenes y comentarios quedan fuera" not in flat
     assert "Tablas e imágenes quedan fuera" in flat
     assert "no se mezclan" in flat
+    # Highlighting and links: typed nullable fields, whole links, visible URL and native formatting.
+    for name in ("highlight_color", "link_url", "null", "partial_link_overlap", "write_may_have_occurred",
+                 "docs_request_rejected"):
+        assert f"`{name}`" in flat
+    assert "URL completa" in flat and "formato habitual" in flat
+    help_skill = (AGENT / "skills" / "ayuda-litman" / "SKILL.md").read_text(encoding="utf-8")
+    assert "resaltado" in help_skill and "enlaces" in help_skill
+    workspace = (AGENT / "workspace" / "AGENTS.md").read_text(encoding="utf-8")
+    assert "resaltado y enlaces" in " ".join(workspace.split())
 
 
 def test_connect_skill_no_longer_excludes_comments_and_names_the_comment_operations():
