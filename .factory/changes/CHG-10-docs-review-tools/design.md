@@ -417,10 +417,10 @@ and documentation. Integration is intentionally omitted to use repository
     - "harness/agent/**"
     - "CHANGELOG.md"
   acceptance:
-    AC-01: "cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest -q tests/dossier/test_comments.py tests/interfaces/test_tools.py tests/adapters/test_docs_adapter.py"
-    AC-02: "cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest -q tests/dossier/test_comments.py tests/interfaces/test_assembly.py tests/adapters/test_docs_adapter.py"
-    AC-03: "cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest -q tests/dossier/test_comments.py tests/adapters/test_docs_adapter.py"
-    AC-04: "cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest -q tests/dossier/test_comments.py tests/dossier/test_files.py tests/interfaces/test_tools.py"
+    AC-01: "bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest -q tests/dossier/test_comments.py tests/interfaces/test_tools.py tests/adapters/test_docs_adapter.py'"
+    AC-02: "bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest -q tests/dossier/test_comments.py tests/interfaces/test_assembly.py tests/adapters/test_docs_adapter.py'"
+    AC-03: "bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest -q tests/dossier/test_comments.py tests/adapters/test_docs_adapter.py'"
+    AC-04: "bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest -q tests/dossier/test_comments.py tests/dossier/test_files.py tests/interfaces/test_tools.py'"
 - id: CHG-10.2
   title: Add highlighting and hyperlinks and verify the complete document workflow
   depends_on: [CHG-10.1]
@@ -436,9 +436,9 @@ and documentation. Integration is intentionally omitted to use repository
     - "harness/agent/**"
     - "CHANGELOG.md"
   acceptance:
-    AC-05: "cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest -q tests/dossier/test_documents.py tests/interfaces/test_tools.py tests/adapters/test_docs_adapter.py"
-    AC-06: "cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest -q tests/dossier/test_documents.py tests/interfaces/test_tools.py tests/adapters/test_docs_adapter.py"
-    AC-07: "cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest -q tests/dossier/test_documents.py tests/interfaces/test_assembly.py"
+    AC-05: "bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest -q tests/dossier/test_documents.py tests/interfaces/test_tools.py tests/adapters/test_docs_adapter.py'"
+    AC-06: "bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest -q tests/dossier/test_documents.py tests/interfaces/test_tools.py tests/adapters/test_docs_adapter.py'"
+    AC-07: "bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest -q tests/dossier/test_documents.py tests/interfaces/test_assembly.py'"
     AC-08: "Run the required full Harness and Core suites from each package and review updated capability documentation and changelog."
     AC-09: manual
 ```
