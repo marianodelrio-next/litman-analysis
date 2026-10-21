@@ -29,6 +29,9 @@ def test_oauth_assembly_writes_through_drive_v2_shared_state(unconfigured_env, t
     assert services.documents.dossier is services.expediente
     assert isinstance(services.sheets, GoogleSheetsGateway) and services.files.sheets is services.sheets
     assert services.files.documents is services.documents and services.files.dossier is services.expediente
+    # One comment service, sharing the Docs gateway: listing and native comment plans read the same threads.
+    assert services.files.comments is services.comments and services.comments.documents is services.documents
+    assert services.comments.docs is services.docs
 
 
 def test_metadata_assembly_stays_read_only(harness_env):
@@ -37,6 +40,7 @@ def test_metadata_assembly_stays_read_only(harness_env):
     assert services.expediente.shared_state is services.shared_state
     assert isinstance(services.docs, MetadataDocsGateway) and services.documents.docs is services.docs
     assert isinstance(services.sheets, MetadataSheetsGateway) and services.files.sheets is services.sheets
+    assert services.comments.docs is services.docs
 
 
 def test_diagnose_reports_the_drive_mechanism_with_usable_oauth(unconfigured_env, monkeypatch):

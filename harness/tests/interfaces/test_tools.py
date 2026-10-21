@@ -201,6 +201,36 @@ def test_file_tools_call_the_file_service_with_their_arguments():
                      ("list_comments", ("r", "f", True))]
 
 
+def test_comment_tools_require_an_anchor_for_new_comments_and_describe_verified_recovery():
+    operation = registry()["preview_comment_changes"].input_schema["properties"]["operations"]["items"]
+    assert operation["additionalProperties"] is False and operation["required"] == ["op"]
+    assert set(operation["properties"]) == {"op", "comment_id", "content", "anchor"}
+    assert operation["properties"]["anchor"]["maxLength"] == 1000 and "add (obligatorio)" in \
+        operation["properties"]["anchor"]["description"]
+    assert "2048 bytes" in operation["properties"]["content"]["description"]
+    assert "docs:<id>" in operation["properties"]["comment_id"]["description"]
+    preview = registry()["preview_comment_changes"].description
+    assert "nunca crea comentarios generales" in preview and "anchor_not_unique" in preview
+    apply = registry()["apply_comment_changes"].description
+    for phrase in ("comment_write_uncertain", "nunca reenvía", "comment_anchor_required", "write_may_have_occurred"):
+        assert phrase in apply
+    assert "source: docs" in registry()["list_comments"].description
+    calls = []
+
+    class Comments:
+        def preview(self, *args):
+            calls.append(args)
+            return {}
+
+    class Services:
+        comments = Comments()
+
+    operations = [{"op": "add", "content": "Revisar", "anchor": "12 meses"}]
+    assert invoke("preview_comment_changes", {"folder_id": "r", "file_id": "f", "operations": operations},
+                  Services)["ok"] is True
+    assert calls == [("r", "f", operations)]
+
+
 def test_preview_analysis_no_longer_accepts_a_provider_argument():
     def factory():
         raise AssertionError("services must not be built for invalid arguments")

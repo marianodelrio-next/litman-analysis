@@ -118,6 +118,10 @@ class DocumentText:
         return (any(self.deleted[begin:end])
                 or any(self.gaps.get(offset) == "suggestion" for offset in range(begin, end + 1)))
 
+    def span_text(self, start: int, stop: int) -> str:
+        """Visible text whose Docs index lies in ``[start, stop)``, e.g. the live text of a comment anchor."""
+        return "".join(char for char, at in zip(self.text, self.index) if start <= at < stop)
+
     def context(self, begin: int, end: int) -> dict[str, Any]:
         return {"offset": begin, "text": self.text[begin:end],
                 "before": self.text[max(0, begin - CONTEXT_CHARS):begin],
@@ -439,12 +443,42 @@ class DocumentService:
     def _read(self, document_id: str) -> tuple[dict[str, Any], int, DocumentText]:
         """The raw document, its tab count (child tabs included) and the first tab's text model."""
         raw = self.docs.get(document_id)
-        tabs = raw.get("tabs") or []
-        if not tabs:
-            raise HarnessError("unsupported_document", "Google Docs no devolvió el contenido del documento")
-        count = sum(1 + len(tab.get("childTabs") or []) for tab in tabs)
-        body = (tabs[0].get("documentTab") or {}).get("body") or {}
-        return raw, count, DocumentText.parse(body)
+        count, document = parse_document(raw)
+        return raw, count, document
+
+
+def parse_document(raw: dict[str, Any]) -> tuple[int, DocumentText]:
+    """The tab count (child tabs included) and the first tab's text model of a raw Docs document."""
+    tabs = raw.get("tabs") or []
+    if not tabs:
+        raise HarnessError("unsupported_document", "Google Docs no devolvió el contenido del documento")
+    count = sum(1 + len(tab.get("childTabs") or []) for tab in tabs)
+    body = (tabs[0].get("documentTab") or {}).get("body") or {}
+    return count, DocumentText.parse(body)
+
+
+def first_tab_id(raw: dict[str, Any]) -> str | None:
+    tab_id = ((raw.get("tabs") or [{}])[0].get("tabProperties") or {}).get("tabId")
+    return tab_id if isinstance(tab_id, str) and tab_id else None
+
+
+def anchor_selection(document: DocumentText, anchor: str, index: int, tab_id: str | None) -> dict[str, Any]:
+    """The one exact occurrence of ``anchor`` as a Docs range of the first tab, with its context.
+
+    Same literal matching as the edit operations: one paragraph, exactly once, never touching pending
+    suggested text.  The caller has already checked that the document has a single tab.
+    """
+    _checked_text(anchor, "anchor", index, minimum=1, maximum=MAX_MATCH_CHARS, newlines=False)
+    found = document.matches(anchor)
+    if len(found) != 1:
+        raise HarnessError("anchor_not_unique", "El ancla debe aparecer exactamente una vez en el documento",
+                           details={"operation": index, "actual": len(found)})
+    begin, end = found[0]
+    _refuse_suggestions(document, begin, end, index)
+    span = {"startIndex": document.index[begin], "endIndex": document.end_index(end)}
+    if tab_id:
+        span["tabId"] = tab_id
+    return {"range": span, "context": document.context(begin, end)}
 
 
 def _invalid(message: str, **details: Any) -> HarnessError:

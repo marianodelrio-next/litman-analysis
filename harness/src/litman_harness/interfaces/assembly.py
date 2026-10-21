@@ -97,10 +97,10 @@ def build_services(env: Mapping[str, str] | None = None, *, provider: DesktopOAu
     analysis = AnalysisService(drive, store, work_root=work, publication=publication,
                                settings=lambda: load_settings(env))
     documents = DocumentService(expediente, docs)
+    comments = CommentService(expediente, documents)
     return Services(kind, drive, shared_state, expediente, analysis, publication, SummaryService(expediente), docs,
                     documents, sheets, SheetsService(expediente, sheets),
-                    FileService(expediente, documents, sheets), FileChangeService(expediente),
-                    CommentService(expediente))
+                    FileService(expediente, documents, sheets, comments), FileChangeService(expediente), comments)
 
 
 def docs_api_status(docs: DocsGateway) -> str:

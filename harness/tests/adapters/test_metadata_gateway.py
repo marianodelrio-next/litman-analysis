@@ -25,7 +25,8 @@ def test_metadata_gateway_is_read_only(harness_env, tmp_path):
 
 def test_metadata_docs_gateway_neither_reads_nor_writes():
     gateway = MetadataDocsGateway()
-    for call in (lambda: gateway.get("doc"), lambda: gateway.batch_update("doc", [], "rev")):
+    for call in (lambda: gateway.get("doc"), lambda: gateway.batch_update("doc", [], "rev"),
+                 lambda: gateway.get_with_comments("doc"), lambda: gateway.batch_update_comments("doc", [], "rev")):
         with pytest.raises(HarnessError) as raised:
             call()
         assert raised.value.code == "read_only_adapter"
