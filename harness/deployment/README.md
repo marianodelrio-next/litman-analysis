@@ -11,6 +11,12 @@ Desktop. Paste one command into a terminal. The installer is idempotent, so the
 same command also reinstalls an existing installation from the latest
 published version.
 
+For Claude Desktop on Windows, follow the
+[business-user guide](../../docs/guia-litman-claude-windows.md). Use a local
+session in the Code tab with the LitMan folder selected. Core analyses use the
+separately installed native Claude Code CLI; the guide includes the checklist
+for the first real Windows validation.
+
 | Component | Windows | Ubuntu |
 | --- | --- | --- |
 | LitMan folder opened in the app | `%USERPROFILE%\LitMan` | `~/LitMan` |

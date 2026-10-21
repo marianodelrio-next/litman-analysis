@@ -21,6 +21,9 @@ public compatibility promise.
 
 - [Harness installation](../harness/deployment/README.md) is the canonical
   end-user and advanced installation guide.
+- [Claude on Windows](guia-litman-claude-windows.md) follows the business-user
+  installation and trial flow in Claude Desktop's local Code tab, with Claude
+  Code running Core analyses and a checklist for the first Windows validation.
 - [Core documentation](../core/README.md) covers standalone analysis and links
   to Core operations, deployment, and decisions.
 - [Harness documentation](../harness/README.md) covers dossier management and
