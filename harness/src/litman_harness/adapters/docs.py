@@ -7,7 +7,8 @@ from typing import Any, Protocol
 from ..errors import HarnessError
 from .google_errors import reasons
 
-# Enough to count the tabs and read the first tab's body; never headers, footers or styles.
+# Enough to count the tabs and read the first tab's body with its paragraph and text styles; never headers,
+# footers or the document's named style definitions.
 _FIELDS = ("revisionId,suggestionsViewMode,"
            "tabs(tabProperties(tabId),childTabs(tabProperties(tabId)),documentTab(body))")
 # The same, plus the document's comment threads and the first tab's comment anchors.
@@ -47,17 +48,18 @@ def _stale_revision(content: Any) -> bool:
 def docs_http_error(status: int, content: Any = None, *, write: bool = False, comments: bool = False) -> HarnessError:
     """The stable harness error for a failed Google Docs HTTP response.
 
-    A 400 on a write carries ``requiredRevisionId``: the document changed after the preview.  A comment batch
-    (``comments``) is told apart: only a 400 that blames the revision is ``document_changed``; any other 400 is
-    ``docs_request_rejected``, a request Google refused without writing anything.
+    A write carries ``requiredRevisionId``: only a 400 that blames the revision is ``document_changed`` (the
+    document changed after the preview); any other 400 is ``docs_request_rejected``, a request Google refused
+    without writing anything, such as a link URL it does not accept.  ``comments`` only names the request.
     """
     if status == 403 and reasons(content) & _DISABLED_REASONS:
         return HarnessError("docs_api_disabled",
                             "La API de Google Docs no está habilitada: el administrador debe habilitar la Google Docs "
                             "API en el proyecto de Google Cloud del cliente OAuth",
                             details={"http_status": status})
-    if status == 400 and comments and not _stale_revision(content):
-        return HarnessError("docs_request_rejected", "Google Docs rechazó la solicitud de comentarios sin aplicarla",
+    if status == 400 and write and not _stale_revision(content):
+        what = "de comentarios" if comments else "de edición"
+        return HarnessError("docs_request_rejected", f"Google Docs rechazó la solicitud {what} sin aplicarla",
                             details={"http_status": status})
     if status == 400 and write:
         return HarnessError("document_changed", "El documento cambió desde la vista previa; prepare un plan nuevo",

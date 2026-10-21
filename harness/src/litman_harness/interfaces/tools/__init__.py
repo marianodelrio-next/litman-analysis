@@ -74,11 +74,12 @@ _TYPES: dict[str, Callable[[Any], bool]] = {
     "object": lambda value: isinstance(value, dict),
     "boolean": lambda value: isinstance(value, bool),
     "integer": lambda value: isinstance(value, int) and not isinstance(value, bool),
+    "null": lambda value: value is None,
 }
 
 
 def validate_arguments(input_schema: dict[str, Any], args: Any) -> None:
-    """Small deterministic subset: object, required, known properties, basic types, enum, array items."""
+    """Small deterministic subset: object, required, known properties, basic and union types, enum, array items."""
     if not isinstance(args, dict):
         raise HarnessError("invalid_request", "Los argumentos deben ser un objeto JSON")
     properties: dict[str, Any] = input_schema.get("properties", {})
@@ -94,16 +95,17 @@ def validate_arguments(input_schema: dict[str, Any], args: Any) -> None:
 
 def _validate_value(name: str, spec: dict[str, Any], value: Any) -> None:
     expected = spec.get("type")
-    if expected and not _TYPES[expected](value):
-        raise HarnessError("invalid_request", f"El argumento {name} debe ser de tipo {expected}",
+    types = expected if isinstance(expected, list) else [expected] if expected else []
+    if types and not any(_TYPES[kind](value) for kind in types):
+        raise HarnessError("invalid_request", f"El argumento {name} debe ser de tipo {' o '.join(types)}",
                            details={"argument": name, "expected": expected})
     if "enum" in spec and value not in spec["enum"]:
         raise HarnessError("invalid_request", f"Valor no admitido para {name}",
                            details={"argument": name, "allowed": spec["enum"]})
-    if expected == "array" and "items" in spec:
+    if isinstance(value, list) and "array" in types and "items" in spec:
         for item in value:
             _validate_value(f"{name}[]", spec["items"], item)
-    if expected == "object" and isinstance(spec.get("additionalProperties"), dict):
+    if isinstance(value, dict) and "object" in types and isinstance(spec.get("additionalProperties"), dict):
         for key, item in value.items():
             _validate_value(f"{name}.{key}", spec["additionalProperties"], item)
 

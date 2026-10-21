@@ -102,6 +102,39 @@ def test_document_tools_declare_closed_operations_and_reject_bad_arguments_befor
         assert invoke(name, args, factory)["error"]["code"] == "invalid_request"
 
 
+def test_document_edit_schema_declares_nullable_highlight_and_link_and_describes_them():
+    properties = registry()["preview_document_edit"].input_schema["properties"]["operations"]["items"]["properties"]
+    assert properties["highlight_color"]["type"] == ["string", "null"]
+    assert properties["highlight_color"]["pattern"] == "^#[0-9A-Fa-f]{6}$"
+    assert properties["link_url"]["type"] == ["string", "null"] and properties["link_url"]["maxLength"] == 2_048
+    assert "partial_link_overlap" in properties["link_url"]["description"]
+    assert all(name in properties["bold"]["description"] for name in ("highlight_color", "link_url"))
+    description = registry()["preview_document_edit"].description
+    assert all(name in description for name in ("highlight_color", "link_url", "null", "before"))
+
+
+def test_argument_validation_accepts_union_and_null_types_and_keeps_basic_type_checks():
+    from litman_harness.interfaces.tools import validate_arguments
+    spec = {"type": "object", "additionalProperties": False, "required": [], "properties": {
+        "color": {"type": ["string", "null"]}, "names": {"type": "array", "items": {"type": ["string", "null"]}},
+        "count": {"type": "integer"}, "flag": {"type": "boolean"}}}
+    validate_arguments(spec, {"color": None, "names": ["a", None], "count": 1, "flag": False})
+    validate_arguments(spec, {"color": "#FFFF00"})
+    for args in ({"color": 3}, {"color": False}, {"names": ["a", 1]}, {"names": None}, {"count": None},
+                 {"count": True}, {"flag": None}, {"flag": "true"}):
+        try:
+            validate_arguments(spec, args)
+        except HarnessError as exc:
+            assert exc.code == "invalid_request"
+        else:
+            raise AssertionError(f"{args} debía rechazarse")
+    try:
+        validate_arguments(spec, {"color": []})
+    except HarnessError as exc:
+        assert exc.details == {"argument": "color", "expected": ["string", "null"]}
+        assert "string o null" in str(exc)
+
+
 def test_sheet_tools_declare_closed_operations_and_reject_bad_arguments_before_services():
     def factory():
         raise AssertionError("services must not be built for invalid arguments")

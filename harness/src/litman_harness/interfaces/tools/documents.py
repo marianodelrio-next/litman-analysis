@@ -2,8 +2,8 @@
 from __future__ import annotations
 
 from . import Tool, schema
-from ...dossier.documents import (LISTS, MAX_MARKDOWN_CHARS, MAX_NAME_CHARS, MAX_OPERATIONS, MAX_TEXT_CHARS, OPERATIONS,
-                                   PARAGRAPH_STYLES, TEXT_FLAGS)
+from ...dossier.documents import (LISTS, MAX_MARKDOWN_CHARS, MAX_NAME_CHARS, MAX_OPERATIONS, MAX_TEXT_CHARS,
+                                   MAX_URL_CHARS, OPERATIONS, PARAGRAPH_STYLES, TEXT_FIELDS, TEXT_FLAGS)
 from .dossier import _FOLDER_ID, _GATE, _PLAN_ID
 
 _DOCUMENT_ID = {"type": "string", "description": "ID de un Google Doc dentro de la carpeta de la licitación."}
@@ -25,8 +25,17 @@ _OPERATION = {
         "list": {"type": "string", "enum": list(LISTS),
                  "description": "set_list: bullets (viñetas), numbered (numerada) o none (quita la lista) en el "
                                 "párrafo que contiene anchor. Cada operación empieza su propia lista."},
-        **{flag: {"type": "boolean", "description": f"set_text_style: {flag} true o false; indique al menos uno de "
-                                                    f"{', '.join(TEXT_FLAGS)}."} for flag in TEXT_FLAGS},
+        **{flag: {"type": "boolean",
+                  "description": f"set_text_style: {flag} true o false; indique al menos uno de "
+                                 f"{', '.join((*TEXT_FLAGS, *TEXT_FIELDS))}."} for flag in TEXT_FLAGS},
+        "highlight_color": {"type": ["string", "null"], "pattern": "^#[0-9A-Fa-f]{6}$",
+                            "description": "set_text_style: color de resaltado #RRGGBB (por ejemplo #FFFF00, "
+                                           "amarillo); null quita el resaltado (transparente). Omitido: sin cambios."},
+        "link_url": {"type": ["string", "null"], "minLength": 1, "maxLength": MAX_URL_CHARS,
+                     "description": "set_text_style: URL absoluta http(s) completa del enlace sobre el texto de find; "
+                                    "null quita el enlace. Si find corta un enlace existente falla con "
+                                    "partial_link_overlap: indique el texto completo del enlace. Google Docs aplica "
+                                    "su formato habitual de enlace. Omitido: sin cambios."},
         "text": {"type": "string", "description": "insert_after/append: texto a insertar; cada \\n empieza un "
                                                   "párrafo con el estilo del párrafo donde cae. append lo añade al "
                                                   "final del último párrafo salvo que empiece por \\n."}}}
@@ -46,9 +55,10 @@ TOOLS = (
          f"{MAX_OPERATIONS} operaciones cerradas y guarda localmente un plan con revision_id y cada texto o párrafo "
          "afectado con su contexto, que la persona debe aceptar. Operaciones de texto: replace_text, insert_after, "
          "append. Operaciones de formato: set_paragraph_style (título, subtítulo, encabezados 1-3 o texto normal), "
-         "set_text_style (negrita, cursiva, subrayado) y set_list (viñetas, numerada o ninguna); un plan lleva sólo "
-         "operaciones de texto o sólo de formato (mixed_operations). Sólo el cuerpo: sin tablas, imágenes, "
-         "comentarios ni sugerencias.",
+         "set_text_style (negrita, cursiva, subrayado, resaltado highlight_color y enlace link_url; null quita el "
+         "resaltado o el enlace) y set_list (viñetas, numerada o ninguna); un plan lleva sólo operaciones de texto o "
+         "sólo de formato (mixed_operations). La vista previa muestra el resaltado y el enlace anteriores (before) "
+         "y la URL completa. Sólo el cuerpo: sin tablas, imágenes, comentarios ni sugerencias.",
          schema({"folder_id": _FOLDER_ID, "document_id": _DOCUMENT_ID,
                  "operations": {"type": "array", "minItems": 1, "maxItems": MAX_OPERATIONS, "items": _OPERATION}},
                 ("folder_id", "document_id", "operations")),

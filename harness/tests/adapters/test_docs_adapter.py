@@ -70,6 +70,35 @@ def test_style_requests_match_the_real_docs_v1_discovery_document():
     assert {"BULLET_DISC_CIRCLE_SQUARE", "NUMBERED_DECIMAL_ALPHA_ROMAN"} <= presets
 
 
+def test_highlight_and_link_requests_match_the_real_docs_v1_discovery_document():
+    """The requests the document service builds for highlight and link set/clear, checked against Docs v1."""
+    from litman_harness.dossier.documents import _text_style_request
+    span = {"startIndex": 5, "endIndex": 20}
+    styles = [_text_style_request(operation) for operation in (
+        {"highlight_color": "#FFFF00"}, {"highlight_color": None}, {"link_url": "https://example.org/a?b=1#c"},
+        {"link_url": None}, {"bold": True, "highlight_color": "#1A2B3C", "link_url": "http://example.org"})]
+    assert styles[1] == {"textStyle": {"backgroundColor": {}}, "fields": "backgroundColor"}
+    assert styles[3] == {"textStyle": {}, "fields": "link"}
+    assert styles[4]["fields"] == "bold,backgroundColor,link"
+    requests = [{"updateTextStyle": {"range": span, **style}} for style in styles]
+    gateway, _ = _gateway([({"status": "200"}, "echo_request_body")])
+    body = gateway.batch_update("doc-1", requests, "rev-1")
+    schemas = _discovery()["schemas"]
+    _conforms(schemas, "BatchUpdateDocumentRequest", body)
+    for request in requests:
+        _conforms(schemas, "UpdateTextStyleRequest", request["updateTextStyle"])
+    for style in styles:
+        assert set(style["fields"].split(",")) <= set(schemas["TextStyle"]["properties"])
+    rgb = styles[0]["textStyle"]["backgroundColor"]["color"]["rgbColor"]
+    assert rgb == {"red": 1.0, "green": 1.0, "blue": 0.0}
+    assert schemas["RgbColor"]["properties"]["red"]["type"] == "number"
+    assert {"url", "bookmarkId", "headingId"} <= set(schemas["Link"]["properties"])
+    assert {"backgroundColorSuggested", "linkSuggested", "boldSuggested"} <= set(
+        schemas["TextStyleSuggestionState"]["properties"])
+    assert {"textStyle", "suggestedTextStyleChanges"} <= set(schemas["TextRun"]["properties"])
+    assert "namedStyleType" in schemas["ParagraphStyle"]["properties"]
+
+
 def test_gateway_calls_match_the_real_docs_v1_discovery_document():
     """Build the real Docs v1 client offline: parameters are checked by the client, bodies against the schema."""
     requests = [{"deleteContentRange": {"range": {"startIndex": 5, "endIndex": 9}}},
@@ -146,12 +175,19 @@ def test_disabled_docs_api_is_a_stable_error_with_a_spanish_admin_message(payloa
     assert raised.value.details == {"http_status": 403}
 
 
-def test_a_400_on_a_guarded_write_means_the_document_changed():
+def test_a_400_on_a_guarded_write_means_the_document_changed_only_when_it_blames_the_revision():
     gateway, _ = _gateway([({"status": "400"}, json.dumps({"error": {"code": 400, "message": "revision"}})),
+                           ({"status": "400"}, json.dumps({"error": {"code": 400, "status": "FAILED_PRECONDITION"}})),
+                           ({"status": "400"}, json.dumps({"error": {"code": 400, "status": "INVALID_ARGUMENT",
+                                                                     "message": "Invalid link URL"}})),
                            ({"status": "400"}, json.dumps({"error": {"code": 400}}))])
-    with pytest.raises(HarnessError) as raised:
-        gateway.batch_update("doc", [], "rev-old")
-    assert raised.value.code == "document_changed"
+    codes = []
+    for _ in range(3):
+        with pytest.raises(HarnessError) as raised:
+            gateway.batch_update("doc", [], "rev-old")
+        codes.append(raised.value.code)
+        assert raised.value.details == {"http_status": 400}
+    assert codes == ["document_changed", "document_changed", "docs_request_rejected"]
     with pytest.raises(HarnessError) as raised:
         gateway.get("doc")
     assert raised.value.code == "docs_error"
@@ -173,3 +209,18 @@ def test_error_reasons_are_read_from_bytes_and_malformed_bodies_are_ignored():
     assert docs_http_error(403, _DISABLED_DETAILS.encode()).code == "docs_api_disabled"
     for content in (None, b"", b"[]", b'{"error": "x"}', b'{"error": {"errors": ["x", {"reason": 3}]}}'):
         assert docs_http_error(403, content).code == "insufficient_permission"
+
+
+def test_the_fake_renders_styled_bodies_with_the_real_docs_v1_shape():
+    """Document tests read styles from FakeDocs: its body must use only Docs v1 fields."""
+    from fakes import FakeDocs
+    docs = FakeDocs()
+    docs.add("doc", ["Plazo: 12 meses 😀", {"table": [["a", "b"]]}, "Fin"])
+    docs.style_outside("doc", "Plazo", bold=True, background="#FF0000", link="https://example.org/")
+    docs.style_outside("doc", "12", suggested="link")
+    body = docs.get("doc")["tabs"][0]["documentTab"]["body"]
+    _conforms(_discovery()["schemas"], "Body", body)
+    runs = [element["textRun"] for item in body["content"] if "paragraph" in item
+            for element in item["paragraph"]["elements"]]
+    assert runs[0]["textStyle"]["backgroundColor"] == {"color": {"rgbColor": {"red": 1.0}}}
+    assert any("suggestedTextStyleChanges" in run for run in runs)
