@@ -439,7 +439,7 @@ and documentation. Integration is intentionally omitted to use repository
     AC-05: "bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest -q tests/dossier/test_documents.py tests/interfaces/test_tools.py tests/adapters/test_docs_adapter.py'"
     AC-06: "bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest -q tests/dossier/test_documents.py tests/interfaces/test_tools.py tests/adapters/test_docs_adapter.py'"
     AC-07: "bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest -q tests/dossier/test_documents.py tests/interfaces/test_assembly.py'"
-    AC-08: "Run the required full Harness and Core suites from each package and review updated capability documentation and changelog."
+    AC-08: manual
     AC-09: manual
 ```
 

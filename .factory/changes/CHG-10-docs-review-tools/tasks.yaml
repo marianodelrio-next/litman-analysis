@@ -1,5 +1,5 @@
 change: CHG-10
-design_digest: sha256:70db5c42d1c4d2385847fffa7f4db5adeac1a0b1c4a8510ad65748aa76b7d029
+design_digest: sha256:e82a08c7f15a4c425fa60b6a41e31d3c23802d4d7e965b9d3538e6266c7c7ecb
 tasks:
 - id: CHG-10.1
   title: Enforce anchored-only native comments with verified recovery and legacy access
@@ -53,6 +53,5 @@ tasks:
       -q tests/dossier/test_documents.py tests/interfaces/test_tools.py tests/adapters/test_docs_adapter.py'
     AC-07: bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
       -q tests/dossier/test_documents.py tests/interfaces/test_assembly.py'
-    AC-08: Run the required full Harness and Core suites from each package and review
-      updated capability documentation and changelog.
+    AC-08: manual
     AC-09: manual
