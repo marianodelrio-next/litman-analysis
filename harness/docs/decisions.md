@@ -116,10 +116,18 @@ sends one `documents.batchUpdate` of index-based `deleteContentRange` and
 `writeControl.requiredRevisionId`; a lost answer is resolved by comparing the
 body with the expected text's hash. A plan holds text operations or style
 operations, never both. A style-only plan leaves the text unchanged, so the hash
-cannot prove that its batch was applied: on resume it is resent once with the
-current revision if the body text still equals the planned text, and ends as a
-`document_changed` conflict otherwise. This is safe because the style requests
-are absolute and move no index. `replaceAllText` was rejected because it
+cannot prove that its batch was applied. It was first resent with the current
+revision whenever the body text still equaled the planned text; that was
+replaced (CHG-10) because a collaborator's format change leaves the text equal,
+and resending would overwrite it. Now the plan stores the requested values and
+their previous values per match: on resume a document showing every requested
+value completes without a write, an unchanged preview revision allows one
+resend on that revision, and anything else is a `document_changed` conflict
+with `write_may_have_occurred: true`. Highlighting and links extend
+`set_text_style` with nullable typed fields (`highlight_color`, `link_url`)
+instead of a separate tool or free-form color and request objects; null
+removes. A link change that cuts through an existing link is refused, because
+Docs would change the whole link beyond the accepted text. `replaceAllText` was rejected because it
 matches case-insensitively by default, reaches every tab, header, and footer,
 and cannot be limited to the counted matches. Exporting to DOCX and re-uploading
 was rejected because it destroys formatting, comments, revision history, and the

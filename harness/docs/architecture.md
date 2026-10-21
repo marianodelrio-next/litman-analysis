@@ -177,8 +177,8 @@ and `append` (`text`, before the body's final newline), plus three style
 operations: `set_paragraph_style` (`anchor`, `style` one of `NORMAL_TEXT`,
 `TITLE`, `SUBTITLE`, `HEADING_1`, `HEADING_2`, `HEADING_3`), `set_text_style`
 (`find`, exact `occurrences`, and at least one of `bold`, `italic`,
-`underline`) and `set_list` (`anchor`, `list` one of `bullets`, `numbered`,
-`none`). A plan holds only text operations or only style operations
+`underline`, `highlight_color`, `link_url`) and `set_list` (`anchor`, `list`
+one of `bullets`, `numbered`, `none`). A plan holds only text operations or only style operations
 (`mixed_operations`). Each `find` or `anchor` must fall within one paragraph. The preview resolves every span to Docs
 indexes counted in UTF-16 code units, refuses overlapping spans, spans touching
 suggestions, documents with more than one tab, and documents the account cannot
@@ -195,7 +195,7 @@ second batch when the body's hash equals the expected one.
 
 Style operations resolve to index-based `updateParagraphStyle` (range of the
 paragraph holding the anchor, `fields: namedStyleType`), `updateTextStyle`
-(range of each match, `fields` limited to the given flags),
+(range of each match, `fields` limited to the given properties),
 `createParagraphBullets` (`BULLET_DISC_CIRCLE_SQUARE` or
 `NUMBERED_DECIMAL_ALPHA_ROMAN`) and `deleteParagraphBullets` requests. They
 change no index, and the plan's expected text is the current text. The preview
@@ -204,11 +204,45 @@ operations on the same paragraph property or on overlapping text spans
 (`overlapping_operations`), and `set_list` on a paragraph that starts with a
 tab (`unsupported_document`), because Docs turns leading tabs into nesting
 levels and removes them. Each `set_list` operation starts its own list, so
-consecutive numbered paragraphs each restart at 1. A style-only plan whose
-answer was lost cannot be recognized by the body text, which is unchanged: on
-resume it is resent once with the document's current revision, only if the
-body text still equals the planned text; otherwise it ends as a
-`document_changed` conflict. Styles are absolute, so resending is idempotent.
+consecutive numbered paragraphs each restart at 1.
+
+`highlight_color` is `#RRGGBB` (stored in upper case) or `null`; it becomes
+`backgroundColor` with RGB fractions, and `null` an empty `OptionalColor`
+(transparent, not white). `link_url` is an absolute `http`/`https` URL with a
+host, without user info, whitespace, backslashes or control characters, of at
+most 2,048 characters, or `null`; it becomes `link.url`, and `null` a masked
+`link` left out of `textStyle`, which clears it. The destination is never
+fetched and Drive sharing is not changed. Omitted fields stay unchanged; flags,
+highlight and link may go together on one match. The text model reads each
+run's `textStyle` (flags, highlight, link, where a bookmark, heading or tab
+link counts as a link) and `suggestedTextStyleChanges`, and each paragraph's
+`namedStyleType`. A match whose characters carry a pending suggested change of
+a requested property is refused (`pending_suggestions`). A link change (set,
+change or removal) whose span cuts through an existing link is refused
+(`partial_link_overlap`): the link is followed across runs with the same
+target and across hidden suggested insertions, and ends at a non-text break or
+a different target, because Docs would repoint or split the whole link. The
+preview shows, per match, the current `before` value of the highlight and the
+link (`mixed` when it varies), the complete URL, and a notice that Google Docs
+gives a link its usual formatting and may not restore the previous one when it
+is removed.
+
+A style-only plan stores `checks`: for each text style match its visible
+offsets, the requested values and a hash of their values before the plan; for
+each `set_paragraph_style` the paragraph and its named style. `set_list` is
+not read back. If an earlier attempt sent the batch, the resumed apply reads
+the document: when the text is unchanged and every requested value is visible,
+it completes without a write. Otherwise it resends only if the revision is
+still the preview's, which proves nothing was written, and the `before` values
+still match; any other case ends as a `document_changed` conflict with
+`write_may_have_occurred: true` and is never resent on a newer revision,
+because a collaborator's format change leaves the text and its hash unchanged.
+A plan stored before `checks` existed is resent only on its preview revision.
+Flags are compared with an absent value meaning `false`, so a value inherited
+from a named style is not seen and ends in that conflict. A 400 on an edit
+batch that does not blame the revision is `docs_request_rejected`: Docs refused
+the requests and wrote nothing.
+
 Tables, images, comments, suggestions, headers, and footers are out of scope;
 inserted text takes the style of the paragraph where it lands.
 

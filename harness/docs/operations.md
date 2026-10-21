@@ -191,7 +191,17 @@ the document changed after the preview, or the preview's revision expired
 (Docs revision IDs are valid for about 24 hours). Read the document again and
 prepare a new preview. An interrupted edit or creation is resumed by repeating
 the same acceptance; it never sends a second edit batch or writes a new
-document's text twice.
+document's text twice. A format plan (including highlight and link) whose
+answer was lost completes on that repetition if the requested formats are
+visible; if the document changed in the meantime, even only its format, it
+ends as `document_changed` with `write_may_have_occurred: true`: the format
+may or may not have been applied, so look at the document before preparing a
+new preview. Lists are not read back, so a lost answer of a plan with
+`set_list` always ends that way. `docs_request_rejected` means Docs refused the
+edit batch, for example a link URL it does not accept, and wrote nothing.
+`partial_link_overlap` asks for the complete text of an existing link. Adding
+a link gives the text Google Docs' usual link formatting, and removing it may
+not restore the previous formatting.
 
 Comment plans on Google Docs never resend a native batch once it was sent.
 `comment_write_uncertain` and `comment_save_failed` carry
@@ -244,8 +254,15 @@ Still pending:
    comments are visible on the intended phrase and section title, that
    `list_comments` reads, replies to and resolves them alongside a historical
    Drive comment without duplicate views, and record the exact 400 payload of a
-   stale revision on a comment batch (the adapter treats `FAILED_PRECONDITION`
-   or a message naming the revision as `document_changed`).
+   stale revision on a comment batch and on an edit batch (the adapter treats
+   `FAILED_PRECONDITION` or a message naming the revision as
+   `document_changed`, and any other 400 as `docs_request_rejected`).
+6. In the same document, apply a yellow highlight to a phrase, change it to
+   another `#RRGGBB` color and clear it; link a phrase to a URL, change the
+   URL and remove the link. Confirm that the text, the document ID and
+   neighbouring formatting and links are unchanged, that a link change on part
+   of an existing link is refused, and that editing the document between
+   preview and apply ends in a conflict instead of formatting other text.
 
 The [Windows Codex app validation guide](../../docs/windows-codex-validation.md)
 owns the detailed checklist, including the long-MCP-call timeout check. It is
