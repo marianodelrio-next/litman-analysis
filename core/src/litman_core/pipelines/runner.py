@@ -75,7 +75,9 @@ def _build_agent_workspace(prepared: PreparedStage, settings: Any) -> PreparedSt
             target = documents_dir / source.name
             shutil.copyfile(source, target)
             target.chmod(0o444)
-            prompt = prompt.replace(str(source), str(target))
+            # Prompts embed paths as JSON strings, where Windows backslashes are escaped.
+            for old, new in ((_json_text(source), _json_text(target)), (str(source), str(target))):
+                prompt = prompt.replace(old, new)
             remapped.append(replace(item, normalized_path=str(target)))
         else:
             remapped.append(item)
@@ -123,6 +125,10 @@ def _load_resources(system_prompt_path: Path, task_prompt_path: Path, prompt_ver
         schema=json.loads(schema_path.read_text(encoding="utf-8")), rules_path=rules_path,
         version_bundle=version_bundle,
     )
+
+
+def _json_text(path: Path) -> str:
+    return json.dumps(str(path), ensure_ascii=False)[1:-1]
 
 
 def _write_json(path: Path, data: object) -> None:

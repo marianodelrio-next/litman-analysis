@@ -201,6 +201,24 @@ def test_prepare_assessment_persists_version_bundle(tmp_path: Path) -> None:
     assert len(bundle["sha256"]["schema"]) == 64
 
 
+def test_prompt_paths_point_to_agent_workspace_when_paths_have_backslashes(tmp_path: Path) -> None:
+    # Windows paths contain backslashes, which the JSON prompt escapes.
+    case = tmp_path / "case"
+    case.mkdir()
+    (case / "source.txt").write_text("contenido", encoding="utf-8")
+
+    prepared = prepare_assessment(case, Settings(), run_dir=tmp_path / "C:\\runs\\run")
+
+    ready = [item for item in prepared.normalized if item.status == "ready"]
+    assert ready
+    for item in ready:
+        workspace_path = Path(item.normalized_path)
+        assert workspace_path.parent.parent.name == "agent-workspace"
+        original_path = prepared.run_dir / "input" / "documents" / workspace_path.name
+        assert json.dumps(str(workspace_path))[1:-1] in prepared.prompt
+        assert json.dumps(str(original_path))[1:-1] not in prepared.prompt
+
+
 @pytest.mark.parametrize("command", ["assess", "analyze", "check"])
 def test_removed_public_commands_are_rejected(monkeypatch, command: str) -> None:
     from litman_core.cli import main
