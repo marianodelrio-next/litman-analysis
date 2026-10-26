@@ -6,6 +6,33 @@ from litman_core.application.ports.llm import LLMResult
 from litman_core.errors import CoreError
 from .codex_cli import _prepare_output_paths
 
+
+def _strict_compatible(node):
+    """Return an equivalent schema that Ajv strict mode accepts without ``allowUnionTypes``.
+
+    ``{"type": [a, b, "null"]}`` becomes ``{"anyOf": [{"type": a}, {"type": b}, {"type": "null"}]}``
+    (a single type plus ``null`` is allowed as is), and each ``required`` name missing from the
+    same object's ``properties`` is declared with the empty schema, which constrains nothing.
+    """
+    if isinstance(node, list):
+        return [_strict_compatible(item) for item in node]
+    if not isinstance(node, dict):
+        return node
+    node = {key: value if key in ("const", "enum", "default", "examples") else _strict_compatible(value)
+            for key, value in node.items()}
+    types = node.get("type")
+    if isinstance(types, list) and len(types) > 1 and not (len(types) == 2 and "null" in types) and "anyOf" not in node:
+        del node["type"]
+        node["anyOf"] = [{"type": kind} for kind in types]
+    required = node.get("required")
+    if isinstance(required, list) and "additionalProperties" not in node:
+        properties = node.get("properties", {})
+        missing = [name for name in required if isinstance(name, str) and name not in properties]
+        if missing and isinstance(properties, dict):
+            node["properties"] = {**properties, **{name: {} for name in missing}}
+    return node
+
+
 class ClaudeCodeProvider:
     def __init__(self, *, binary="claude", model=None, timeout_seconds=1800, config_dir=None, **_):
         self.binary, self.model, self.timeout_seconds, self.config_dir = binary, model, timeout_seconds, config_dir
@@ -18,12 +45,15 @@ class ClaudeCodeProvider:
         meta-schema.  The declaration is metadata and is not needed for the
         CLI, so remove it only from the in-memory copy sent to Claude while
         preserving the canonical schema on disk and all its constraints.
+        Some Claude Code builds also compile the schema in Ajv strict mode,
+        so equivalent strict-clean forms replace union types and required
+        names without a local property declaration.
         """
         schema = json.loads(schema_path.read_text(encoding="utf-8"))
         if not isinstance(schema, dict):
             raise ValueError("El schema de Claude Code debe ser un objeto JSON")
         schema.pop("$schema", None)
-        return json.dumps(schema, ensure_ascii=False, separators=(",", ":"))
+        return json.dumps(_strict_compatible(schema), ensure_ascii=False, separators=(",", ":"))
 
     def generate(self, *, instructions, prompt, schema_path, case_dir, output_paths):
         _prepare_output_paths(output_paths)
