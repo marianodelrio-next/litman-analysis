@@ -14,7 +14,7 @@ install the exact wheel:
 
 ```sh
 uv venv --python 3.11 .venv
-uv pip install --python .venv/bin/python /path/litman_core-0.3.0-py3-none-any.whl
+uv pip install --python .venv/bin/python /path/litman_core-0.4.0-py3-none-any.whl
 ```
 
 Run the installed CLI:

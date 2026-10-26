@@ -9,6 +9,8 @@ LitMan is published as a single product version, shared by Core and Harness; see
 [the tagged-releases decision](docs/decisions/0002-tagged-releases.md).
 
 ## [Unreleased]
+
+## [0.4.0] - 2026-10-26
 ### Fixed
 
 - Initial and detailed analyses run with Claude Code on Windows no longer fail
