@@ -15,6 +15,11 @@ LitMan is published as a single product version, shared by Core and Harness; see
 - A Windows installation and first-trial guide for Claude Desktop's local Code
   tab, with native Claude Code running the analyses and a validation checklist.
 
+### Fixed
+
+- Analyses run with Claude Code no longer fail with a schema error on Claude
+  Code versions that check output schemas strictly, as seen on Windows.
+
 ## [0.2.0] - 2026-10-21
 ### Changed
 

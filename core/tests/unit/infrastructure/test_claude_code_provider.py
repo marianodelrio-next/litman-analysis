@@ -3,8 +3,10 @@ import subprocess
 from pathlib import Path
 
 import pytest
+from jsonschema import Draft202012Validator
 
 from litman_core.application.ports.llm import output_paths_for_run
+from litman_core.resource_paths import resource_path
 from litman_core.infrastructure.llm.claude_code import ClaudeCodeProvider
 import litman_core.infrastructure.llm.claude_code as claude_code
 
@@ -85,6 +87,56 @@ def test_schema_argument_removes_draft_metadata_but_preserves_constraints(tmp_pa
     assert passed["$defs"] == schema["$defs"]
     assert passed["required"] == schema["required"]
     assert json.loads(schema_path.read_text(encoding="utf-8")) == schema
+
+
+def _strict_violations(node, path="#"):
+    """Union types and unlisted ``required`` names that Ajv strict mode rejects."""
+    found = []
+    if isinstance(node, list):
+        for index, item in enumerate(node):
+            found += _strict_violations(item, f"{path}/{index}")
+    elif isinstance(node, dict):
+        types = node.get("type")
+        if isinstance(types, list) and len(types) > 1 and not (len(types) == 2 and "null" in types):
+            found.append(f"{path}/type")
+        if isinstance(node.get("required"), list) and "additionalProperties" not in node:
+            found += [f"{path}/required/{name}" for name in node["required"] if name not in node.get("properties", {})]
+        for key, value in node.items():
+            if key not in ("const", "enum", "default", "examples"):
+                found += _strict_violations(value, f"{path}/{key}")
+    return found
+
+
+def test_union_types_and_unlisted_required_names_become_equivalent_strict_forms(tmp_path):
+    schema = {
+        "type": "object", "additionalProperties": False, "required": ["page", "kind"],
+        "properties": {"page": {"type": ["integer", "string", "null"]},
+                       "note": {"type": ["string", "null"]},
+                       "kind": {"enum": [{"type": ["a", "b", "c"]}]}},
+        "allOf": [{"if": {"properties": {"page": {"const": 0}}}, "then": {"required": ["note"]}}],
+    }
+    schema_path = tmp_path / "schema.json"
+    schema_path.write_text(json.dumps(schema), encoding="utf-8")
+
+    passed = json.loads(ClaudeCodeProvider._prepare_schema(schema_path))
+
+    assert passed["properties"]["page"] == {"anyOf": [{"type": "integer"}, {"type": "string"}, {"type": "null"}]}
+    assert passed["properties"]["note"] == {"type": ["string", "null"]}
+    assert passed["properties"]["kind"] == schema["properties"]["kind"]
+    assert passed["allOf"][0]["then"] == {"required": ["note"], "properties": {"note": {}}}
+    assert _strict_violations(passed) == []
+    kind = {"type": ["a", "b", "c"]}
+    for instance in ({"page": 3, "kind": kind}, {"page": "iv", "kind": kind}, {"page": None, "kind": kind},
+                     {"page": 1.5, "kind": kind}, {"page": 0, "kind": kind}, {"page": 0, "note": "x", "kind": kind},
+                     {"page": 1, "kind": kind, "extra": 1}):
+        assert Draft202012Validator(passed).is_valid(instance) == Draft202012Validator(schema).is_valid(instance)
+
+
+@pytest.mark.parametrize("name", ["assessment.schema.json", "detailed-analysis.schema.json",
+                                  "technical-content.schema.json"])
+def test_packaged_schemas_sent_to_claude_have_no_strict_mode_violations(name):
+    path = resource_path("schemas", name)
+    assert _strict_violations(json.loads(ClaudeCodeProvider._prepare_schema(path))) == []
 
 
 def test_invalid_schema_creates_diagnostic_and_does_not_run_cli(tmp_path, monkeypatch):
