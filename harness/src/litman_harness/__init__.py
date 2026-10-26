@@ -6,6 +6,6 @@ Drive publisher.  It is a separate user-OAuth client.
 
 from .errors import HarnessError
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 __all__ = ["HarnessError", "__version__"]

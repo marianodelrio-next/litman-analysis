@@ -10,6 +10,7 @@ LitMan is published as a single product version, shared by Core and Harness; see
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-26
 ### Added
 
 - A Windows installation and first-trial guide for Claude Desktop's local Code
