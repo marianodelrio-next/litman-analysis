@@ -40,7 +40,7 @@ Use `/factory-design` when the user explicitly requests a Factory design or
 change. It registers a change with acceptance criteria and tasks. A person
 must explicitly approve a named change before implementation.
 
-Use `/factory-implement <task>` only for an approved Factory task. The task
+Use `/factory-build <task>` only for an approved Factory task. The task
 runs in its own Orca workspace and closes after its checks and acceptance
 criteria are verified. Use `/factory-status` for tracking and recovery.
 
@@ -48,9 +48,10 @@ criteria are verified. Use `/factory-status` for tracking and recovery.
 
 This repository is developed with the Software Factory on local Orca.
 
-- Skills: `/factory-design` (design and approve a change), `/factory-implement <task>` (implement a
-  task in its own Orca workspace), `/factory-status` (tracking, notes, recovery, memory),
-  `/factory-board` (live kanban of the tasks), `/factory-init` (prepare or update this repository).
+- Skills: `/factory-design` (design and approve a change), `/factory-build <task>` (build a task
+  in its own Orca workspace), `/factory-quick` (a small change without design),
+  `/factory-status` (tracking, notes, recovery, merges, memory), `/factory-board` (live kanban),
+  `/factory-help` (how it works, what to do next), `/factory-init` (prepare or update this repo).
 - The `swfactory` CLI is the only way to change Factory state (`.factory/`). Never edit
   `.factory/state/`, `approval.json`, `rejection.json` or `tasks.yaml` by hand.
 - Approving or rejecting a design needs an explicit message from the person that names the
