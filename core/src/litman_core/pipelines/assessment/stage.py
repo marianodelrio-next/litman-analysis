@@ -55,7 +55,7 @@ def _validate(data: dict, prepared: PreparedStage) -> dict:
     ready = {item.document_id for item in prepared.normalized if item.status == "ready"}
     processed = {item.get("documento_id") for item in data.get("control_documental", {}).get("documentos", []) if item.get("procesado") is True}
     if ready and not (ready & processed):
-        validation["document_processing_errors"] = ["Hay documentos normalizados ready pero Codex no marcó ninguno como procesado"]
+        validation["document_processing_errors"] = ["Hay documentos normalizados ready pero el agente no marcó ninguno como procesado"]
         validation["valid"] = False
     prepared.context["evidence_index"] = evidence_index
     return validation
