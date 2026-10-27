@@ -1,0 +1,32 @@
+change: CHG-11
+design_digest: sha256:789731b7e67348be57ed95be8cf255585589d862ad748444b0b5f464df257dae
+tasks:
+- id: CHG-11.1
+  title: Use a fixed technical proposal filename and verify publication
+  depends_on: []
+  complexity: normal
+  review:
+  - quality
+  - conformance
+  scope:
+  - core/src/litman_core/generation/technical_proposal/generator.py
+  - core/tests/**
+  - harness/tests/**
+  - core/docs/contracts.md
+  - harness/docs/architecture.md
+  - harness/docs/operations.md
+  - docs/contracts/examples/success-detailed-analysis.json
+  - CHANGELOG.md
+  integrate: pr
+  acceptance:
+    AC-01: bash -lc 'cd core && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q tests/unit/generation/test_technical_proposal.py'
+    AC-02: bash -lc 'cd core && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q tests/unit/generation/test_generation_service.py tests/unit/infrastructure/test_local_storage.py'
+    AC-03: bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q tests/analysis/test_analysis_service.py tests/dossier/test_publication.py'
+    AC-04: bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q tests/dossier/test_publication.py -k renamed_live_offer_remains_registered'
+    AC-05: manual
+    AC-06: bash -lc 'cd core && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q && cd ../harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest -q'
