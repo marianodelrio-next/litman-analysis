@@ -56,7 +56,7 @@ enums, and rejection of extra properties; invalid input returns
 | `identity` | query | Report the active account. |
 | `diagnose` | query | Report adapters, identity, scopes, Core contract/environment/provider, shared-state mechanism, Google Docs and Sheets API state (`docs_api`, `sheets_api`), guided-install state, and whether configured paths exist, never tokens or paths. |
 | `inspect` | query | Inventory the connected folder tree, candidates, suggestions, and next actions. |
-| `status` | query | Combine inspection with manifest status, pending local publications, and `recommended_action`. |
+| `status` | query | Combine inspection with manifest status, read-only drift diagnostics, pending local publications, and `recommended_action`. |
 | `preview_incorporation` | query | Plan only missing folders, originals, live offer, context, and manifest work. |
 | `apply_incorporation` | mutation | Apply the accepted incorporation `plan_id`. |
 | `preview_analysis` | query | Plan Core analysis and publication with the provider fixed by `setup`. |

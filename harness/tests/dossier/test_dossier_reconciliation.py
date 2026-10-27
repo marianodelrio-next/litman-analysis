@@ -41,3 +41,30 @@ def test_status_reports_missing_published_artifact(tmp_path):
     result = service.status('root')
     assert any(x['kind'] == 'artifact' and x['id'] == 'lost' for x in result['missing_resources'])
     assert any(x['code'] == 'resource_unavailable' and x['id'] == 'lost' for x in result['drift'])
+
+
+def test_truncated_inventory_is_explicit(monkeypatch, tmp_path):
+    from litman_harness.dossier import service as service_module
+    from litman_harness.dossier.tree import walk_tree
+
+    drive = dossier_drive()
+    service = ExpedienteService(drive, PlanStore(tmp_path / 'plans'), AtomicSharedState(drive))
+    service.apply_incorporation(service.preview_incorporation('root', ['source']).id)
+    monkeypatch.setattr(service_module, 'walk_tree', lambda drive, root, children: walk_tree(drive, root, children, limit=1))
+    result = service.status('root')
+    assert result['tree_truncated'] and not result['candidate_scan_complete']
+    assert any(x['code'] == 'candidate_scan_incomplete' for x in result['drift'])
+    assert not any(x['code'] == 'resource_unavailable' for x in result['drift'])
+
+
+def test_moved_original_is_reported(tmp_path):
+    drive = dossier_drive()
+    drive.resources['source'] = replace(drive.resources['source'], capabilities={'canMoveItemWithinDrive': True})
+    service = ExpedienteService(drive, PlanStore(tmp_path / 'plans'), AtomicSharedState(drive))
+    service.apply_incorporation(service.preview_incorporation('root', ['source']).id)
+    drive.resources['source'] = replace(drive.resources['source'], parents=('root',))
+    result = service.status('root')
+    assert any(x['code'] == 'original_misplaced' and x['id'] == 'source' for x in result['drift'])
+    drive.resources['source'] = replace(drive.resources['source'], parents=('unavailable-parent',))
+    result = service.status('root')
+    assert any(x['code'] == 'resource_unavailable' and x['id'] == 'source' for x in result['drift'])

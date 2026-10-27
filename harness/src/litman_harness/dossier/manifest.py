@@ -164,4 +164,6 @@ class Manifest:
         for analysis in self.analyses:
             if analysis.get("folder_id"):
                 refs.append(("analysis_folder", analysis.get("folder_id")))
+            if analysis.get("status") == "published":
+                refs.extend(("artifact", item.get("file_id")) for item in analysis.get("artifacts") or [])
         return refs
