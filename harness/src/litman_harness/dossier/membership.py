@@ -27,7 +27,11 @@ def belongs_to_root(drive: Any, root: Resource, item: Resource, *, ignore_own_tr
         seen.add(parent_id)
         try:
             parent = drive.get(parent_id)
-        except (HarnessError, KeyError):
+        except KeyError:
+            continue
+        except HarnessError as exc:
+            if exc.code not in ("not_found", "insufficient_permission"):
+                raise
             continue
         if parent.trashed or parent.drive_id != root.drive_id:
             continue

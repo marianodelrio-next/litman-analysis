@@ -68,3 +68,37 @@ def test_moved_original_is_reported(tmp_path):
     drive.resources['source'] = replace(drive.resources['source'], parents=('unavailable-parent',))
     result = service.status('root')
     assert any(x['code'] == 'resource_unavailable' and x['id'] == 'source' for x in result['drift'])
+
+
+def test_status_propagates_transient_drive_errors(tmp_path, monkeypatch):
+    import pytest
+    from litman_harness.errors import HarnessError
+
+    drive = dossier_drive()
+    service = ExpedienteService(drive, PlanStore(tmp_path / 'plans'), AtomicSharedState(drive))
+    service.apply_incorporation(service.preview_incorporation('root', ['source']).id)
+    state = service.load_state(drive.resources['root'])
+    state.manifest.summary = {'items': [{'key': 'objeto', 'value': 'x', 'source_file_id': 'copied-source'}],
+                              'based_on_analyses': []}
+    drive.contents[state.manifest_file.id] = state.manifest.serialize().encode()
+    original_get = drive.get
+
+    def failing_get(identifier):
+        if identifier == 'copied-source':
+            raise HarnessError('drive_error', 'temporary', details={'http_status': 503})
+        return original_get(identifier)
+
+    monkeypatch.setattr(drive, 'get', failing_get)
+    with pytest.raises(HarnessError, match='temporary'):
+        service.status('root')
+    monkeypatch.setattr(drive, 'get', original_get)
+    original_download = drive.download
+
+    def failing_download(identifier, path):
+        if identifier == state.manifest.context_file_id:
+            raise HarnessError('drive_error', 'temporary', details={'http_status': 503})
+        return original_download(identifier, path)
+
+    monkeypatch.setattr(drive, 'download', failing_download)
+    with pytest.raises(HarnessError, match='temporary'):
+        service.status('root')

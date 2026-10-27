@@ -219,7 +219,11 @@ class ExpedienteService:
             try:
                 item = self.drive.get(identifier)
                 return item if belongs_to_root(self.drive, root, item) else None
-            except (HarnessError, KeyError):
+            except KeyError:
+                return None
+            except HarnessError as exc:
+                if exc.code not in ("not_found", "insufficient_permission"):
+                    raise
                 return None
 
         def inside(identifier: str, item: Resource, folder_id: str | None) -> bool:
@@ -229,7 +233,11 @@ class ExpedienteService:
                 return folder_id in known[identifier].ancestors
             try:
                 return belongs_to_root(self.drive, self.drive.get(folder_id), item)
-            except (HarnessError, KeyError):
+            except KeyError:
+                return False
+            except HarnessError as exc:
+                if exc.code not in ("not_found", "insufficient_permission"):
+                    raise
                 return False
 
         for original in manifest.originals:
@@ -269,7 +277,12 @@ class ExpedienteService:
                 if current != manifest.context_sha256:
                     add("context_changed", manifest.context_file_id, old=manifest.context_sha256, current=current,
                         suggested_tool="status")
-            except (HarnessError, KeyError):
+            except KeyError:
+                add("resource_unavailable", manifest.context_file_id, kind="context", current="unreadable",
+                    suggested_tool="status")
+            except HarnessError as exc:
+                if exc.code not in ("not_found", "insufficient_permission", "invalid_context"):
+                    raise
                 add("resource_unavailable", manifest.context_file_id, kind="context", current="unreadable",
                     suggested_tool="status")
         return sorted(drift, key=lambda entry: (entry["code"], entry["id"] or "", entry.get("kind", "")))
@@ -280,7 +293,9 @@ class ExpedienteService:
             return []
         try:
             folder = self._originals_folder(manifest, {})
-        except HarnessError:
+        except HarnessError as exc:
+            if exc.code not in ("not_found", "insufficient_permission"):
+                raise
             return []
         return [item.id for original, item in self._placeable_originals(root, manifest, folder)
                 if item.md5_checksum == original.get("md5_checksum")]
@@ -344,7 +359,12 @@ class ExpedienteService:
                 continue
             try:
                 item = self.drive.get(identifier)
-            except (HarnessError, KeyError):
+            except KeyError:
+                missing.append({"kind": kind, "id": identifier, "reason": "not_found_or_revoked"})
+                continue
+            except HarnessError as exc:
+                if exc.code not in ("not_found", "insufficient_permission"):
+                    raise
                 missing.append({"kind": kind, "id": identifier, "reason": "not_found_or_revoked"})
                 continue
             if not belongs_to_root(self.drive, root, item):
@@ -517,7 +537,9 @@ class ExpedienteService:
                 continue
             try:
                 item = self.drive.get(original["file_id"])
-            except HarnessError:
+            except HarnessError as exc:
+                if exc.code not in ("not_found", "insufficient_permission"):
+                    raise
                 continue
             if belongs_to_root(self.drive, root, item) and not self._inside(originals_folder, item):
                 placeable.append((original, item))
