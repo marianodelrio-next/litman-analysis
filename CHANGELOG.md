@@ -10,6 +10,11 @@ LitMan is published as a single product version, shared by Core and Harness; see
 
 ## [Unreleased]
 
+### Fixed
+
+- LitMan now explains and handles requests to change the analysis provider or
+  model, including when the default model is in use.
+
 ## [0.4.0] - 2026-10-26
 ### Fixed
 

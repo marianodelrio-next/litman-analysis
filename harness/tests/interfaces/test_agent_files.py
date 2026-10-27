@@ -81,6 +81,14 @@ def test_workspace_template_mentions_the_litman_binary_placeholder():
     assert "{{LITMAN_BIN}}" in template
 
 
+def test_workspace_guides_analysis_model_changes():
+    template = (AGENT / "workspace" / "AGENTS.md").read_text(encoding="utf-8")
+    for term in ("`setup`", "`diagnose`", "`null`", "predeterminado", "planes"):
+        assert term in template
+    help_skill = (AGENT / "skills" / "ayuda-litman" / "SKILL.md").read_text(encoding="utf-8")
+    assert "cambia el modelo de análisis" in help_skill
+
+
 DOCUMENT_TOOLS = ("read_google_doc", "preview_document_edit", "apply_document_edit", "preview_document_creation",
                   "apply_document_creation")
 

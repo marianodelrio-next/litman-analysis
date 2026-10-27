@@ -28,6 +28,8 @@ def test_registry_exposes_operations_with_schema_and_kind():
     setup_schema = registry()["setup"].input_schema
     assert setup_schema["required"] == ["provider"]
     assert "codex" in setup_schema["properties"]["provider"]["enum"]
+    description = registry()["setup"].description
+    assert all(term in description for term in ("cambia", "`diagnose`", "predeterminado", "ya preparados"))
     assert {tool.name for tool in registry().values() if tool.mutates} == {"apply_incorporation", "execute_analysis",
                                                                               "discard_analysis", "apply_publication",
                                                                               "apply_summary", "setup",
