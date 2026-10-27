@@ -1,0 +1,93 @@
+change: CHG-12
+design_digest: sha256:1191c5e8fcb50da66a0740da4a47fed3ff561cea2d5f270f89eaa0b2b34735f9
+tasks:
+- id: CHG-12.1
+  title: Diagnose registered dossier drift without Drive writes
+  depends_on: []
+  complexity: complex
+  review:
+  - quality
+  - conformance
+  scope:
+  - harness/src/litman_harness/dossier/service.py
+  - harness/src/litman_harness/dossier/manifest.py
+  - harness/src/litman_harness/dossier/recommendation.py
+  - harness/tests/dossier/test_dossier_reconciliation.py
+  - harness/tests/dossier/test_tree.py
+  - harness/tests/dossier/test_recommendation.py
+  integrate: pr
+  acceptance:
+    AC-01: bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q tests/dossier/test_dossier_reconciliation.py tests/dossier/test_tree.py'
+    AC-02: bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q tests/dossier/test_tree.py tests/dossier/test_recommendation.py'
+    AC-11: bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q'
+- id: CHG-12.2
+  title: Reconcile originals and managed references with accepted plans
+  depends_on:
+  - CHG-12.1
+  complexity: complex
+  review:
+  - quality
+  - conformance
+  scope:
+  - harness/src/litman_harness/dossier/manifest.py
+  - harness/src/litman_harness/dossier/service.py
+  - harness/src/litman_harness/dossier/reconciliation.py
+  - harness/src/litman_harness/dossier/recommendation.py
+  - harness/src/litman_harness/dossier/context.py
+  - harness/src/litman_harness/dossier/summary.py
+  - harness/src/litman_harness/dossier/file_changes.py
+  - harness/src/litman_harness/interfaces/assembly.py
+  - harness/src/litman_harness/interfaces/tools/dossier.py
+  - harness/tests/dossier/**
+  - harness/tests/interfaces/**
+  integrate: pr
+  acceptance:
+    AC-03: bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q tests/dossier/test_dossier_reconciliation.py tests/dossier/test_dossier_service.py'
+    AC-04: bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q tests/dossier/test_dossier_reconciliation.py tests/dossier/test_recommendation.py'
+    AC-05: bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q tests/dossier/test_summary.py tests/dossier/test_dossier_reconciliation.py'
+    AC-06: bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q tests/dossier/test_dossier_reconciliation.py tests/dossier/test_file_changes.py'
+    AC-07: bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q tests/dossier/test_dossier_reconciliation.py'
+    AC-11: bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q'
+- id: CHG-12.3
+  title: Guard relevant work and explain reconciliation in the product flow
+  depends_on:
+  - CHG-12.2
+  complexity: normal
+  review:
+  - quality
+  - conformance
+  scope:
+  - harness/src/litman_harness/analysis/service.py
+  - harness/src/litman_harness/dossier/files.py
+  - harness/src/litman_harness/dossier/summary.py
+  - harness/src/litman_harness/dossier/file_changes.py
+  - harness/src/litman_harness/interfaces/tools/analysis.py
+  - harness/src/litman_harness/interfaces/tools/dossier.py
+  - harness/agent/skills/conectar-licitacion/SKILL.md
+  - harness/agent/skills/ayuda-litman/SKILL.md
+  - harness/agent/workspace/AGENTS.md
+  - harness/docs/architecture.md
+  - harness/docs/operations.md
+  - harness/docs/decisions.md
+  - harness/tests/analysis/**
+  - harness/tests/dossier/**
+  - harness/tests/interfaces/**
+  - CHANGELOG.md
+  integrate: pr
+  acceptance:
+    AC-08: bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q tests/analysis/test_analysis_service.py tests/dossier/test_files.py tests/dossier/test_dossier_reconciliation.py'
+    AC-09: bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q tests/dossier/test_file_changes.py tests/dossier/test_documents.py tests/dossier/test_sheets.py'
+    AC-10: manual
+    AC-11: bash -lc 'cd harness && UV_CACHE_DIR=/tmp/licitaBot-uv-cache uv run pytest
+      -q'
