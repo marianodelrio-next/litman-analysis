@@ -182,3 +182,15 @@ def test_draft_profile_keeps_previous_deterministic_generation(tmp_path: Path) -
         artifacts=["technical-document"], provider=None, content_profile="draft-v1",
     )
     assert manifest["generation"]["mode"] == "deterministic-fallback"
+
+
+def test_generated_manifest_feeds_detailed_delivery_catalog(tmp_path: Path) -> None:
+    from litman_core.infrastructure.storage.common import detailed_analysis_delivery_catalog
+
+    dossier_path = tmp_path / "dossier.json"
+    dossier_path.write_text(json.dumps(dossier()), encoding="utf-8")
+    run = tmp_path / "run"
+    generate_documents(dossier_path, output_dir=run, provider=None)
+    technical = [item for item in detailed_analysis_delivery_catalog(run) if item.role == "technical_document"]
+    assert len(technical) == 1
+    assert technical[0].relative_path == "propuesta_tecnica.docx"

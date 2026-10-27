@@ -45,7 +45,10 @@ The publisher derives a closed deliverable catalog from the current run:
 - `assessment` publishes `ficha_oportunidad.pdf`.
 - `detailed-analysis` publishes `resumen_tecnico.docx`,
   `guia_preparacion_oferta.docx`, exactly one technical DOCX declared by the
-  generation manifest, and `simulador_economico.xlsx`.
+  generation manifest, and `simulador_economico.xlsx`. Core names the technical
+  DOCX `propuesta_tecnica.docx` for new runs, regardless of tender identity.
+  This reduces the path length but does not guarantee that deeply nested paths fit
+  every Windows path limit.
 
 Diagnostics, lineage, and publication manifests are not deliverables. With
 `publication.include_run_files = false`, the local run is reduced to the

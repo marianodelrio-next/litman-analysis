@@ -117,11 +117,11 @@ def test_execute_retains_success_workspace_with_flat_public_artifacts(tmp_path: 
 
 
 def test_execute_detailed_catalog_includes_the_single_technical_docx(tmp_path: Path):
-    analysis = service(Drive(), tmp_path, core_run("detailed-analysis", technical="memoria_tecnica.docx"))
+    analysis = service(Drive(), tmp_path, core_run("detailed-analysis"))
     plan = analysis.preview("root", ["file"], "detailed-analysis")
     result = analysis.execute(plan.id)
     names = [item["name"] for item in result["public_artifacts"]]
-    assert names == ["resumen_tecnico.docx", "guia_preparacion_oferta.docx", "memoria_tecnica.docx",
+    assert names == ["resumen_tecnico.docx", "guia_preparacion_oferta.docx", "propuesta_tecnica.docx",
                      "simulador_economico.xlsx"]
     assert all(Path(item["path"]).is_file() and len(item["sha256"]) == 64 for item in result["public_artifacts"])
     assert result["public_artifacts"][2]["role"] == "technical_document"

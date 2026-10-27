@@ -270,3 +270,8 @@ linked here but is not maintained by this task. A local MCP smoke can use
 temporary `LITMAN_HARNESS_METADATA` and send `initialize`,
 `notifications/initialized`, `tools/list`, then an `inspect` `tools/call`
 over stdin.
+
+New detailed analyses produce `propuesta_tecnica.docx`. Repeated uploads may gain
+a date suffix; the converted Google Doc initially named `propuesta_tecnica` can
+be renamed without losing its ID-based live-offer registration. Existing files
+and Google Docs keep their names.
