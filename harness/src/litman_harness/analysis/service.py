@@ -16,6 +16,7 @@ from .. import __version__
 from ..adapters import core
 from ..adapters.drive import DriveGateway
 from ..dossier.models import FOLDER_MIME, Resource
+from ..dossier.service import ExpedienteService
 from ..errors import HarnessError, safe_exception_message
 from ..plans import PlanStore
 from ..plans.models import OperationRecord, OperationStatus, Plan, PlanAction
@@ -34,7 +35,8 @@ class AnalysisService:
     def __init__(self, drive: DriveGateway, plan_store: PlanStore | None = None, *,
                  work_root: Path | None = None, run: core.Runner = subprocess.run,
                  publication: "PublicationService | None" = None,
-                 settings: Callable[[], dict[str, Any] | None] | None = None):
+                 settings: Callable[[], dict[str, Any] | None] | None = None,
+                 dossier: ExpedienteService | None = None):
         self.drive = drive
         self.plan_store = plan_store
         self.work_root = work_root
@@ -43,6 +45,9 @@ class AnalysisService:
         # without it the analysis stays local (development and isolated tests).
         self.publication = publication
         self.settings = settings or (lambda: None)
+        # With a dossier service, preview checks a selected registered original
+        # against its manifest MD5 (drift) instead of trusting only Drive's current content.
+        self.dossier = dossier
 
     def preview(self, root_folder_id: str, original_ids: list[str], job_type: str) -> Plan:
         if job_type not in core.JOB_TYPES:
@@ -60,16 +65,23 @@ class AnalysisService:
         root = self._root(root_folder_id)
         # Only the content (MD5) of each original identifies the input; the root is
         # rechecked for existence, trash and capability, never by Drive ``version``.
+        registered = self._active_originals(root)
         snapshot: dict[str, str | None] = {}
         actions: list[PlanAction] = []
         for identifier in original_ids:
             item = self.drive.get(identifier)
             validate_original(self.drive, root, item)
+            original = registered.get(identifier)
+            if original is not None and original.get("md5_checksum") not in (None, item.md5_checksum):
+                raise HarnessError("registered_original_changed",
+                                   "El original registrado cambió desde que se registró; revise el expediente "
+                                   "con status antes de analizarlo", details={"file_id": identifier,
+                                   "registered_md5": original["md5_checksum"], "current_md5": item.md5_checksum})
             md5 = require_checksum(item)
             snapshot[item.id] = md5
             actions.append(PlanAction("download_original", item.id, item.name, None, md5,
                                       {"mime_type": item.mime_type, "size": item.size,
-                                       "drive_version": item.version}))
+                                       "drive_version": item.version, "registered": identifier in registered}))
         run_core_metadata = {
             "provider": provider, "publication": "included" if self.publication else "local_only",
             "expected_roles": list(REQUIRED_ROLES[job_type]),
@@ -214,6 +226,19 @@ class AnalysisService:
         if platform.system() != "Windows":
             os.chmod(workspace, 0o700)
         return workspace
+
+    def _active_originals(self, root: Resource) -> dict[str, dict[str, Any]]:
+        """Manifest-registered active originals of ``root``, by file ID; empty without a dossier or manifest.
+
+        One targeted ``load_state`` read, not a full ``status`` candidate scan: analysis
+        selection only needs to tell a registered original from an unregistered candidate.
+        """
+        if self.dossier is None:
+            return {}
+        manifest = self.dossier.load_state(root).manifest
+        if manifest is None:
+            return {}
+        return {item["file_id"]: item for item in manifest.active_originals()}
 
     def _root(self, folder_id: str) -> Resource:
         root = self.drive.get(folder_id)
