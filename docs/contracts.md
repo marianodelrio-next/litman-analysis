@@ -97,7 +97,7 @@ labels published files outside the deliverable catalog. Harness always uses
 ## `info` output
 
 ```json
-{"contract": 1, "version": "0.4.0", "providers": ["claude-code", "codex"],
+{"contract": 1, "version": "0.5.0", "providers": ["claude-code", "codex"],
  "environment": {
    "providers": {"codex": {"cli": true, "session": true},
                  "claude-code": {"cli": false, "session": false}},
@@ -129,6 +129,6 @@ Every `run` and `info` result includes `contract: 1`.
 
 ## Consumer requirements
 
-Harness pins `litman-core==0.4.0`; the `contract` check protects it from an
+Harness pins `litman-core==0.5.0`; the `contract` check protects it from an
 incompatible installation. Consumers must rely only on the exit behavior and
 JSON structures documented here, not on Core's internal run files.
