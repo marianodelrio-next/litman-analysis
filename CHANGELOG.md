@@ -10,6 +10,11 @@ LitMan is published as a single product version, shared by Core and Harness; see
 
 ## [Unreleased]
 
+### Changed
+
+- New detailed analyses use the shorter technical proposal filename
+  `propuesta_tecnica.docx`, reducing the length of generated paths.
+
 ### Fixed
 
 - LitMan now explains and handles requests to change the analysis provider or

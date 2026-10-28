@@ -118,7 +118,9 @@ the date taken from the analysis `completed_at`; names are fixed in the
 preview, so a resumed publication never uploads twice and nothing existing is
 overwritten or removed. Plans stored before this layout, which create a dated
 run folder, still resume. For a detailed analysis without a live offer,
-publication also converts the technical DOCX to a Google Doc in `Oferta`. It never
+publication also converts the technical DOCX (`propuesta_tecnica.docx` in new
+Core runs) to a Google Doc initially named `propuesta_tecnica` in `Oferta`. The
+live offer is registered by Drive ID, so renaming it preserves the link. It never
 replaces an existing live offer. Manifest changes are merged additively; a
 concurrent manifest write makes the operation recoverable and retrying resumes
 without rerunning Core or re-uploading completed artifacts. A fully published

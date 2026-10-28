@@ -203,7 +203,7 @@ _ROLES_BY_NAME = {"ficha_oportunidad.pdf": "opportunity_report", "resumen_tecnic
                   "simulador_economico.xlsx": "economic_simulator"}
 
 
-def core_run(job_type: str = "assessment", *, technical: str = "memoria_tecnica.docx", local_path=None,
+def core_run(job_type: str = "assessment", *, technical: str = "propuesta_tecnica.docx", local_path=None,
              tamper=None):
     """Fake ``litman-core`` honouring the public CLI contract with ``include_run_files = false``.
 
