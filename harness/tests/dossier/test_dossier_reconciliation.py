@@ -384,11 +384,23 @@ def test_adopt_copy_rejects_a_file_id_already_registered(tmp_path):
     from litman_harness.errors import HarnessError
 
     drive = dossier_drive()
+    drive.add(Resource('source2', 'otro.pdf', PDF, '1', drive_id='shared', parents=('root',)), b'otro')
     service_dossier = ExpedienteService(drive, PlanStore(tmp_path / 'plans'), AtomicSharedState(drive))
-    service_dossier.apply_incorporation(service_dossier.preview_incorporation('root', ['source']).id)
+    service_dossier.apply_incorporation(
+        service_dossier.preview_incorporation('root', ['source', 'source2']).id)
     service = ReconciliationService(service_dossier)
     with pytest.raises(HarnessError, match='ya está registrada') as exc:
         service.preview('root', [{'op': 'adopt_copy', 'file_id': 'source', 'copy_file_id': 'source'}])
+    assert exc.value.code == 'invalid_request'
+    # Colliding with a different resource already registered as another original.
+    with pytest.raises(HarnessError, match='ya está registrada') as exc:
+        service.preview('root', [{'op': 'adopt_copy', 'file_id': 'source', 'copy_file_id': 'source2'}])
+    assert exc.value.code == 'invalid_request'
+    # Two adopt_copy ops in the same batch proposing the same (still unregistered) copy.
+    drive.add(Resource('dup-copy', 'pliego.pdf', PDF, '1', drive_id='shared', parents=('root',)), b'pliego')
+    with pytest.raises(HarnessError, match='ya está registrada') as exc:
+        service.preview('root', [{'op': 'adopt_copy', 'file_id': 'source', 'copy_file_id': 'dup-copy'},
+                                 {'op': 'adopt_copy', 'file_id': 'source2', 'copy_file_id': 'dup-copy'}])
     assert exc.value.code == 'invalid_request'
 
 

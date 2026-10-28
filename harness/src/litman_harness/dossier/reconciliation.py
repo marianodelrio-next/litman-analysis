@@ -42,6 +42,7 @@ class ReconciliationService:
             raise HarnessError('dossier_not_adopted', 'Incorpore la licitación primero')
         actions = []
         seen = set()
+        seen_copies = set()
         for index, op in enumerate(operations):
             kind = op.get('op') if isinstance(op, dict) else None
             fields = ({'op', 'file_id', 'new_name'} if kind == 'rename_managed' else
@@ -92,8 +93,9 @@ class ReconciliationService:
                 copy_id = op['copy_file_id']
                 registered = ({o['file_id'] for o in manifest.originals} |
                               {a['file_id'] for an in manifest.analyses for a in (an.get('artifacts') or [])})
-                if copy_id in registered:
+                if copy_id in registered or copy_id in seen_copies:
                     raise HarnessError('invalid_request', 'La copia ya está registrada', details={'file_id': copy_id})
+                seen_copies.add(copy_id)
                 copy_item = self.drive.get(copy_id)
                 if not belongs_to_root(self.drive, root, copy_item):
                     raise HarnessError('document_outside_tree', 'La copia no está dentro de la licitación')
