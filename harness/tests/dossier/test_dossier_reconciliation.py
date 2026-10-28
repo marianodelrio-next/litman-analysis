@@ -249,3 +249,21 @@ def test_reconciliation_resume_after_rename_response_lost(tmp_path, monkeypatch)
     result = service.apply(plan.id)
     assert result['status'] == 'succeeded'
     assert result['manifest']['originals'][0]['observed_name'] == 'new.pdf'
+
+
+def test_in_place_reconciliation_does_not_require_destination_write_permission(tmp_path):
+    from litman_harness.dossier.reconciliation import ReconciliationService
+
+    drive = dossier_drive()
+    dossier = ExpedienteService(drive, PlanStore(tmp_path / 'plans'), AtomicSharedState(drive))
+    dossier.apply_incorporation(dossier.preview_incorporation('root', ['source']).id)
+    state = dossier.load_state(drive.get('root'))
+    folder_id = state.manifest.folders['originals']
+    drive.resources[folder_id] = replace(drive.get(folder_id), capabilities={})
+    service = ReconciliationService(dossier)
+    plan = service.preview('root', [{'op': 'place_original', 'file_id': 'source'}])
+    assert plan.actions[0].metadata['strategy'] == 'in_place'
+    result = service.apply(plan.id)
+    assert result['status'] == 'succeeded'
+    assert result['manifest']['originals'][0]['placement'] == 'in_place'
+    assert drive.get('source').parents == ('root',)

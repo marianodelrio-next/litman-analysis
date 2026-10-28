@@ -74,15 +74,16 @@ class ReconciliationService:
                 _checked_name(target, index)
                 if not item.capabilities.get('canRename', False):
                     raise HarnessError('insufficient_capability', 'No se puede renombrar el recurso')
+            strategy = placement_strategy(item) if kind == 'place_original' else None
             if kind in ('place_original', 'return_artifact'):
                 if not destination:
                     raise HarnessError('invalid_manifest', 'No hay carpeta de destino registrada')
                 folder = self.drive.get(destination)
-                if not belongs_to_root(self.drive, root, folder) or not folder.capabilities.get('canAddChildren', False):
+                if (not belongs_to_root(self.drive, root, folder) or
+                        (strategy != 'in_place' and not folder.capabilities.get('canAddChildren', False))):
                     raise HarnessError('insufficient_capability', 'No se puede usar la carpeta de destino')
                 if kind == 'return_artifact' and not item.capabilities.get('canMoveItemWithinDrive', False):
                     raise HarnessError('insufficient_capability', 'No se puede mover el artefacto')
-            strategy = placement_strategy(item) if kind == 'place_original' else None
             metadata = {'index': index, 'category': category, 'observed_name': item.name if item else None,
                         'parents': list(item.parents) if item else [], 'destination': destination,
                         'strategy': strategy, 'can_copy': bool(item and item.capabilities.get('canCopy')),
@@ -129,7 +130,9 @@ class ReconciliationService:
                 record['observed_name' if category == 'original' else 'name'] = action.name
             elif action.kind in ('place_original', 'return_artifact'):
                 folder = self.drive.get(destination)
-                if not belongs_to_root(self.drive, root, folder) or not folder.capabilities.get('canAddChildren', False):
+                if (not belongs_to_root(self.drive, root, folder) or
+                        (action.metadata['strategy'] != 'in_place' and
+                         not folder.capabilities.get('canAddChildren', False))):
                     raise OperationConflict('No se puede usar la carpeta de destino', details={'file_id': item.id})
                 if action.kind == 'place_original':
                     if not run.done(action):
@@ -161,7 +164,8 @@ class ReconciliationService:
                 raise OperationConflict("El recurso cambió desde la vista previa", details={"file_id": item.id})
             if action.kind in ("place_original", "return_artifact"):
                 folder = self.drive.get(destination)
-                if not belongs_to_root(self.drive, root, folder) or not folder.capabilities.get("canAddChildren", False):
+                if (not belongs_to_root(self.drive, root, folder) or
+                        (metadata["strategy"] != "in_place" and not folder.capabilities.get("canAddChildren", False))):
                     raise OperationConflict("No se puede usar la carpeta de destino", details={"file_id": item.id})
                 if not target:
                     strategy = metadata["strategy"] if action.kind == "place_original" else "move"
