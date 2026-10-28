@@ -352,6 +352,47 @@ def test_preview_marks_registered_and_unregistered_selections(tmp_path: Path):
     assert flags == {"source": True, "extra": False}
 
 
+def test_preview_rejects_a_retired_original_until_reactivated(tmp_path: Path):
+    from litman_harness.dossier.reconciliation import ReconciliationService
+
+    drive, dossier = _adopted_dossier(tmp_path)
+    reconciliation = ReconciliationService(dossier)
+    reconciliation.apply(reconciliation.preview("root", [{"op": "retire_original", "file_id": "source"}]).id)
+    analysis = service(drive, tmp_path, settings=_settings(), dossier=dossier)
+    with pytest.raises(HarnessError) as raised:
+        analysis.preview("root", ["source"], "assessment")
+    assert raised.value.code == "retired_original_requires_reactivation"
+    assert raised.value.details["file_id"] == "source"
+    reconciliation.apply(reconciliation.preview("root", [{"op": "reactivate_original", "file_id": "source"}]).id)
+    assert analysis.preview("root", ["source"], "assessment").snapshot == {"source": drive.resources["source"].md5_checksum}
+
+
+def test_preview_with_candidates_surfaces_unregistered_files_without_selecting_them(tmp_path: Path):
+    drive, dossier = _adopted_dossier(tmp_path)
+    drive.add(Resource("extra", "nuevo.pdf", PDF, "1", drive_id="shared", parents=("root",),
+                       capabilities={"canDownload": True}), b"nuevo")
+    analysis = service(drive, tmp_path, settings=_settings(), dossier=dossier)
+    result = analysis.preview_with_candidates("root", ["source"], "assessment")
+    assert result["other_candidate_original_ids"] == ["extra"]
+    assert result["candidate_scan_truncated"] is False
+    assert all(a["resource_id"] != "extra" for a in result["actions"])
+
+
+def test_preview_with_candidates_excludes_already_selected_ids(tmp_path: Path):
+    drive, dossier = _adopted_dossier(tmp_path)
+    drive.add(Resource("extra", "nuevo.pdf", PDF, "1", drive_id="shared", parents=("root",),
+                       capabilities={"canDownload": True}), b"nuevo")
+    analysis = service(drive, tmp_path, settings=_settings(), dossier=dossier)
+    result = analysis.preview_with_candidates("root", ["source", "extra"], "assessment")
+    assert result["other_candidate_original_ids"] == []
+
+
+def test_preview_with_candidates_without_a_dossier_reports_no_candidates(tmp_path: Path):
+    analysis = service(Drive(), tmp_path, settings=_settings())
+    result = analysis.preview_with_candidates("root", ["file"], "assessment")
+    assert result["other_candidate_original_ids"] == [] and result["candidate_scan_truncated"] is False
+
+
 def test_preview_without_a_dossier_never_treats_a_selection_as_registered(tmp_path: Path):
     drive = Drive()
     analysis = service(drive, tmp_path, settings=_settings())

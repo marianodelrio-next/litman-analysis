@@ -251,15 +251,24 @@ provenance; a silently ignored v1-only field was rejected because an older
 client could then include a retired original in a new analysis without
 knowing.
 
-## Analysis selection rechecks a registered original's manifest MD5
+## Analysis selection rechecks a registered original's lifecycle and manifest MD5
 
-`preview_analysis` treats a selected original differently depending on
-whether it is a manifest-registered active original: an unregistered file may
-still be selected (always by explicit ID, never inferred by name), but a
-registered one is rechecked against the manifest's stored MD5 before the plan
-is built, and a mismatch raises `registered_original_changed` instead of
-silently analyzing content the person never reviewed. This is one targeted
-`load_state` read, not a `status` candidate scan, keeping the check close to
-the cost of the existing membership and capability checks it joins. Each
-planned action also records whether its original was registered, so a human
-reading the plan can see a new candidate was included.
+`preview_analysis` treats a selected original differently depending on its
+manifest status. An unregistered file may still be selected (always by
+explicit ID, never inferred by name); a retired original is rejected with
+`retired_original_requires_reactivation`, because reactivation is an explicit
+decision with its own identity and checksum rule (see the retirement decision
+above) that analysis must not bypass; an active registered original is
+rechecked against the manifest's stored MD5 before the plan is built, and a
+mismatch raises `registered_original_changed` instead of silently analyzing
+content the person never reviewed. This is one targeted `load_state` read,
+not a `status` candidate scan, keeping the check close to the cost of the
+existing membership and capability checks it joins. Each planned action also
+records whether its original was registered, so a human reading the plan can
+see a new candidate was included. Analysis preview additionally runs the same
+candidate scan `status` runs for unregistered originals, once, to report
+other eligible files the person did not select
+(`other_candidate_original_ids`) without adding them to the plan: selection by
+ID stays the only way a file enters an analysis, but a person reviewing the
+preview can see what else is available. A truncated scan is reported as such
+rather than implying completeness.

@@ -62,7 +62,13 @@ description: Conecta una licitación por el ID de su carpeta de Drive y guía a 
    (retirar o reactivar un original exige su decisión explícita, nunca se
    infiere). Si `preview_analysis` devuelve `registered_original_changed`, es
    el mismo caso: explica que el original registrado cambió y ofrece revisarlo
-   con `status` o `preview_reconciliation` antes de repetir el análisis.
+   con `status` o `preview_reconciliation` antes de repetir el análisis. Si
+   devuelve `retired_original_requires_reactivation`, el original está
+   retirado: no se analiza hasta que la persona decida reactivarlo con
+   `preview_reconciliation`. `other_candidate_original_ids` en la respuesta de
+   `preview_analysis` son archivos elegibles sin registrar que no se
+   seleccionaron: menciónalos sólo como opción, nunca los añadas al análisis
+   sin que la persona los confirme por ID.
 5. `propose_summary`/`refresh_summary`: sigue la skill `resumir-licitacion`.
 6. Si `recommended_action` es `null`, pregunta qué quiere hacer ofreciendo
    `next_actions`. Ante `pending_concurrency_gate`, `conflict` o

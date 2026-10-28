@@ -61,7 +61,7 @@ enums, and rejection of extra properties; invalid input returns
 | `apply_incorporation` | mutation | Apply the accepted incorporation `plan_id`. |
 | `preview_reconciliation` | query | Plan up to 20 closed repair actions (retire/reactivate an original, adopt its current name, rename a managed resource, place an original, return an artifact, adopt an already-created copy). |
 | `apply_reconciliation` | mutation | Apply the accepted reconciliation `plan_id`; rechecks IDs, names, MD5, membership, permissions, manifest content, and context ETag. |
-| `preview_analysis` | query | Plan Core analysis and publication with the provider fixed by `setup`; a selected registered original whose content drifted from the manifest is rejected (`registered_original_changed`) instead of silently analyzing the new content. |
+| `preview_analysis` | query | Plan Core analysis and publication with the provider fixed by `setup`; a selected original rejects `registered_original_changed` if a registered original's content drifted, or `retired_original_requires_reactivation` if it was retired, and the result lists other eligible unregistered files the person did not select (`other_candidate_original_ids`) without adding them. |
 | `execute_analysis` | mutation | Run Core for the accepted plan and publish without another acceptance step. |
 | `discard_analysis` | local mutation | Delete only an unpublished analysis workspace. |
 | `preview_publication` | query | Plan recovery of a locally recorded analysis publication. |

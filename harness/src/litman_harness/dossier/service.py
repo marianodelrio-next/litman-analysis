@@ -310,6 +310,16 @@ class ExpedienteService:
         return recommend(folder_id=root_id, state="adopted", manifest=manifest,
                          pending=self._pending_analyses(root_id))
 
+    def unregistered_original_candidates(self, root: Resource) -> tuple[list[str], bool]:
+        """Eligible original IDs below ``root`` not yet registered, and whether the walk was truncated.
+
+        One explicit tree walk for a caller (analysis preview) that needs this scan once,
+        not the full ``status`` diagnosis.
+        """
+        state = self.load_state(root)
+        tree, truncated = walk_tree(self.drive, root, state.children)
+        return self._candidates(tree, state.manifest)["originals"], truncated
+
     def load_state(self, root: Resource) -> DossierState:
         """Locate and validate ``_LitMan/manifest.json`` below the connected root only."""
         children = self.drive.children(root.id, root.drive_id)

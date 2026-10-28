@@ -15,9 +15,11 @@ LitMan is published as a single product version, shared by Core and Harness; see
 - Accepted reconciliation plans can retire or reactivate originals and repair names and placements of managed files.
 - Dossier status reports changes to registered originals and published files,
   unavailable references, edited context, and incomplete candidate scans.
-- Analyzing a registered original whose content changed since it was
-  registered is now explained and refused before running the analysis,
-  instead of silently analyzing the new content.
+- Analyzing a registered original whose content changed, or a retired
+  original, since it was registered is now explained and refused before
+  running the analysis, instead of silently analyzing it. Analysis preview
+  also lists other eligible, unregistered files found in the dossier without
+  selecting them for the person's review.
 
 ### Changed
 
