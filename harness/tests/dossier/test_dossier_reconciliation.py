@@ -267,3 +267,71 @@ def test_in_place_reconciliation_does_not_require_destination_write_permission(t
     assert result['status'] == 'succeeded'
     assert result['manifest']['originals'][0]['placement'] == 'in_place'
     assert drive.get('source').parents == ('root',)
+
+
+def test_concurrent_manifest_after_rename_can_be_reconciled_with_new_plan(tmp_path, monkeypatch):
+    from litman_harness.dossier.manifest import Manifest
+    from litman_harness.dossier.reconciliation import ReconciliationService
+
+    drive = dossier_drive()
+    drive.resources['source'] = replace(drive.get('source'), capabilities={'canRename': True})
+    shared = AtomicSharedState(drive)
+    dossier = ExpedienteService(drive, PlanStore(tmp_path / 'plans'), shared)
+    dossier.apply_incorporation(dossier.preview_incorporation('root', ['source']).id)
+    state = dossier.load_state(drive.get('root'))
+    service = ReconciliationService(dossier)
+    plan = service.preview('root', [{'op': 'rename_managed', 'file_id': 'source', 'new_name': 'new.pdf'}])
+    rename = drive.rename
+    def concurrent_rename(identifier, name):
+        result = rename(identifier, name)
+        manifest = Manifest.parse(drive.contents[state.manifest_file.id].decode())
+        manifest.workflow_phase = 'analisis_inicial'
+        drive.write_text(state.manifest_file.id, manifest.serialize())
+        return result
+    monkeypatch.setattr(drive, 'rename', concurrent_rename)
+    result = service.apply(plan.id)
+    assert result['status'] == 'conflict' and result['writes']
+    assert result['conflict']['recovery']['operations'] == [{'op': 'adopt_current_name', 'file_id': 'source'}]
+    monkeypatch.setattr(drive, 'rename', rename)
+    repair = service.preview('root', result['conflict']['recovery']['operations'])
+    result = service.apply(repair.id)
+    assert result['status'] == 'succeeded'
+    assert result['manifest']['workflow_phase'] == 'analisis_inicial'
+    assert result['manifest']['originals'][0]['observed_name'] == 'new.pdf'
+
+
+def test_concurrent_manifest_after_artifact_move_can_be_reconciled(tmp_path, monkeypatch):
+    from litman_harness.dossier.manifest import Manifest
+    from litman_harness.dossier.reconciliation import ReconciliationService
+
+    drive = dossier_drive()
+    shared = AtomicSharedState(drive)
+    dossier = ExpedienteService(drive, PlanStore(tmp_path / 'plans'), shared)
+    dossier.apply_incorporation(dossier.preview_incorporation('root', ['source']).id)
+    state = dossier.load_state(drive.get('root'))
+    folder_id = state.manifest.folders['initial']
+    drive.resources[folder_id] = replace(drive.get(folder_id), capabilities={'canAddChildren': True})
+    drive.add(Resource('artifact', 'result.pdf', PDF, '1', drive_id='shared', parents=('root',),
+                       capabilities={'canMoveItemWithinDrive': True}), b'result')
+    state.manifest.analyses = [{'operation_id': 'a', 'status': 'published', 'folder_id': folder_id,
+                                'artifacts': [{'file_id': 'artifact', 'name': 'result.pdf'}]}]
+    drive.write_text(state.manifest_file.id, state.manifest.serialize())
+    service = ReconciliationService(dossier)
+    plan = service.preview('root', [{'op': 'return_artifact', 'file_id': 'artifact'}])
+    move = drive.move
+    def concurrent_move(identifier, parent, parents):
+        result = move(identifier, parent, parents)
+        manifest = Manifest.parse(drive.contents[state.manifest_file.id].decode())
+        manifest.workflow_phase = 'analisis_inicial'
+        drive.write_text(state.manifest_file.id, manifest.serialize())
+        return result
+    monkeypatch.setattr(drive, 'move', concurrent_move)
+    result = service.apply(plan.id)
+    assert result['status'] == 'conflict' and result['writes']
+    assert result['conflict']['recovery']['operations'] == [{'op': 'return_artifact', 'file_id': 'artifact'}]
+    monkeypatch.setattr(drive, 'move', move)
+    repair = service.preview('root', result['conflict']['recovery']['operations'])
+    result = service.apply(repair.id)
+    assert result['status'] == 'succeeded'
+    assert result['manifest']['workflow_phase'] == 'analisis_inicial'
+    assert drive.get('artifact').parents == (folder_id,)

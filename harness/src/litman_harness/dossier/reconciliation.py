@@ -145,7 +145,25 @@ class ReconciliationService:
                     run.complete(action, {"resource_id": item.id})
         manifest.history.append({'operation_id': run.plan.operation_id, 'kind': run.plan.kind,
                                  'performed_by': self.dossier.performed_by(), 'completed_at': now()})
-        conflict = self.dossier.write_shared_state(run, root, manifest, base, manifest_version=version)
+        try:
+            conflict = self.dossier.write_shared_state(run, root, manifest, base, manifest_version=version)
+        except HarnessError as exc:
+            if exc.code != 'concurrent_change' or not run.completed:
+                raise
+            operations = []
+            for action in run.plan.actions:
+                if not run.done(action):
+                    continue
+                if action.kind == 'rename_managed':
+                    operations.append({'op': 'adopt_current_name', 'file_id': action.resource_id})
+                elif action.kind in ('place_original', 'return_artifact'):
+                    if run.output(action).get('strategy') != 'copy':
+                        operations.append({'op': action.kind, 'file_id': action.resource_id})
+            raise OperationConflict(
+                'El manifiesto cambió después de modificar recursos; revise el estado y acepte un nuevo plan',
+                details={'code': 'concurrent_change', 'recovery': {
+                    'tool': 'preview_reconciliation', 'folder_id': root.id, 'operations': operations,
+                    'note': 'Revise todos los recursos afectados antes de aceptar un nuevo plan.'}}) from exc
         return self.dossier.shared_result(run, manifest, conflict)
 
     def _check_action(self, root: Resource, manifest: Manifest, action: PlanAction) -> tuple[Resource, bool]:
