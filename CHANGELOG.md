@@ -10,6 +10,7 @@ LitMan is published as a single product version, shared by Core and Harness; see
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-28
 ### Added
 
 - Accepted reconciliation plans can retire or reactivate originals and repair names and placements of managed files.
