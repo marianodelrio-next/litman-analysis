@@ -59,8 +59,10 @@ enums, and rejection of extra properties; invalid input returns
 | `status` | query | Combine inspection with manifest status, read-only drift diagnostics, pending local publications, and `recommended_action`. |
 | `preview_incorporation` | query | Plan only missing folders, originals, live offer, context, and manifest work. |
 | `apply_incorporation` | mutation | Apply the accepted incorporation `plan_id`. |
-| `preview_analysis` | query | Plan Core analysis and publication with the provider fixed by `setup`. |
-| `execute_analysis` | mutation | Run Core for the accepted plan and publish without another acceptance step. |
+| `preview_reconciliation` | query | Plan up to 20 closed repair actions (retire/reactivate an original, adopt its current name, rename a managed resource, place an original, return an artifact, adopt an already-created copy). |
+| `apply_reconciliation` | mutation | Apply the accepted reconciliation `plan_id`; rechecks IDs, names, MD5, membership, permissions, manifest content, and context ETag. |
+| `preview_analysis` | query | Plan Core analysis and publication with the provider fixed by `setup`; a selected original rejects `registered_original_changed` if a registered original's content drifted, or `retired_original_requires_reactivation` if it was retired, and the result lists other eligible unregistered files the person did not select (`other_candidate_original_ids`) without adding them. |
+| `execute_analysis` | mutation | Run Core for the accepted plan and publish without another acceptance step; rechecks each selected original's manifest status (retirement, MD5) again before Core runs, in case it changed after the plan was accepted. |
 | `discard_analysis` | local mutation | Delete only an unpublished analysis workspace. |
 | `preview_publication` | query | Plan recovery of a locally recorded analysis publication. |
 | `apply_publication` | mutation | Apply or resume an accepted publication plan. |

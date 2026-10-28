@@ -97,7 +97,7 @@ def build_services(env: Mapping[str, str] | None = None, *, provider: DesktopOAu
     expediente = ExpedienteService(drive, store, shared_state)
     publication = PublicationService(expediente, work)
     analysis = AnalysisService(drive, store, work_root=work, publication=publication,
-                               settings=lambda: load_settings(env))
+                               settings=lambda: load_settings(env), dossier=expediente)
     documents = DocumentService(expediente, docs)
     comments = CommentService(expediente, documents)
     return Services(kind, drive, shared_state, expediente, analysis, publication, SummaryService(expediente), docs,

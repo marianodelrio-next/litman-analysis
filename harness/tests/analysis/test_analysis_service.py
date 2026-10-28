@@ -6,11 +6,12 @@ from pathlib import Path
 import subprocess
 
 import pytest
-from fakes import core_run
+from fakes import PDF, AtomicSharedState, core_run, dossier_drive
 
 from litman_harness.analysis import service as service_module
 from litman_harness.analysis.service import AnalysisService, remove_workspace
 from litman_harness.dossier.models import FOLDER_MIME, Resource
+from litman_harness.dossier.service import ExpedienteService
 from litman_harness.errors import HarnessError
 from litman_harness.plans import PlanStore
 
@@ -41,10 +42,10 @@ def _settings(provider: str = "codex", model: str | None = None):
     return get
 
 
-def service(drive, tmp_path: Path, run=None, *, settings=None) -> AnalysisService:
+def service(drive, tmp_path: Path, run=None, *, settings=None, dossier=None) -> AnalysisService:
     kwargs = {"run": run} if run else {}
     return AnalysisService(drive, PlanStore(tmp_path / "plans"), work_root=tmp_path / "work",
-                           settings=settings or _settings(), **kwargs)
+                           settings=settings or _settings(), dossier=dossier, **kwargs)
 
 
 def test_analysis_preview_rejects_native_google_documents():
@@ -308,3 +309,135 @@ def test_original_without_md5_is_rejected_in_preview():
     with pytest.raises(HarnessError) as raised:
         AnalysisService(drive, settings=_settings()).preview("root", ["file"], "assessment")
     assert raised.value.code == "missing_checksum"
+
+
+def _adopted_dossier(tmp_path: Path):
+    """An adopted dossier with ``source`` registered as its only active original."""
+    drive = dossier_drive()
+    dossier = ExpedienteService(drive, PlanStore(tmp_path / "dossier-plans"), AtomicSharedState(drive))
+    dossier.apply_incorporation(dossier.preview_incorporation("root", ["source"]).id)
+    return drive, dossier
+
+
+def test_preview_rejects_a_registered_original_whose_content_drifted(tmp_path: Path):
+    drive, dossier = _adopted_dossier(tmp_path)
+    drive.resources["source"] = replace(drive.resources["source"], md5_checksum="0" * 32)
+    analysis = service(drive, tmp_path, settings=_settings(), dossier=dossier)
+    with pytest.raises(HarnessError, match="cambió") as raised:
+        analysis.preview("root", ["source"], "assessment")
+    assert raised.value.code == "registered_original_changed"
+    assert raised.value.details["file_id"] == "source"
+
+
+def test_preview_rejects_a_registered_original_with_no_stored_checksum(tmp_path: Path):
+    """Same drift comparison as ``status``: a missing registered MD5 against a present one is drift too."""
+    drive, dossier = _adopted_dossier(tmp_path)
+    state = dossier.load_state(drive.resources["root"])
+    state.manifest.originals[0]["md5_checksum"] = None
+    drive.contents[state.manifest_file.id] = state.manifest.serialize().encode()
+    analysis = service(drive, tmp_path, settings=_settings(), dossier=dossier)
+    with pytest.raises(HarnessError) as raised:
+        analysis.preview("root", ["source"], "assessment")
+    assert raised.value.code == "registered_original_changed"
+
+
+def test_preview_marks_registered_and_unregistered_selections(tmp_path: Path):
+    drive, dossier = _adopted_dossier(tmp_path)
+    drive.add(Resource("extra", "nuevo.pdf", PDF, "1", drive_id="shared", parents=("root",),
+                       capabilities={"canDownload": True}), b"nuevo")
+    analysis = service(drive, tmp_path, settings=_settings(), dossier=dossier)
+    plan = analysis.preview("root", ["source", "extra"], "assessment")
+    flags = {action.resource_id: action.metadata["registered"] for action in plan.actions
+             if action.kind == "download_original"}
+    assert flags == {"source": True, "extra": False}
+
+
+def test_preview_rejects_a_retired_original_until_reactivated(tmp_path: Path):
+    from litman_harness.dossier.reconciliation import ReconciliationService
+
+    drive, dossier = _adopted_dossier(tmp_path)
+    reconciliation = ReconciliationService(dossier)
+    reconciliation.apply(reconciliation.preview("root", [{"op": "retire_original", "file_id": "source"}]).id)
+    analysis = service(drive, tmp_path, settings=_settings(), dossier=dossier)
+    with pytest.raises(HarnessError) as raised:
+        analysis.preview("root", ["source"], "assessment")
+    assert raised.value.code == "retired_original_requires_reactivation"
+    assert raised.value.details["file_id"] == "source"
+    reconciliation.apply(reconciliation.preview("root", [{"op": "reactivate_original", "file_id": "source"}]).id)
+    assert analysis.preview("root", ["source"], "assessment").snapshot == {"source": drive.resources["source"].md5_checksum}
+
+
+def test_execute_rejects_a_registered_original_retired_after_preview(tmp_path: Path):
+    """The manifest can change between an accepted preview and execution; recheck it, not just at preview."""
+    from litman_harness.dossier.reconciliation import ReconciliationService
+
+    drive, dossier = _adopted_dossier(tmp_path)
+    calls: list[Any] = []
+    run = core_run()
+
+    def counted(command, **kwargs):
+        calls.append(command)
+        return run(command, **kwargs)
+
+    analysis = service(drive, tmp_path, counted, settings=_settings(), dossier=dossier)
+    plan = analysis.preview("root", ["source"], "assessment")
+    reconciliation = ReconciliationService(dossier)
+    reconciliation.apply(reconciliation.preview("root", [{"op": "retire_original", "file_id": "source"}]).id)
+    with pytest.raises(HarnessError) as raised:
+        analysis.execute(plan.id)
+    assert raised.value.code == "retired_original_requires_reactivation"
+    assert raised.value.details["file_id"] == "source"
+    assert not calls
+
+
+def test_execute_rejects_a_registered_original_changed_in_the_manifest_after_preview(tmp_path: Path):
+    drive, dossier = _adopted_dossier(tmp_path)
+    calls: list[Any] = []
+    run = core_run()
+
+    def counted(command, **kwargs):
+        calls.append(command)
+        return run(command, **kwargs)
+
+    analysis = service(drive, tmp_path, counted, settings=_settings(), dossier=dossier)
+    plan = analysis.preview("root", ["source"], "assessment")
+    state = dossier.load_state(drive.resources["root"])
+    state.manifest.originals[0]["md5_checksum"] = "0" * 32
+    drive.contents[state.manifest_file.id] = state.manifest.serialize().encode()
+    with pytest.raises(HarnessError) as raised:
+        analysis.execute(plan.id)
+    assert raised.value.code == "registered_original_changed"
+    assert not calls
+
+
+def test_preview_with_candidates_surfaces_unregistered_files_without_selecting_them(tmp_path: Path):
+    drive, dossier = _adopted_dossier(tmp_path)
+    drive.add(Resource("extra", "nuevo.pdf", PDF, "1", drive_id="shared", parents=("root",),
+                       capabilities={"canDownload": True}), b"nuevo")
+    analysis = service(drive, tmp_path, settings=_settings(), dossier=dossier)
+    result = analysis.preview_with_candidates("root", ["source"], "assessment")
+    assert result["other_candidate_original_ids"] == ["extra"]
+    assert result["candidate_scan_truncated"] is False
+    assert all(a["resource_id"] != "extra" for a in result["actions"])
+
+
+def test_preview_with_candidates_excludes_already_selected_ids(tmp_path: Path):
+    drive, dossier = _adopted_dossier(tmp_path)
+    drive.add(Resource("extra", "nuevo.pdf", PDF, "1", drive_id="shared", parents=("root",),
+                       capabilities={"canDownload": True}), b"nuevo")
+    analysis = service(drive, tmp_path, settings=_settings(), dossier=dossier)
+    result = analysis.preview_with_candidates("root", ["source", "extra"], "assessment")
+    assert result["other_candidate_original_ids"] == []
+
+
+def test_preview_with_candidates_without_a_dossier_reports_no_candidates(tmp_path: Path):
+    analysis = service(Drive(), tmp_path, settings=_settings())
+    result = analysis.preview_with_candidates("root", ["file"], "assessment")
+    assert result["other_candidate_original_ids"] == [] and result["candidate_scan_truncated"] is False
+
+
+def test_preview_without_a_dossier_never_treats_a_selection_as_registered(tmp_path: Path):
+    drive = Drive()
+    analysis = service(drive, tmp_path, settings=_settings())
+    plan = analysis.preview("root", ["file"], "assessment")
+    assert plan.actions[0].metadata["registered"] is False

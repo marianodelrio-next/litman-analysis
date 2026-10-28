@@ -101,13 +101,28 @@ account or plans made stale by relevant Drive changes. Created resources carry
 interrupted operation to adopt exactly one prior result instead of duplicating
 it. Multiple matching resources are a conflict.
 
-Analysis downloads only planned originals into a private workspace whose input
-directory is the analysis operation UUID. Harness generates Core's minimal
-configuration and invokes `litman-core run --config`; it does not depend on a
-user-maintained Core configuration. Harness validates the public result by
-artifact role, path containment, presence, and SHA-256, then records a closed
-local catalog. Core-internal files such as `validation.json` and
-`generation_manifest.json` are never consumed.
+`preview_analysis` checks each selected original's membership and, when it is
+manifest-registered, its lifecycle and content: a retired original raises
+`retired_original_requires_reactivation` (reactivation is a separate, explicit
+decision) and an active one whose current MD5 no longer matches the
+manifest's stored value raises `registered_original_changed`, both before the
+plan is stored (rationale in [decisions.md](decisions.md)). Each planned
+action also records whether its original is registered, so analyzing an
+unregistered file is always visible rather than implicit, and the response
+also lists other eligible unregistered originals the person did not select
+(`other_candidate_original_ids`), from one explicit candidate scan, without
+adding them to the plan. The manifest can change between an accepted preview
+and `execute_analysis`, so execution rechecks the same retirement and MD5
+rules against the current manifest, immediately before Core runs and before
+anything is downloaded, not only at preview time. Analysis downloads only
+planned originals into a
+private workspace whose input directory is the analysis operation UUID.
+Harness generates Core's minimal configuration and invokes
+`litman-core run --config`; it does not depend on a user-maintained Core
+configuration. Harness validates the public result by artifact role, path
+containment, presence, and SHA-256, then records a closed local catalog.
+Core-internal files such as `validation.json` and `generation_manifest.json`
+are never consumed.
 
 An analysis plan includes publication. Publication uploads each validated
 artifact directly into the registered phase folder (`Analisis inicial` or

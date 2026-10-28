@@ -16,6 +16,7 @@ from .. import __version__
 from ..adapters import core
 from ..adapters.drive import DriveGateway
 from ..dossier.models import FOLDER_MIME, Resource
+from ..dossier.service import ExpedienteService
 from ..errors import HarnessError, safe_exception_message
 from ..plans import PlanStore
 from ..plans.models import OperationRecord, OperationStatus, Plan, PlanAction
@@ -28,13 +29,37 @@ if TYPE_CHECKING:  # the publication service imports this module; inject it, nev
 LOCAL_VALIDATED = "local_validated"
 
 
+def _check_registration(identifier: str, current_md5: str | None, registered: dict[str, dict[str, Any]]) -> None:
+    """Reject a selected ID that the manifest shows as retired or drifted; a no-op if unregistered.
+
+    Shared by ``preview`` (against Drive's current content) and the pre-Core recheck in
+    ``_run_core`` (against the plan's locked snapshot): both must refuse the same registered
+    original the same way, whether it changed before or after the plan was accepted.
+    """
+    original = registered.get(identifier)
+    if original is None:
+        return
+    if original.get("status", "active") == "retired":
+        raise HarnessError("retired_original_requires_reactivation",
+                           "Este original está retirado; reactívelo con preview_reconciliation antes de analizarlo",
+                           details={"file_id": identifier})
+    # Same drift comparison as ``status`` (``dossier/service.py:_drift``): any mismatch,
+    # including an unexpectedly missing registered checksum, is drift.
+    if original.get("md5_checksum") != current_md5:
+        raise HarnessError("registered_original_changed",
+                           "El original registrado cambió; revise el expediente con status antes de analizarlo",
+                           details={"file_id": identifier, "registered_md5": original.get("md5_checksum"),
+                                    "current_md5": current_md5})
+
+
 class AnalysisService:
     """Prepare and run Core locally on originals selected inside the connected dossier."""
 
     def __init__(self, drive: DriveGateway, plan_store: PlanStore | None = None, *,
                  work_root: Path | None = None, run: core.Runner = subprocess.run,
                  publication: "PublicationService | None" = None,
-                 settings: Callable[[], dict[str, Any] | None] | None = None):
+                 settings: Callable[[], dict[str, Any] | None] | None = None,
+                 dossier: ExpedienteService | None = None):
         self.drive = drive
         self.plan_store = plan_store
         self.work_root = work_root
@@ -43,6 +68,9 @@ class AnalysisService:
         # without it the analysis stays local (development and isolated tests).
         self.publication = publication
         self.settings = settings or (lambda: None)
+        # With a dossier service, preview checks a selected registered original
+        # against its manifest MD5 (drift) instead of trusting only Drive's current content.
+        self.dossier = dossier
 
     def preview(self, root_folder_id: str, original_ids: list[str], job_type: str) -> Plan:
         if job_type not in core.JOB_TYPES:
@@ -60,16 +88,19 @@ class AnalysisService:
         root = self._root(root_folder_id)
         # Only the content (MD5) of each original identifies the input; the root is
         # rechecked for existence, trash and capability, never by Drive ``version``.
+        registered = self._registered_originals(root)
         snapshot: dict[str, str | None] = {}
         actions: list[PlanAction] = []
         for identifier in original_ids:
             item = self.drive.get(identifier)
             validate_original(self.drive, root, item)
+            original = registered.get(identifier)
+            _check_registration(identifier, item.md5_checksum, registered)
             md5 = require_checksum(item)
             snapshot[item.id] = md5
             actions.append(PlanAction("download_original", item.id, item.name, None, md5,
                                       {"mime_type": item.mime_type, "size": item.size,
-                                       "drive_version": item.version}))
+                                       "drive_version": item.version, "registered": original is not None}))
         run_core_metadata = {
             "provider": provider, "publication": "included" if self.publication else "local_only",
             "expected_roles": list(REQUIRED_ROLES[job_type]),
@@ -83,6 +114,20 @@ class AnalysisService:
         if self.plan_store:
             self.plan_store.save(plan)
         return plan
+
+    def preview_with_candidates(self, root_folder_id: str, original_ids: list[str], job_type: str) -> dict[str, Any]:
+        """The stored plan plus other eligible originals not selected, for human awareness (never auto-selected).
+
+        One explicit candidate scan, as the design allows for this already expensive operation;
+        execution still only downloads what the accepted plan selected.
+        """
+        plan = self.preview(root_folder_id, original_ids, job_type)
+        other_ids: list[str] = []
+        truncated = False
+        if self.dossier is not None:
+            ids, truncated = self.dossier.unregistered_original_candidates(self._root(root_folder_id))
+            other_ids = [identifier for identifier in ids if identifier not in original_ids]
+        return {**plan.json(), "other_candidate_original_ids": other_ids, "candidate_scan_truncated": truncated}
 
     def execute(self, accepted_plan_id: str) -> dict[str, Any]:
         """Run Core only for a previously stored plan of the active account.
@@ -137,6 +182,12 @@ class AnalysisService:
         model = run_action.metadata.get("model")
         core.validate_provider(provider)
         root = self._root(plan.root_folder_id)
+        # The manifest can change between an accepted preview and this execution (for example a
+        # retirement); recheck it here too, not only at preview time.
+        registered = self._registered_originals(root)
+        for action in plan.actions:
+            if action.kind == "download_original" and action.resource_id:
+                _check_registration(action.resource_id, action.expected_version, registered)
         verify_originals(self.drive, root, plan)
         workspace = self._new_workspace()
         try:
@@ -214,6 +265,20 @@ class AnalysisService:
         if platform.system() != "Windows":
             os.chmod(workspace, 0o700)
         return workspace
+
+    def _registered_originals(self, root: Resource) -> dict[str, dict[str, Any]]:
+        """Every manifest-registered original of ``root`` (active or retired), by file ID.
+
+        Empty without a dossier or manifest. One targeted ``load_state`` read, not a full
+        ``status`` candidate scan: analysis selection only needs to tell a registered original
+        (active or retired) from an unregistered candidate.
+        """
+        if self.dossier is None:
+            return {}
+        manifest = self.dossier.load_state(root).manifest
+        if manifest is None:
+            return {}
+        return {item["file_id"]: item for item in manifest.originals}
 
     def _root(self, folder_id: str) -> Resource:
         root = self.drive.get(folder_id)

@@ -224,3 +224,58 @@ by raw ID, native threads are addressed as `docs:<id>`, and no cross-API ID
 equivalence is assumed beyond showing an identical raw ID once. Existing
 comments are neither deleted nor migrated, and an accepted plan with an
 unfinished unanchored `add` is refused rather than rewritten.
+
+## Dossier drift is detected on demand and repaired only by accepted plans
+
+Since 2026-10-27 (CHG-12) `status` compares the manifest to Drive only when
+called, reporting unregistered candidates, renamed or content-changed
+registered resources, misplaced originals and artifacts, inaccessible or
+out-of-tree references, and external `contexto.md` edits as a `drift` list;
+it never writes, and a truncated walk is reported as incomplete rather than a
+clean inventory. Repairs go through a separate, closed
+`preview_reconciliation`/`apply_reconciliation` pair (retire or reactivate an
+original, adopt its current name, rename a managed resource, place an
+original, return a published artifact, or adopt a copy created during a prior
+conflict), bound to the active account and the manifest content seen at
+preview time, with the same `If-Match`, operation-marker and context-conflict
+behaviour as every other mutation. No background watcher, scheduled job, or
+silent manifest write exists. `litman-dossier-v2` adds only the active/retired
+distinction for originals: v1 is read with every original active, and the
+first accepted shared-state write migrates it to v2; older Harness versions
+already read an unknown version read-only. A retired original keeps its ID and
+provenance for history but is excluded from new analysis input and active
+reference checks; reactivation requires the same ID and its stored MD5, so a
+replacement file is registered as a new original instead. Dropping retired
+originals was rejected because it would break summary and analysis
+provenance; a silently ignored v1-only field was rejected because an older
+client could then include a retired original in a new analysis without
+knowing.
+
+## Analysis selection rechecks a registered original's lifecycle and manifest MD5
+
+`preview_analysis` treats a selected original differently depending on its
+manifest status. An unregistered file may still be selected (always by
+explicit ID, never inferred by name); a retired original is rejected with
+`retired_original_requires_reactivation`, because reactivation is an explicit
+decision with its own identity and checksum rule (see the retirement decision
+above) that analysis must not bypass; an active registered original is
+rechecked against the manifest's stored MD5 before the plan is built, and a
+mismatch raises `registered_original_changed` instead of silently analyzing
+content the person never reviewed. This is one targeted `load_state` read,
+not a `status` candidate scan, keeping the check close to the cost of the
+existing membership and capability checks it joins. Each planned action also
+records whether its original was registered, so a human reading the plan can
+see a new candidate was included. Analysis preview additionally runs the same
+candidate scan `status` runs for unregistered originals, once, to report
+other eligible files the person did not select
+(`other_candidate_original_ids`) without adding them to the plan: selection by
+ID stays the only way a file enters an analysis, but a person reviewing the
+preview can see what else is available. A truncated scan is reported as such
+rather than implying completeness. The same two checks (retirement, MD5) run
+again immediately before Core runs, against the manifest's state at that
+moment rather than the one seen at preview: an accepted plan can sit
+unexecuted, and the manifest can change in that window (most plainly, the
+same original being retired through an accepted reconciliation plan). A
+preview-only check would let that plan still run Core on a retired or
+changed original, silently reintroducing the exact risk the guard exists to
+close.
