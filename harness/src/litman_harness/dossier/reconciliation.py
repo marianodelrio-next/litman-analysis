@@ -12,7 +12,7 @@ from .models import Resource
 from .service import ExpedienteService, OperationConflict, OperationRun, now, placement_strategy, placement_warning
 
 _ACTIONS = {'retire_original', 'reactivate_original', 'adopt_current_name', 'rename_managed',
-            'place_original', 'return_artifact'}
+            'place_original', 'return_artifact', 'adopt_copy'}
 
 
 def _managed(manifest: Manifest, identifier: str) -> tuple[str, dict[str, Any], str | None]:
@@ -44,7 +44,8 @@ class ReconciliationService:
         seen = set()
         for index, op in enumerate(operations):
             kind = op.get('op') if isinstance(op, dict) else None
-            fields = {'op', 'file_id', 'new_name'} if kind == 'rename_managed' else {'op', 'file_id'}
+            fields = ({'op', 'file_id', 'new_name'} if kind == 'rename_managed' else
+                      {'op', 'file_id', 'copy_file_id'} if kind == 'adopt_copy' else {'op', 'file_id'})
             if kind not in _ACTIONS or set(op) != fields or not isinstance(op.get('file_id'), str) or not op['file_id']:
                 raise HarnessError('invalid_request', 'Acción de reconciliación inválida', details={'operation': index})
             identifier = op['file_id']
@@ -53,7 +54,7 @@ class ReconciliationService:
             seen.add(identifier)
             category, record, destination = _managed(manifest, identifier)
             active = record.get('status', 'active') == 'active'
-            if kind in ('retire_original', 'reactivate_original', 'place_original') and category != 'original':
+            if kind in ('retire_original', 'reactivate_original', 'place_original', 'adopt_copy') and category != 'original':
                 raise HarnessError('invalid_request', 'La acción requiere un original')
             if kind == 'return_artifact' and category != 'artifact':
                 raise HarnessError('invalid_request', 'La acción requiere un artefacto publicado')
@@ -61,12 +62,14 @@ class ReconciliationService:
                 raise HarnessError('invalid_request', 'El original ya tiene ese estado')
             if kind not in ('retire_original', 'reactivate_original') and category == 'original' and not active:
                 raise HarnessError('invalid_request', 'El original está retirado')
+            if kind == 'adopt_copy' and (not isinstance(op.get('copy_file_id'), str) or not op['copy_file_id']):
+                raise HarnessError('invalid_request', 'Falta el identificador de la copia', details={'operation': index})
             item = None
             if kind != 'retire_original':
                 item = self.drive.get(identifier)
                 if not belongs_to_root(self.drive, root, item):
                     raise HarnessError('document_outside_tree', 'El recurso no está dentro de la licitación')
-                if category == 'original' and kind in ('reactivate_original', 'place_original') and (
+                if category == 'original' and kind in ('reactivate_original', 'place_original', 'adopt_copy') and (
                         not record.get('md5_checksum') or item.md5_checksum != record.get('md5_checksum')):
                     raise HarnessError('original_changed', 'El original no coincide con el checksum registrado')
             target = op.get('new_name', item.name if item else '')
@@ -84,10 +87,19 @@ class ReconciliationService:
                     raise HarnessError('insufficient_capability', 'No se puede usar la carpeta de destino')
                 if kind == 'return_artifact' and not item.capabilities.get('canMoveItemWithinDrive', False):
                     raise HarnessError('insufficient_capability', 'No se puede mover el artefacto')
+            copy_checksum = None
+            if kind == 'adopt_copy':
+                copy_item = self.drive.get(op['copy_file_id'])
+                if not belongs_to_root(self.drive, root, copy_item):
+                    raise HarnessError('document_outside_tree', 'La copia no está dentro de la licitación')
+                if copy_item.md5_checksum != item.md5_checksum:
+                    raise HarnessError('original_changed', 'La copia no coincide con el original')
+                copy_checksum = copy_item.md5_checksum
             metadata = {'index': index, 'category': category, 'observed_name': item.name if item else None,
                         'parents': list(item.parents) if item else [], 'destination': destination,
                         'strategy': strategy, 'can_copy': bool(item and item.capabilities.get('canCopy')),
-                        'warning': placement_warning(strategy, item.name) if strategy else None}
+                        'warning': placement_warning(strategy, item.name) if strategy else None,
+                        'copy_file_id': op.get('copy_file_id'), 'copy_checksum': copy_checksum}
             actions.append(PlanAction(kind, identifier, target, str(index), item.md5_checksum if item else None, metadata))
         actions.extend((PlanAction('update_context', manifest.context_file_id, CONTEXT_NAME, root.id),
                         PlanAction('update_manifest', state.manifest_file.id, MANIFEST_NAME, None,
@@ -107,7 +119,7 @@ class ReconciliationService:
         base, manifest, version = self.dossier.read_manifest_unchanged(update)
         # Check every affected resource before performing the first Drive mutation.
         for action in run.plan.actions:
-            if action.kind in _ACTIONS and action.kind != "retire_original":
+            if action.kind in _ACTIONS and action.kind not in ('retire_original', 'adopt_copy'):
                 self._check_action(root, manifest, action)
         for action in run.plan.actions:
             if action.kind not in _ACTIONS:
@@ -115,6 +127,13 @@ class ReconciliationService:
             category, record, destination = _managed(manifest, action.resource_id)
             if action.kind == 'retire_original':
                 record['status'] = 'retired'
+                continue
+            if action.kind == 'adopt_copy':
+                copy_item = self.drive.get(action.metadata['copy_file_id'])
+                if (not belongs_to_root(self.drive, root, copy_item) or
+                        copy_item.md5_checksum != action.metadata['copy_checksum']):
+                    raise OperationConflict('La copia registrada cambió', details={'file_id': copy_item.id})
+                record.update(file_id=copy_item.id, copied_from=action.resource_id, provenance='copied')
                 continue
             item, target_state = self._check_action(root, manifest, action)
             if action.kind == 'reactivate_original':
@@ -157,7 +176,13 @@ class ReconciliationService:
                 if action.kind == 'rename_managed':
                     operations.append({'op': 'adopt_current_name', 'file_id': action.resource_id})
                 elif action.kind in ('place_original', 'return_artifact'):
-                    if run.output(action).get('strategy') != 'copy':
+                    outcome = run.output(action)
+                    if outcome.get('strategy') == 'copy':
+                        # Re-issuing place_original would recompute the strategy and copy
+                        # again; adopt_copy registers the copy already created instead.
+                        operations.append({'op': 'adopt_copy', 'file_id': action.resource_id,
+                                           'copy_file_id': outcome['resource_id']})
+                    else:
                         operations.append({'op': action.kind, 'file_id': action.resource_id})
             raise OperationConflict(
                 'El manifiesto cambió después de modificar recursos; revise el estado y acepte un nuevo plan',

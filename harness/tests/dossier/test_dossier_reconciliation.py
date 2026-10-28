@@ -335,3 +335,44 @@ def test_concurrent_manifest_after_artifact_move_can_be_reconciled(tmp_path, mon
     assert result['status'] == 'succeeded'
     assert result['manifest']['workflow_phase'] == 'analisis_inicial'
     assert drive.get('artifact').parents == (folder_id,)
+
+
+def test_concurrent_manifest_after_copied_placement_adopts_the_copy_without_duplicating_it(tmp_path, monkeypatch):
+    from litman_harness.dossier.manifest import Manifest
+    from litman_harness.dossier.reconciliation import ReconciliationService
+
+    drive = dossier_drive()
+    shared = AtomicSharedState(drive)
+    dossier = ExpedienteService(drive, PlanStore(tmp_path / 'plans'), shared)
+    dossier.apply_incorporation(dossier.preview_incorporation('root', ['source']).id)
+    state = dossier.load_state(drive.get('root'))
+    folder_id = state.manifest.folders['originals']
+    drive.resources['source'] = replace(drive.get('source'), capabilities={'canCopy': True})
+    drive.resources[folder_id] = replace(drive.get(folder_id), capabilities={'canAddChildren': True})
+    service = ReconciliationService(dossier)
+    plan = service.preview('root', [{'op': 'place_original', 'file_id': 'source'}])
+    assert plan.actions[0].metadata['strategy'] == 'copy'
+    copy = drive.copy
+    def concurrent_copy(file_id, name, parent_id, operation_id, action_id):
+        result = copy(file_id, name, parent_id, operation_id, action_id)
+        manifest = Manifest.parse(drive.contents[state.manifest_file.id].decode())
+        manifest.workflow_phase = 'analisis_inicial'
+        drive.write_text(state.manifest_file.id, manifest.serialize())
+        return result
+    monkeypatch.setattr(drive, 'copy', concurrent_copy)
+    before = list(drive.created)
+    result = service.apply(plan.id)
+    assert result['status'] == 'conflict' and result['writes']
+    new_copies = [identifier for identifier in drive.created if identifier not in before]
+    assert len(new_copies) == 1
+    copy_id = new_copies[0]
+    assert result['conflict']['recovery']['operations'] == [
+        {'op': 'adopt_copy', 'file_id': 'source', 'copy_file_id': copy_id}]
+    repair = service.preview('root', result['conflict']['recovery']['operations'])
+    result = service.apply(repair.id)
+    assert result['status'] == 'succeeded'
+    assert result['manifest']['workflow_phase'] == 'analisis_inicial'
+    assert result['manifest']['originals'][0]['file_id'] == copy_id
+    assert result['manifest']['originals'][0]['copied_from'] == 'source'
+    assert result['manifest']['originals'][0]['provenance'] == 'copied'
+    assert [identifier for identifier in drive.created if identifier not in before] == new_copies
