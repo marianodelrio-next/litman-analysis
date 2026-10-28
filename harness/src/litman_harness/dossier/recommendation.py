@@ -31,7 +31,7 @@ def recommend(*, folder_id: str, state: str, manifest: Manifest | None, candidat
     published = manifest.published_analyses() if manifest else []
     # Only a dossier without registered originals needs organising first; extra
     # unregistered candidates never block the path (they stay an option in next_actions).
-    if manifest is None or not manifest.originals:
+    if manifest is None or not manifest.active_originals():
         return _action(
             "incorporate",
             "Organizar la licitación: registrar los pliegos originales y la estructura de carpetas.",
@@ -48,7 +48,7 @@ def recommend(*, folder_id: str, state: str, manifest: Manifest | None, candidat
     if misplaced_originals:
         return _action("organize_originals", "Colocar los pliegos registrados en la carpeta Originales.",
                        "preview_incorporation", {"folder_id": folder_id})
-    originals = [item["file_id"] for item in manifest.originals]
+    originals = [item["file_id"] for item in manifest.active_originals()]
     if not published:
         return _action("run_assessment", "Analizar la oportunidad (análisis inicial) y publicar sus resultados.",
                        "preview_analysis",

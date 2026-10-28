@@ -114,18 +114,20 @@ def test_protected_resources_are_refused_and_trash_checks_the_whole_subtree(tmp_
         with pytest.raises(HarnessError) as raised:
             setup.preview([operation])
         assert raised.value.code == "protected_resource"
-    # Renaming a registered original is allowed: only move/trash are refused.
+    # Managed renames require reconciliation.
     setup.drive.resources["source"] = replace(setup.drive.resources["source"],
                                               capabilities={**setup.drive.resources["source"].capabilities,
                                                             "canRename": True})
-    setup.preview([{"op": "rename", "file_id": "source", "name": "renombrado.pdf"}])
+    with pytest.raises(HarnessError) as raised:
+        setup.preview([{"op": "rename", "file_id": "source", "name": "renombrado.pdf"}])
+    assert raised.value.code == "managed_rename_requires_reconciliation"
     allowed = setup.plans()
     # Trashing the folder that holds a registered original is refused too.
     originals_folder = manifest.folders["originals"]
     with pytest.raises(HarnessError) as raised:
         setup.preview([{"op": "trash", "file_id": originals_folder}])
     assert raised.value.code == "protected_resource"
-    assert setup.plans() == allowed and len(allowed) == len(before) + 1
+    assert setup.plans() == allowed and len(allowed) == len(before)
 
 
 def test_move_into_itself_or_a_descendant_is_invalid_move(tmp_path: Path):

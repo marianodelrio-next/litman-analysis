@@ -13,7 +13,7 @@ OPERATIONS = {"identity", "diagnose", "inspect", "status", "preview_incorporatio
               "preview_document_edit", "apply_document_edit", "preview_document_creation", "apply_document_creation",
               "list_folder", "search_in_dossier", "get_file_info", "read_file", "list_comments",
               "preview_sheet_edit", "apply_sheet_edit", "preview_file_changes", "apply_file_changes",
-              "preview_comment_changes", "apply_comment_changes"}
+              "preview_comment_changes", "apply_comment_changes", "preview_reconciliation", "apply_reconciliation"}
 
 
 def test_registry_exposes_operations_with_schema_and_kind():
@@ -23,6 +23,9 @@ def test_registry_exposes_operations_with_schema_and_kind():
         assert descriptor["description"].startswith(("Consulta", "Mutación"))
     incorporation = registry()["preview_incorporation"].input_schema["properties"]
     assert incorporation["overwrite_context"]["type"] == "boolean"
+    reconciliation_op = registry()["preview_reconciliation"].input_schema["properties"]["operations"]["items"]
+    assert "adopt_copy" in reconciliation_op["properties"]["op"]["enum"]
+    assert "copy_file_id" in reconciliation_op["properties"]
     preview_analysis = registry()["preview_analysis"].input_schema
     assert "provider" not in preview_analysis["properties"]
     setup_schema = registry()["setup"].input_schema
@@ -37,11 +40,11 @@ def test_registry_exposes_operations_with_schema_and_kind():
                                                                               "apply_document_creation",
                                                                               "apply_sheet_edit",
                                                                               "apply_file_changes",
-                                                                              "apply_comment_changes"}
+                                                                              "apply_comment_changes", "apply_reconciliation"}
 
 
 DESTRUCTIVE = {"apply_document_edit", "apply_file_changes", "apply_sheet_edit", "apply_summary",
-               "apply_incorporation", "discard_analysis"}
+               "apply_incorporation", "discard_analysis", "apply_reconciliation"}
 
 
 def test_tools_declare_mcp_annotations_derived_from_their_kind():

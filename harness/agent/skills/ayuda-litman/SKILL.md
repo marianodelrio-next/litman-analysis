@@ -144,3 +144,6 @@ Si la persona pide algo que no aparece aquí, dile que LitMan todavía no puede
 hacerlo y sugiérele pedírselo al desarrollador de LitMan. No lo hagas por
 otra vía: nunca con computer use, el navegador, otros conectores de Drive ni
 scripts.
+
+- `preview_reconciliation`: prepara la reconciliación para aceptación. Ejemplo: retirar un original por ID.
+- `apply_reconciliation`: aplica el plan aceptado. Ejemplo: confirmar la retirada seleccionada.

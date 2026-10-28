@@ -45,7 +45,7 @@ EXPORT_FORMATS = {GOOGLE_DOC_MIME: {"pdf": PDF_MIME, "docx": DOCX_MIME, "md": MD
 CONVERT_TARGETS = {DOCX_MIME: GOOGLE_DOC_MIME, MD_MIME: GOOGLE_DOC_MIME,
                    XLSX_MIME: GOOGLE_SHEET_MIME, CSV_MIME: GOOGLE_SHEET_MIME}
 _CONFLICT_CODES = {"insufficient_permission", "insufficient_capability", "protected_resource", "name_exists",
-                   "export_too_large"}
+                   "export_too_large", "managed_rename_requires_reconciliation"}
 def _invalid(message: str, **details: Any) -> HarnessError:
     return HarnessError("invalid_request", message, details=details)
 
@@ -145,7 +145,12 @@ class FileChangeService:
                 always.add(state.manifest.context_file_id)
             move_trash |= {identifier for _, identifier in state.manifest.references()}
             move_trash |= set(state.manifest.summary_sources())
-        return {"always": always, "move_trash": move_trash}
+        managed = set()
+        if state.manifest is not None:
+            managed = {item["file_id"] for item in state.manifest.originals}
+            managed |= {artifact["file_id"] for analysis in state.manifest.analyses if analysis.get("status") == "published"
+                        for artifact in analysis.get("artifacts") or [] if artifact.get("file_id")}
+        return {"always": always, "move_trash": move_trash, "managed": managed}
 
     def _check_protected(self, root: Resource, kind: str, item: Resource | None,
                          protected: dict[str, set[str]]) -> None:
@@ -154,6 +159,8 @@ class FileChangeService:
         if item.id in protected["always"]:
             raise HarnessError("protected_resource", "Ese recurso está protegido y no se puede modificar",
                                details={"file_id": item.id})
+        if kind == "rename" and item.id in protected["managed"]:
+            raise HarnessError("managed_rename_requires_reconciliation", "Use preview_reconciliation para renombrar este recurso", details={"file_id": item.id})
         if kind in ("move", "trash") and item.id in protected["move_trash"]:
             raise HarnessError("protected_resource", "Ese recurso está registrado en la licitación y no se puede "
                                "mover ni enviar a la papelera", details={"file_id": item.id})
@@ -281,6 +288,7 @@ class FileChangeService:
 
     def _apply_rename(self, run: OperationRun, root: Resource, action: PlanAction) -> dict[str, Any]:
         item = self._reresolve(root, action.resource_id)
+        self._guarded(run, action, lambda: self._check_protected(root, "rename", item, self._protected_ids(root)))
         if item.name == action.name:
             return {"resource_id": item.id}
 

@@ -240,7 +240,7 @@ class ExpedienteService:
                     raise
                 return False
 
-        for original in manifest.originals:
+        for original in manifest.active_originals():
             identifier = original["file_id"]
             item = resource(identifier)
             if item is None:
@@ -268,7 +268,10 @@ class ExpedienteService:
                 if folder and not inside(identifier, item, folder):
                     add("artifact_misplaced", identifier, old=folder, current=list(item.parents), suggested_tool="status")
         sources = {item.get("source_file_id") for item in (manifest.summary or {}).get("items", [])}
+        retired = set(manifest.summary_sources(historical=True)) - set(manifest.summary_sources())
         for identifier in sorted(source for source in sources if isinstance(source, str)):
+            if identifier in retired:
+                add("summary_source_retired", identifier, suggested_tool="preview_summary")
             if resource(identifier) is None:
                 add("summary_source_unavailable", identifier, suggested_tool="status")
         if manifest.context_file_id and manifest.context_sha256 and resource(manifest.context_file_id):
@@ -532,7 +535,7 @@ class ExpedienteService:
         if manifest is None:
             return []
         placeable = []
-        for original in manifest.originals:
+        for original in manifest.active_originals():
             if original.get("placement") == "in_place":
                 continue
             try:
@@ -703,6 +706,8 @@ class ExpedienteService:
             original.update(file_id=outcome["resource_id"], copied_from=action.resource_id, provenance="copied")
         elif outcome["strategy"] == "in_place":
             original["placement"] = "in_place"
+        else:
+            original.pop("placement", None)
 
     def read_manifest_unchanged(self, update: PlanAction) -> tuple[Manifest, Manifest, str]:
         """Strict plans: the manifest must have the content seen in the preview.
@@ -749,6 +754,7 @@ class ExpedienteService:
         carries ``context_conflict``.  Returns that conflict, if any.
         """
         plan = run.plan
+        manifest.upgrade()
         content = render_context(manifest, root.name)
         context_action = self._context_action(plan)
         if context_action.kind == "create_context":

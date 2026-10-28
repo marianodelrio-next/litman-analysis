@@ -24,6 +24,7 @@ from ..dossier.publication import PublicationService
 from ..dossier.service import ExpedienteService
 from ..dossier.sheets import SheetsService
 from ..dossier.summary import SummaryService
+from ..dossier.reconciliation import ReconciliationService
 from ..dossier.shared_state import SharedStateCapability, UnavailableSharedState
 from ..errors import HarnessError, safe_exception_message
 from ..local_paths import CONFIGURABLE, METADATA_ENV, client_path, plan_store_root, token_path, work_root
@@ -52,6 +53,7 @@ class Services:
     files: FileService
     file_changes: FileChangeService
     comments: CommentService
+    reconciliation: ReconciliationService
 
 
 def adapter_kind(env: Mapping[str, str]) -> str:
@@ -100,7 +102,7 @@ def build_services(env: Mapping[str, str] | None = None, *, provider: DesktopOAu
     comments = CommentService(expediente, documents)
     return Services(kind, drive, shared_state, expediente, analysis, publication, SummaryService(expediente), docs,
                     documents, sheets, SheetsService(expediente, sheets),
-                    FileService(expediente, documents, sheets, comments), FileChangeService(expediente), comments)
+                    FileService(expediente, documents, sheets, comments), FileChangeService(expediente), comments, ReconciliationService(expediente))
 
 
 def docs_api_status(docs: DocsGateway) -> str:

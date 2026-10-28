@@ -102,3 +102,319 @@ def test_status_propagates_transient_drive_errors(tmp_path, monkeypatch):
     monkeypatch.setattr(drive, 'download', failing_download)
     with pytest.raises(HarnessError, match='temporary'):
         service.status('root')
+
+
+def test_v2_retirement_preserves_history_and_excludes_active_sources():
+    from litman_harness.dossier.manifest import Manifest
+    from litman_harness.dossier.recommendation import recommend
+    from litman_harness.dossier.context import render_context
+
+    manifest = Manifest.new(Resource('root', 'Tender', 'folder', '1'))
+    manifest.originals = [{'file_id': 'a', 'observed_name': 'A', 'md5_checksum': 'hash'}]
+    manifest.summary = {'items': [{'key': 'objeto', 'value': 'X', 'source_file_id': 'a'}], 'based_on_analyses': []}
+    manifest.upgrade()
+    manifest.originals[0]['status'] = 'retired'
+    restored = Manifest.parse(manifest.serialize())
+    assert restored.originals[0]['file_id'] == 'a'
+    assert not restored.active_originals()
+    assert 'a' not in restored.summary_sources()
+    assert ('original', 'a') not in restored.references()
+    assert recommend(folder_id='root', state='adopted', manifest=restored)['kind'] == 'incorporate'
+    context = render_context(restored, 'Tender')
+    assert 'retirad' in context and 'open?id=a' not in context
+
+
+def test_reconciliation_retire_reactivate_and_rename(tmp_path):
+    from litman_harness.dossier.reconciliation import ReconciliationService
+    drive = dossier_drive()
+    drive.resources['source'] = replace(drive.resources['source'], capabilities={'canRename': True})
+    dossier = ExpedienteService(drive, PlanStore(tmp_path / 'plans'), AtomicSharedState(drive))
+    dossier.apply_incorporation(dossier.preview_incorporation('root', ['source']).id)
+    service = ReconciliationService(dossier)
+    plan = service.preview('root', [{'op': 'retire_original', 'file_id': 'source'}])
+    result = service.apply(plan.id)
+    assert result['manifest']['originals'][0]['status'] == 'retired'
+    plan = service.preview('root', [{'op': 'reactivate_original', 'file_id': 'source'}])
+    assert service.apply(plan.id)['manifest']['originals'][0]['status'] == 'active'
+    plan = service.preview('root', [{'op': 'rename_managed', 'file_id': 'source', 'new_name': 'new.pdf'}])
+    result = service.apply(plan.id)
+    assert result['manifest']['originals'][0]['observed_name'] == 'new.pdf'
+    assert drive.get('source').name == 'new.pdf'
+
+
+def test_reconciliation_conflicts_on_changed_name(tmp_path):
+    from litman_harness.dossier.reconciliation import ReconciliationService
+    drive = dossier_drive()
+    dossier = ExpedienteService(drive, PlanStore(tmp_path / 'plans'), AtomicSharedState(drive))
+    dossier.apply_incorporation(dossier.preview_incorporation('root', ['source']).id)
+    service = ReconciliationService(dossier)
+    plan = service.preview('root', [{'op': 'adopt_current_name', 'file_id': 'source'}])
+    drive.resources['source'] = replace(drive.resources['source'], name='other.pdf')
+    assert service.apply(plan.id)['status'] == 'conflict'
+
+
+def test_reconciliation_placement_and_artifact_return(tmp_path):
+    from litman_harness.dossier.reconciliation import ReconciliationService
+    drive = dossier_drive()
+    dossier = ExpedienteService(drive, PlanStore(tmp_path / 'plans'), AtomicSharedState(drive))
+    dossier.apply_incorporation(dossier.preview_incorporation('root', ['source']).id)
+    state = dossier.load_state(drive.get('root'))
+    manifest = state.manifest
+    original_folder = manifest.folders['originals']
+    initial = manifest.folders['initial']
+    for identifier in (original_folder, initial):
+        drive.resources[identifier] = replace(drive.get(identifier), capabilities={'canAddChildren': True})
+    drive.resources['source'] = replace(drive.get('source'), capabilities={'canMoveItemWithinDrive': True})
+    drive.add(Resource('artifact', 'result.pdf', PDF, '1', drive_id='shared', parents=('root',),
+                       capabilities={'canMoveItemWithinDrive': True}), b'result')
+    manifest.analyses = [{'operation_id': 'a', 'status': 'published', 'folder_id': initial,
+                          'artifacts': [{'file_id': 'artifact', 'name': 'result.pdf'}]}]
+    drive.contents[state.manifest_file.id] = manifest.serialize().encode()
+    service = ReconciliationService(dossier)
+    plan = service.preview('root', [{'op': 'place_original', 'file_id': 'source'},
+                                    {'op': 'return_artifact', 'file_id': 'artifact'}])
+    assert service.apply(plan.id)['status'] == 'succeeded'
+    assert drive.get('source').parents == (original_folder,)
+    assert drive.get('artifact').parents == (initial,)
+
+
+def test_reconciliation_adopts_current_artifact_name(tmp_path):
+    from litman_harness.dossier.reconciliation import ReconciliationService
+    drive = dossier_drive()
+    dossier = ExpedienteService(drive, PlanStore(tmp_path / 'plans'), AtomicSharedState(drive))
+    dossier.apply_incorporation(dossier.preview_incorporation('root', ['source']).id)
+    state = dossier.load_state(drive.get('root'))
+    state.manifest.analyses = [{'operation_id': 'a', 'status': 'published',
+                                'artifacts': [{'file_id': 'artifact', 'name': 'old.pdf'}]}]
+    drive.add(Resource('artifact', 'new.pdf', PDF, '1', drive_id='shared', parents=('root',)), b'file')
+    drive.contents[state.manifest_file.id] = state.manifest.serialize().encode()
+    service = ReconciliationService(dossier)
+    result = service.apply(service.preview('root', [{'op': 'adopt_current_name', 'file_id': 'artifact'}]).id)
+    assert result['manifest']['analyses'][0]['artifacts'][0]['name'] == 'new.pdf'
+
+
+def test_reconciliation_rechecks_capabilities_before_any_write(tmp_path):
+    from litman_harness.dossier.reconciliation import ReconciliationService
+    drive = dossier_drive()
+    drive.resources['source'] = replace(drive.get('source'), capabilities={'canRename': True})
+    dossier = ExpedienteService(drive, PlanStore(tmp_path / 'plans'), AtomicSharedState(drive))
+    dossier.apply_incorporation(dossier.preview_incorporation('root', ['source']).id)
+    state = dossier.load_state(drive.get('root'))
+    folder = state.manifest.folders['originals']
+    drive.resources[folder] = replace(drive.get(folder), capabilities={'canAddChildren': True})
+    drive.add(Resource('artifact', 'result.pdf', PDF, '1', drive_id='shared', parents=('root',),
+                       capabilities={'canMoveItemWithinDrive': True}), b'result')
+    state.manifest.analyses = [{'operation_id': 'a', 'status': 'published', 'folder_id': folder,
+                                'artifacts': [{'file_id': 'artifact', 'name': 'result.pdf'}]}]
+    drive.contents[state.manifest_file.id] = state.manifest.serialize().encode()
+    service = ReconciliationService(dossier)
+    plan = service.preview('root', [{'op': 'rename_managed', 'file_id': 'source', 'new_name': 'renamed.pdf'},
+                                    {'op': 'return_artifact', 'file_id': 'artifact'}])
+    drive.resources['artifact'] = replace(drive.get('artifact'), capabilities={})
+    result = service.apply(plan.id)
+    assert result['status'] == 'conflict' and not result['writes']
+    assert drive.get('source').name == 'pliego.pdf'
+
+
+def test_reconciliation_disappeared_resource_is_conflict(tmp_path):
+    from litman_harness.dossier.reconciliation import ReconciliationService
+    drive = dossier_drive()
+    dossier = ExpedienteService(drive, PlanStore(tmp_path / 'plans'), AtomicSharedState(drive))
+    dossier.apply_incorporation(dossier.preview_incorporation('root', ['source']).id)
+    service = ReconciliationService(dossier)
+    plan = service.preview('root', [{'op': 'adopt_current_name', 'file_id': 'source'}])
+    del drive.resources['source']
+    assert service.apply(plan.id)['status'] == 'conflict'
+
+
+def test_reconciliation_resume_after_rename_response_lost(tmp_path, monkeypatch):
+    import pytest
+    from litman_harness.errors import HarnessError
+    from litman_harness.dossier.reconciliation import ReconciliationService
+    drive = dossier_drive()
+    drive.resources['source'] = replace(drive.get('source'), capabilities={'canRename': True})
+    dossier = ExpedienteService(drive, PlanStore(tmp_path / 'plans'), AtomicSharedState(drive))
+    dossier.apply_incorporation(dossier.preview_incorporation('root', ['source']).id)
+    service = ReconciliationService(dossier)
+    plan = service.preview('root', [{'op': 'rename_managed', 'file_id': 'source', 'new_name': 'new.pdf'}])
+    rename = drive.rename
+    def interrupted(identifier, name):
+        rename(identifier, name)
+        raise RuntimeError('response lost')
+    monkeypatch.setattr(drive, 'rename', interrupted)
+    with pytest.raises(HarnessError) as exc:
+        service.apply(plan.id)
+    assert exc.value.code == 'operation_interrupted'
+    monkeypatch.setattr(drive, 'rename', rename)
+    result = service.apply(plan.id)
+    assert result['status'] == 'succeeded'
+    assert result['manifest']['originals'][0]['observed_name'] == 'new.pdf'
+
+
+def test_in_place_reconciliation_does_not_require_destination_write_permission(tmp_path):
+    from litman_harness.dossier.reconciliation import ReconciliationService
+
+    drive = dossier_drive()
+    dossier = ExpedienteService(drive, PlanStore(tmp_path / 'plans'), AtomicSharedState(drive))
+    dossier.apply_incorporation(dossier.preview_incorporation('root', ['source']).id)
+    state = dossier.load_state(drive.get('root'))
+    folder_id = state.manifest.folders['originals']
+    drive.resources[folder_id] = replace(drive.get(folder_id), capabilities={})
+    service = ReconciliationService(dossier)
+    plan = service.preview('root', [{'op': 'place_original', 'file_id': 'source'}])
+    assert plan.actions[0].metadata['strategy'] == 'in_place'
+    result = service.apply(plan.id)
+    assert result['status'] == 'succeeded'
+    assert result['manifest']['originals'][0]['placement'] == 'in_place'
+    assert drive.get('source').parents == ('root',)
+
+
+def test_concurrent_manifest_after_rename_can_be_reconciled_with_new_plan(tmp_path, monkeypatch):
+    from litman_harness.dossier.manifest import Manifest
+    from litman_harness.dossier.reconciliation import ReconciliationService
+
+    drive = dossier_drive()
+    drive.resources['source'] = replace(drive.get('source'), capabilities={'canRename': True})
+    shared = AtomicSharedState(drive)
+    dossier = ExpedienteService(drive, PlanStore(tmp_path / 'plans'), shared)
+    dossier.apply_incorporation(dossier.preview_incorporation('root', ['source']).id)
+    state = dossier.load_state(drive.get('root'))
+    service = ReconciliationService(dossier)
+    plan = service.preview('root', [{'op': 'rename_managed', 'file_id': 'source', 'new_name': 'new.pdf'}])
+    rename = drive.rename
+    def concurrent_rename(identifier, name):
+        result = rename(identifier, name)
+        manifest = Manifest.parse(drive.contents[state.manifest_file.id].decode())
+        manifest.workflow_phase = 'analisis_inicial'
+        drive.write_text(state.manifest_file.id, manifest.serialize())
+        return result
+    monkeypatch.setattr(drive, 'rename', concurrent_rename)
+    result = service.apply(plan.id)
+    assert result['status'] == 'conflict' and result['writes']
+    assert result['conflict']['recovery']['operations'] == [{'op': 'adopt_current_name', 'file_id': 'source'}]
+    monkeypatch.setattr(drive, 'rename', rename)
+    repair = service.preview('root', result['conflict']['recovery']['operations'])
+    result = service.apply(repair.id)
+    assert result['status'] == 'succeeded'
+    assert result['manifest']['workflow_phase'] == 'analisis_inicial'
+    assert result['manifest']['originals'][0]['observed_name'] == 'new.pdf'
+
+
+def test_concurrent_manifest_after_artifact_move_can_be_reconciled(tmp_path, monkeypatch):
+    from litman_harness.dossier.manifest import Manifest
+    from litman_harness.dossier.reconciliation import ReconciliationService
+
+    drive = dossier_drive()
+    shared = AtomicSharedState(drive)
+    dossier = ExpedienteService(drive, PlanStore(tmp_path / 'plans'), shared)
+    dossier.apply_incorporation(dossier.preview_incorporation('root', ['source']).id)
+    state = dossier.load_state(drive.get('root'))
+    folder_id = state.manifest.folders['initial']
+    drive.resources[folder_id] = replace(drive.get(folder_id), capabilities={'canAddChildren': True})
+    drive.add(Resource('artifact', 'result.pdf', PDF, '1', drive_id='shared', parents=('root',),
+                       capabilities={'canMoveItemWithinDrive': True}), b'result')
+    state.manifest.analyses = [{'operation_id': 'a', 'status': 'published', 'folder_id': folder_id,
+                                'artifacts': [{'file_id': 'artifact', 'name': 'result.pdf'}]}]
+    drive.write_text(state.manifest_file.id, state.manifest.serialize())
+    service = ReconciliationService(dossier)
+    plan = service.preview('root', [{'op': 'return_artifact', 'file_id': 'artifact'}])
+    move = drive.move
+    def concurrent_move(identifier, parent, parents):
+        result = move(identifier, parent, parents)
+        manifest = Manifest.parse(drive.contents[state.manifest_file.id].decode())
+        manifest.workflow_phase = 'analisis_inicial'
+        drive.write_text(state.manifest_file.id, manifest.serialize())
+        return result
+    monkeypatch.setattr(drive, 'move', concurrent_move)
+    result = service.apply(plan.id)
+    assert result['status'] == 'conflict' and result['writes']
+    assert result['conflict']['recovery']['operations'] == [{'op': 'return_artifact', 'file_id': 'artifact'}]
+    monkeypatch.setattr(drive, 'move', move)
+    repair = service.preview('root', result['conflict']['recovery']['operations'])
+    result = service.apply(repair.id)
+    assert result['status'] == 'succeeded'
+    assert result['manifest']['workflow_phase'] == 'analisis_inicial'
+    assert drive.get('artifact').parents == (folder_id,)
+
+
+def test_concurrent_manifest_after_copied_placement_adopts_the_copy_without_duplicating_it(tmp_path, monkeypatch):
+    from litman_harness.dossier.manifest import Manifest
+    from litman_harness.dossier.reconciliation import ReconciliationService
+
+    drive = dossier_drive()
+    shared = AtomicSharedState(drive)
+    dossier = ExpedienteService(drive, PlanStore(tmp_path / 'plans'), shared)
+    dossier.apply_incorporation(dossier.preview_incorporation('root', ['source']).id)
+    state = dossier.load_state(drive.get('root'))
+    folder_id = state.manifest.folders['originals']
+    drive.resources['source'] = replace(drive.get('source'), capabilities={'canCopy': True})
+    drive.resources[folder_id] = replace(drive.get(folder_id), capabilities={'canAddChildren': True})
+    service = ReconciliationService(dossier)
+    plan = service.preview('root', [{'op': 'place_original', 'file_id': 'source'}])
+    assert plan.actions[0].metadata['strategy'] == 'copy'
+    copy = drive.copy
+    def concurrent_copy(file_id, name, parent_id, operation_id, action_id):
+        result = copy(file_id, name, parent_id, operation_id, action_id)
+        manifest = Manifest.parse(drive.contents[state.manifest_file.id].decode())
+        manifest.workflow_phase = 'analisis_inicial'
+        drive.write_text(state.manifest_file.id, manifest.serialize())
+        return result
+    monkeypatch.setattr(drive, 'copy', concurrent_copy)
+    before = list(drive.created)
+    result = service.apply(plan.id)
+    assert result['status'] == 'conflict' and result['writes']
+    new_copies = [identifier for identifier in drive.created if identifier not in before]
+    assert len(new_copies) == 1
+    copy_id = new_copies[0]
+    assert result['conflict']['recovery']['operations'] == [
+        {'op': 'adopt_copy', 'file_id': 'source', 'copy_file_id': copy_id}]
+    repair = service.preview('root', result['conflict']['recovery']['operations'])
+    result = service.apply(repair.id)
+    assert result['status'] == 'succeeded'
+    assert result['manifest']['workflow_phase'] == 'analisis_inicial'
+    assert result['manifest']['originals'][0]['file_id'] == copy_id
+    assert result['manifest']['originals'][0]['copied_from'] == 'source'
+    assert result['manifest']['originals'][0]['provenance'] == 'copied'
+    assert [identifier for identifier in drive.created if identifier not in before] == new_copies
+
+
+def test_adopt_copy_rejects_a_file_id_already_registered(tmp_path):
+    import pytest
+    from litman_harness.dossier.reconciliation import ReconciliationService
+    from litman_harness.errors import HarnessError
+
+    drive = dossier_drive()
+    drive.add(Resource('source2', 'otro.pdf', PDF, '1', drive_id='shared', parents=('root',)), b'otro')
+    service_dossier = ExpedienteService(drive, PlanStore(tmp_path / 'plans'), AtomicSharedState(drive))
+    service_dossier.apply_incorporation(
+        service_dossier.preview_incorporation('root', ['source', 'source2']).id)
+    service = ReconciliationService(service_dossier)
+    with pytest.raises(HarnessError, match='ya está registrada') as exc:
+        service.preview('root', [{'op': 'adopt_copy', 'file_id': 'source', 'copy_file_id': 'source'}])
+    assert exc.value.code == 'invalid_request'
+    # Colliding with a different resource already registered as another original.
+    with pytest.raises(HarnessError, match='ya está registrada') as exc:
+        service.preview('root', [{'op': 'adopt_copy', 'file_id': 'source', 'copy_file_id': 'source2'}])
+    assert exc.value.code == 'invalid_request'
+    # Two adopt_copy ops in the same batch proposing the same (still unregistered) copy.
+    drive.add(Resource('dup-copy', 'pliego.pdf', PDF, '1', drive_id='shared', parents=('root',)), b'pliego')
+    with pytest.raises(HarnessError, match='ya está registrada') as exc:
+        service.preview('root', [{'op': 'adopt_copy', 'file_id': 'source', 'copy_file_id': 'dup-copy'},
+                                 {'op': 'adopt_copy', 'file_id': 'source2', 'copy_file_id': 'dup-copy'}])
+    assert exc.value.code == 'invalid_request'
+
+
+def test_adopt_copy_apply_reports_a_conflict_when_the_copy_vanished(tmp_path):
+    from litman_harness.dossier.reconciliation import ReconciliationService
+
+    drive = dossier_drive()
+    shared = AtomicSharedState(drive)
+    dossier = ExpedienteService(drive, PlanStore(tmp_path / 'plans'), shared)
+    dossier.apply_incorporation(dossier.preview_incorporation('root', ['source']).id)
+    drive.add(Resource('copy-1', 'pliego.pdf', PDF, '1', 123, 'shared', ('root',)), b'pliego')
+    service = ReconciliationService(dossier)
+    plan = service.preview('root', [{'op': 'adopt_copy', 'file_id': 'source', 'copy_file_id': 'copy-1'}])
+    del drive.resources['copy-1']
+    result = service.apply(plan.id)
+    assert result['status'] == 'conflict'
+    assert result['conflict']['file_id'] == 'copy-1'

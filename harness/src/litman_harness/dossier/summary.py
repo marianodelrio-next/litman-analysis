@@ -39,7 +39,7 @@ class SummaryService:
             raise HarnessError("invalid_request", "offset debe ser un entero mayor o igual que 0")
         root = self.dossier.root(folder_id)
         manifest = self._adopted(root)
-        kind = manifest.summary_sources().get(file_id)
+        kind = manifest.summary_sources(historical=True).get(file_id)
         if kind is None:  # decided from the manifest: unregistered IDs never reach Drive
             raise HarnessError("document_not_registered",
                                "Sólo se pueden leer originales registrados o artefactos publicados de esta "
@@ -85,6 +85,7 @@ class SummaryService:
         if not manifest.context_file_id:
             raise HarnessError("invalid_manifest", "El manifiesto no registra contexto.md")
         clean = validated_items(items, set(manifest.summary_sources()))
+        self._check_sources(root, clean)
         actions = (
             PlanAction("set_summary", None, "summary", None, metadata={
                 "items": clean, "based_on_analyses": based_on, "previous_summary": manifest.summary}),
@@ -110,6 +111,12 @@ class SummaryService:
         if any(item.get("source_file_id") and item["source_file_id"] not in sources
                for item in change.metadata["items"]):
             raise OperationConflict("Una fuente del resumen ya no está registrada", details={"action": "set_summary"})
+        try:
+            self._check_sources(root, change.metadata["items"])
+        except HarnessError as exc:
+            if exc.code not in ("not_found", "insufficient_permission", "document_outside_tree"):
+                raise
+            raise OperationConflict("Una fuente del resumen no está disponible", details={"code": exc.code}) from exc
         accepted_by = self.dossier.performed_by()
         manifest.summary = {"items": change.metadata["items"],
                             "based_on_analyses": change.metadata["based_on_analyses"],
@@ -118,6 +125,13 @@ class SummaryService:
                                  "performed_by": accepted_by, "completed_at": now()})
         context_conflict = self.dossier.write_shared_state(run, root, manifest, base, manifest_version=version)
         return self.dossier.shared_result(run, manifest, context_conflict)
+
+    def _check_sources(self, root: Resource, items: list[dict[str, Any]]) -> None:
+        for identifier in {item.get("source_file_id") for item in items} - {None}:
+            item = self.drive.get(identifier)
+            if not belongs_to_root(self.drive, root, item):
+                raise HarnessError("document_outside_tree", "La fuente ya no está dentro de la licitación",
+                                   details={"file_id": identifier})
 
     def _adopted(self, root: Resource) -> Manifest:
         state = self.dossier.load_state(root)
