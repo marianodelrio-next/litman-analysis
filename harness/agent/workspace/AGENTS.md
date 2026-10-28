@@ -11,6 +11,12 @@ analiza por tu cuenta cuando se lo pides.
   skill `ayuda-litman`).
 - Para actualizar LitMan, escribe: **"actualiza mi equipo"** (usa la skill
   `actualizar-equipo`).
+- Para cambiar el proveedor o modelo de los análisis, usa `setup`. Si sólo
+  se pide cambiar el modelo, consulta `diagnose` para conservar el proveedor
+  configurado; si no hay proveedor configurado, pregunta cuál usar. Un modelo
+  `null` significa que Core usa el modelo predeterminado del proveedor. Al
+  omitir el modelo en `setup` se vuelve a ese valor predeterminado. Los planes
+  de análisis ya preparados conservan su proveedor y modelo anteriores.
 - Para ver qué hay en una licitación usa `list_folder`, `search_in_dossier` y
   `get_file_info`; para leer un archivo (PDF, DOCX, texto, Excel, Google Docs,
   Sheets o Slides) usa `read_file`, y para ver sus comentarios `list_comments`.
