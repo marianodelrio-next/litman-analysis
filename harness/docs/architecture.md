@@ -101,13 +101,21 @@ account or plans made stale by relevant Drive changes. Created resources carry
 interrupted operation to adopt exactly one prior result instead of duplicating
 it. Multiple matching resources are a conflict.
 
-Analysis downloads only planned originals into a private workspace whose input
-directory is the analysis operation UUID. Harness generates Core's minimal
-configuration and invokes `litman-core run --config`; it does not depend on a
-user-maintained Core configuration. Harness validates the public result by
-artifact role, path containment, presence, and SHA-256, then records a closed
-local catalog. Core-internal files such as `validation.json` and
-`generation_manifest.json` are never consumed.
+`preview_analysis` checks each selected original's membership and, when it is
+a manifest-registered active original, rechecks its current MD5 against the
+manifest's stored value: a drift raises `registered_original_changed` before
+the plan is stored, and the person is pointed at `status` to review it. This
+is one targeted `load_state` read, not a full candidate scan. Each planned
+action also records whether its original is registered or a new,
+explicitly-selected candidate, so analyzing an unregistered file is always
+visible rather than implicit. Analysis downloads only planned originals into a
+private workspace whose input directory is the analysis operation UUID.
+Harness generates Core's minimal configuration and invokes
+`litman-core run --config`; it does not depend on a user-maintained Core
+configuration. Harness validates the public result by artifact role, path
+containment, presence, and SHA-256, then records a closed local catalog.
+Core-internal files such as `validation.json` and `generation_manifest.json`
+are never consumed.
 
 An analysis plan includes publication. Publication uploads each validated
 artifact directly into the registered phase folder (`Analisis inicial` or

@@ -50,6 +50,19 @@ description: Conecta una licitación por el ID de su carpeta de Drive y guía a 
 4. Sugerencias por nombre (`suggested_original_ids`, `suggested_folder_ids`)
    sólo se usan si la persona las confirma; nunca decidas por el nombre.
    `decide_detailed_analysis` es una pregunta de negocio: pregúntala.
+
+   **Cambios detectados (`drift` de `status`).** `status` compara lo
+   registrado con Drive sólo cuando se consulta; nunca escribe ni vigila en
+   segundo plano. Cada entrada de `drift` describe un cambio concreto
+   (nombre, contenido, ubicación, un recurso ya no disponible, una fuente de
+   resumen retirada o `contexto.md` editado fuera de LitMan) y nunca da por
+   borrado algo sólo inaccesible; un rastreo incompleto (`candidate_scan_incomplete`)
+   nunca se presenta como inventario completo. Explica el cambio a la persona
+   y prepara `preview_reconciliation` sólo con la reparación que confirme
+   (retirar o reactivar un original exige su decisión explícita, nunca se
+   infiere). Si `preview_analysis` devuelve `registered_original_changed`, es
+   el mismo caso: explica que el original registrado cambió y ofrece revisarlo
+   con `status` o `preview_reconciliation` antes de repetir el análisis.
 5. `propose_summary`/`refresh_summary`: sigue la skill `resumir-licitacion`.
 6. Si `recommended_action` es `null`, pregunta qué quiere hacer ofreciendo
    `next_actions`. Ante `pending_concurrency_gate`, `conflict` o
@@ -132,8 +145,11 @@ description: Conecta una licitación por el ID de su carpeta de Drive y guía a 
    mover, renombrar ni enviar a la papelera. Ante `insufficient_capability`,
    `protected_resource`, `name_exists` o `conflict`, explícalo a la persona
    con la operación afectada y no lo intentes por otra vía: prepara un plan
-   nuevo sin esa operación si quiere seguir. `trash` usa la papelera de
-   Drive, nunca borra de forma permanente.
+   nuevo sin esa operación si quiere seguir. Ante
+   `managed_rename_requires_reconciliation`, ese archivo es un original o un
+   resultado publicado: no reintentes el renombrado aquí, prepara
+   `preview_reconciliation` con `rename_managed` en su lugar. `trash` usa la
+   papelera de Drive, nunca borra de forma permanente.
 8. Usa sólo las herramientas de LitMan para la licitación y sus archivos de
    Drive. Nunca uses computer use, el navegador, otros conectores de Drive,
    scripts ni las APIs de Google directamente. Si ninguna herramienta de

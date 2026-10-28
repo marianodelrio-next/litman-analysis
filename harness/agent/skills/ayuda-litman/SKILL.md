@@ -39,6 +39,19 @@ como vista previa y sólo se aplica cuando la persona lo acepta.
 - `recover`: muestra en qué quedó una operación interrumpida.
   Ejemplo: "¿en qué quedó el análisis que se cortó?"
 
+## Reconciliar cambios detectados
+
+`status` avisa cuando algo registrado cambió en Drive (nombre, contenido,
+ubicación, un archivo que ya no está disponible o `contexto.md` editado fuera
+de LitMan); nunca lo corrige por sí solo.
+
+- `preview_reconciliation`: prepara hasta 20 reparaciones explícitas (retirar
+  o reactivar un original, renombrarlo, moverlo a Originales o devolver un
+  resultado a su carpeta).
+  Ejemplo: "retira el original que ya no está" o "renómbralo como lo tiene en Drive"
+- `apply_reconciliation`: aplica esa reparación cuando la aceptas.
+  Ejemplo: "sí, hazlo"
+
 ## Análisis
 
 - `preview_analysis`: prepara el análisis de los pliegos con los originales y
@@ -144,6 +157,3 @@ Si la persona pide algo que no aparece aquí, dile que LitMan todavía no puede
 hacerlo y sugiérele pedírselo al desarrollador de LitMan. No lo hagas por
 otra vía: nunca con computer use, el navegador, otros conectores de Drive ni
 scripts.
-
-- `preview_reconciliation`: prepara la reconciliación para aceptación. Ejemplo: retirar un original por ID.
-- `apply_reconciliation`: aplica el plan aceptado. Ejemplo: confirmar la retirada seleccionada.
