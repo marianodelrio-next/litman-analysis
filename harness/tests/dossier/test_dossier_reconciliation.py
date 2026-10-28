@@ -151,3 +151,43 @@ def test_reconciliation_conflicts_on_changed_name(tmp_path):
     plan = service.preview('root', [{'op': 'adopt_current_name', 'file_id': 'source'}])
     drive.resources['source'] = replace(drive.resources['source'], name='other.pdf')
     assert service.apply(plan.id)['status'] == 'conflict'
+
+
+def test_reconciliation_placement_and_artifact_return(tmp_path):
+    from litman_harness.dossier.reconciliation import ReconciliationService
+    drive = dossier_drive()
+    dossier = ExpedienteService(drive, PlanStore(tmp_path / 'plans'), AtomicSharedState(drive))
+    dossier.apply_incorporation(dossier.preview_incorporation('root', ['source']).id)
+    state = dossier.load_state(drive.get('root'))
+    manifest = state.manifest
+    original_folder = manifest.folders['originals']
+    initial = manifest.folders['initial']
+    for identifier in (original_folder, initial):
+        drive.resources[identifier] = replace(drive.get(identifier), capabilities={'canAddChildren': True})
+    drive.resources['source'] = replace(drive.get('source'), capabilities={'canMoveItemWithinDrive': True})
+    drive.add(Resource('artifact', 'result.pdf', PDF, '1', drive_id='shared', parents=('root',),
+                       capabilities={'canMoveItemWithinDrive': True}), b'result')
+    manifest.analyses = [{'operation_id': 'a', 'status': 'published', 'folder_id': initial,
+                          'artifacts': [{'file_id': 'artifact', 'name': 'result.pdf'}]}]
+    drive.contents[state.manifest_file.id] = manifest.serialize().encode()
+    service = ReconciliationService(dossier)
+    plan = service.preview('root', [{'op': 'place_original', 'file_id': 'source'},
+                                    {'op': 'return_artifact', 'file_id': 'artifact'}])
+    assert service.apply(plan.id)['status'] == 'succeeded'
+    assert drive.get('source').parents == (original_folder,)
+    assert drive.get('artifact').parents == (initial,)
+
+
+def test_reconciliation_adopts_current_artifact_name(tmp_path):
+    from litman_harness.dossier.reconciliation import ReconciliationService
+    drive = dossier_drive()
+    dossier = ExpedienteService(drive, PlanStore(tmp_path / 'plans'), AtomicSharedState(drive))
+    dossier.apply_incorporation(dossier.preview_incorporation('root', ['source']).id)
+    state = dossier.load_state(drive.get('root'))
+    state.manifest.analyses = [{'operation_id': 'a', 'status': 'published',
+                                'artifacts': [{'file_id': 'artifact', 'name': 'old.pdf'}]}]
+    drive.add(Resource('artifact', 'new.pdf', PDF, '1', drive_id='shared', parents=('root',)), b'file')
+    drive.contents[state.manifest_file.id] = state.manifest.serialize().encode()
+    service = ReconciliationService(dossier)
+    result = service.apply(service.preview('root', [{'op': 'adopt_current_name', 'file_id': 'artifact'}]).id)
+    assert result['manifest']['analyses'][0]['artifacts'][0]['name'] == 'new.pdf'

@@ -706,6 +706,8 @@ class ExpedienteService:
             original.update(file_id=outcome["resource_id"], copied_from=action.resource_id, provenance="copied")
         elif outcome["strategy"] == "in_place":
             original["placement"] = "in_place"
+        else:
+            original.pop("placement", None)
 
     def read_manifest_unchanged(self, update: PlanAction) -> tuple[Manifest, Manifest, str]:
         """Strict plans: the manifest must have the content seen in the preview.

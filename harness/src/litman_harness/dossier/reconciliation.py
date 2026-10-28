@@ -116,7 +116,7 @@ class ReconciliationService:
                 raise OperationConflict('El recurso ya no está en la licitación', details={'file_id': item.id})
             metadata = action.metadata
             target_state = ((action.kind == 'rename_managed' and item.name == action.name and list(item.parents) == metadata['parents'])
-                            or (action.kind in ('place_original', 'return_artifact') and destination in item.parents
+                            or (action.kind in ('place_original', 'return_artifact') and list(item.parents) == [destination]
                                 and item.name == metadata['observed_name']))
             original_state = item.name == metadata['observed_name'] and list(item.parents) == metadata['parents']
             if not (original_state or target_state) or (category == 'original' and item.md5_checksum != action.expected_version):
