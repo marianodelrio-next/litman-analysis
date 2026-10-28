@@ -155,8 +155,9 @@ class ExpedienteService:
         children = self.drive.children(root.id, root.drive_id)
         return self._inspection(root, children, None)
 
-    def _inspection(self, root: Resource, children: list[Resource], manifest: Manifest | None) -> dict[str, Any]:
-        tree, truncated = walk_tree(self.drive, root, children)
+    def _inspection(self, root: Resource, children: list[Resource], manifest: Manifest | None,
+                    inventory: tuple[list[TreeItem], bool] | None = None) -> dict[str, Any]:
+        tree, truncated = inventory if inventory is not None else walk_tree(self.drive, root, children)
         candidates = self._candidates(tree, manifest)
         next_actions = self._next_actions(candidates)
         if any(item.name == "_LitMan" and item.mime_type == FOLDER_MIME for item in children):
@@ -172,11 +173,14 @@ class ExpedienteService:
         root = self.root(folder_id)
         state = self.load_state(root)
         manifest = state.manifest
-        result = self._inspection(root, state.children, manifest)
+        inventory = walk_tree(self.drive, root, state.children)
+        result = self._inspection(root, state.children, manifest, inventory)
         pending = self._pending_analyses(root.id)
         result.update({"state": state.state, "manifest": manifest.json() if manifest else None,
                        "manifest_file_id": state.manifest_file.id if state.manifest_file else None,
                        "problem": state.problem, "missing_resources": state.missing,
+                       "drift": self._drift(root, state, inventory, result["candidates"]),
+                       "candidate_scan_complete": not inventory[1],
                        "pending_publications": pending,
                        "next_actions": self._status_actions(state, result["candidates"], result["next_actions"],
                                                             pending),
@@ -185,13 +189,113 @@ class ExpedienteService:
                            pending=pending, misplaced_originals=self._misplaced_originals(root, manifest))})
         return result
 
+    def _drift(self, root: Resource, state: DossierState, inventory: tuple[list[TreeItem], bool],
+               candidates: dict[str, Any]) -> list[dict[str, Any]]:
+        """Describe observed differences without changing shared state or inferring identities."""
+        tree, truncated = inventory
+        known = {entry.resource.id: entry for entry in tree}
+        drift: list[dict[str, Any]] = []
+
+        def add(code: str, identifier: str | None = None, **values: Any) -> None:
+            drift.append({"code": code, "id": identifier, **values})
+
+        for identifier in candidates["originals"]:
+            add("unregistered_original", identifier, suggested_tool="preview_incorporation")
+        if truncated:
+            add("candidate_scan_incomplete", suggested_tool="status")
+        manifest = state.manifest
+        if manifest is None:
+            return drift
+        unavailable = {item["id"]: item["reason"] for item in state.missing}
+        for missing in state.missing:
+            add("resource_unavailable", missing["id"], kind=missing["kind"],
+                current=missing["reason"], suggested_tool="status")
+
+        def resource(identifier: str) -> Resource | None:
+            if identifier in unavailable:
+                return None
+            if identifier in known:
+                return known[identifier].resource
+            try:
+                item = self.drive.get(identifier)
+                return item if belongs_to_root(self.drive, root, item) else None
+            except KeyError:
+                return None
+            except HarnessError as exc:
+                if exc.code not in ("not_found", "insufficient_permission"):
+                    raise
+                return None
+
+        def inside(identifier: str, item: Resource, folder_id: str | None) -> bool:
+            if not folder_id:
+                return False
+            if identifier in known:
+                return folder_id in known[identifier].ancestors
+            try:
+                return belongs_to_root(self.drive, self.drive.get(folder_id), item)
+            except KeyError:
+                return False
+            except HarnessError as exc:
+                if exc.code not in ("not_found", "insufficient_permission"):
+                    raise
+                return False
+
+        for original in manifest.originals:
+            identifier = original["file_id"]
+            item = resource(identifier)
+            if item is None:
+                continue
+            if original.get("observed_name") is not None and original["observed_name"] != item.name:
+                add("original_name_changed", identifier, old=original["observed_name"], current=item.name,
+                    suggested_tool="status")
+            if original.get("md5_checksum") != item.md5_checksum:
+                add("original_content_changed", identifier, old=original.get("md5_checksum"),
+                    current=item.md5_checksum, suggested_tool="status")
+            folder = manifest.folders.get("originals")
+            if folder and original.get("placement") != "in_place" and not inside(identifier, item, folder):
+                add("original_misplaced", identifier, old=folder, current=list(item.parents), suggested_tool="status")
+        for analysis in manifest.analyses:
+            if analysis.get("status") != "published":
+                continue
+            for artifact in analysis.get("artifacts") or []:
+                identifier = artifact.get("file_id")
+                if not isinstance(identifier, str) or (item := resource(identifier)) is None:
+                    continue
+                if artifact.get("name") is not None and artifact["name"] != item.name:
+                    add("artifact_name_changed", identifier, old=artifact["name"], current=item.name,
+                        suggested_tool="status")
+                folder = analysis.get("folder_id")
+                if folder and not inside(identifier, item, folder):
+                    add("artifact_misplaced", identifier, old=folder, current=list(item.parents), suggested_tool="status")
+        sources = {item.get("source_file_id") for item in (manifest.summary or {}).get("items", [])}
+        for identifier in sorted(source for source in sources if isinstance(source, str)):
+            if resource(identifier) is None:
+                add("summary_source_unavailable", identifier, suggested_tool="status")
+        if manifest.context_file_id and manifest.context_sha256 and resource(manifest.context_file_id):
+            try:
+                current = context_sha256(self._download_text(manifest.context_file_id, "invalid_context"))
+                if current != manifest.context_sha256:
+                    add("context_changed", manifest.context_file_id, old=manifest.context_sha256, current=current,
+                        suggested_tool="status")
+            except KeyError:
+                add("resource_unavailable", manifest.context_file_id, kind="context", current="unreadable",
+                    suggested_tool="status")
+            except HarnessError as exc:
+                if exc.code not in ("not_found", "insufficient_permission", "invalid_context"):
+                    raise
+                add("resource_unavailable", manifest.context_file_id, kind="context", current="unreadable",
+                    suggested_tool="status")
+        return sorted(drift, key=lambda entry: (entry["code"], entry["id"] or "", entry.get("kind", "")))
+
     def _misplaced_originals(self, root: Resource, manifest: Manifest | None) -> list[str]:
         """Registered originals the incorporation preview would place (content unchanged since registration)."""
         if manifest is None or not manifest.folders.get("originals"):
             return []
         try:
             folder = self._originals_folder(manifest, {})
-        except HarnessError:
+        except HarnessError as exc:
+            if exc.code not in ("not_found", "insufficient_permission"):
+                raise
             return []
         return [item.id for original, item in self._placeable_originals(root, manifest, folder)
                 if item.md5_checksum == original.get("md5_checksum")]
@@ -255,7 +359,12 @@ class ExpedienteService:
                 continue
             try:
                 item = self.drive.get(identifier)
-            except (HarnessError, KeyError):
+            except KeyError:
+                missing.append({"kind": kind, "id": identifier, "reason": "not_found_or_revoked"})
+                continue
+            except HarnessError as exc:
+                if exc.code not in ("not_found", "insufficient_permission"):
+                    raise
                 missing.append({"kind": kind, "id": identifier, "reason": "not_found_or_revoked"})
                 continue
             if not belongs_to_root(self.drive, root, item):
@@ -428,7 +537,9 @@ class ExpedienteService:
                 continue
             try:
                 item = self.drive.get(original["file_id"])
-            except HarnessError:
+            except HarnessError as exc:
+                if exc.code not in ("not_found", "insufficient_permission"):
+                    raise
                 continue
             if belongs_to_root(self.drive, root, item) and not self._inside(originals_folder, item):
                 placeable.append((original, item))
@@ -822,6 +933,7 @@ class ExpedienteService:
         registered = {item["file_id"] for item in manifest.originals} if manifest else set()
         if manifest:  # the source of a copied original stays in place but is already registered
             registered |= {item["copied_from"] for item in manifest.originals if item.get("copied_from")}
+            registered |= {identifier for kind, identifier in manifest.references() if kind == "artifact"}
         if manifest and manifest.context_file_id:
             registered.add(manifest.context_file_id)
         if manifest and manifest.live_offer:

@@ -10,6 +10,11 @@ LitMan is published as a single product version, shared by Core and Harness; see
 
 ## [Unreleased]
 
+### Added
+
+- Dossier status reports changes to registered originals and published files,
+  unavailable references, edited context, and incomplete candidate scans.
+
 ### Changed
 
 - New detailed analyses use the shorter technical proposal filename

@@ -103,3 +103,16 @@ def test_litman_folder_is_not_a_folder_candidate(tmp_path: Path):
     drive = nested_drive()
     folders = ExpedienteService(drive, PlanStore(tmp_path / "plans")).inspect("root")["candidates"]["folders"]
     assert "lit" not in [item["id"] for item in folders] and {"id": "orig", "path": "originales"} in folders
+
+
+def test_registered_work_folders_exclude_nested_candidates(tmp_path: Path):
+    drive = dossier_drive()
+    service = ExpedienteService(drive, PlanStore(tmp_path / 'plans'), AtomicSharedState(drive))
+    service.apply_incorporation(service.preview_incorporation('root', ['source']).id)
+    state = service.load_state(drive.resources['root'])
+    for role in ('internal', 'offer', 'initial', 'detailed', 'deliveries'):
+        folder = state.manifest.folders[role]
+        drive.add(Resource(f'{role}-sub', 'sub', FOLDER_MIME, '1', drive_id='shared', parents=(folder,)))
+        drive.add(Resource(f'{role}-file', 'file.pdf', PDF, '1', drive_id='shared', parents=(f'{role}-sub',)), b'x')
+    drive.add(Resource('candidate', 'candidate.pdf', PDF, '1', drive_id='shared', parents=('root',)), b'x')
+    assert service.status('root')['candidates']['originals'] == ['candidate']
