@@ -17,9 +17,10 @@ LitMan is published as a single product version, shared by Core and Harness; see
   unavailable references, edited context, and incomplete candidate scans.
 - Analyzing a registered original whose content changed, or a retired
   original, since it was registered is now explained and refused before
-  running the analysis, instead of silently analyzing it. Analysis preview
-  also lists other eligible, unregistered files found in the dossier without
-  selecting them for the person's review.
+  running the analysis, instead of silently analyzing it; this is rechecked
+  again right before running, in case it changed after the plan was already
+  accepted. Analysis preview also lists other eligible, unregistered files
+  found in the dossier without selecting them for the person's review.
 
 ### Changed
 

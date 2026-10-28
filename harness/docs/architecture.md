@@ -111,7 +111,11 @@ action also records whether its original is registered, so analyzing an
 unregistered file is always visible rather than implicit, and the response
 also lists other eligible unregistered originals the person did not select
 (`other_candidate_original_ids`), from one explicit candidate scan, without
-adding them to the plan. Analysis downloads only planned originals into a
+adding them to the plan. The manifest can change between an accepted preview
+and `execute_analysis`, so execution rechecks the same retirement and MD5
+rules against the current manifest, immediately before Core runs and before
+anything is downloaded, not only at preview time. Analysis downloads only
+planned originals into a
 private workspace whose input directory is the analysis operation UUID.
 Harness generates Core's minimal configuration and invokes
 `litman-core run --config`; it does not depend on a user-maintained Core

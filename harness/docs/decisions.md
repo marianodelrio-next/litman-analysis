@@ -271,4 +271,11 @@ other eligible files the person did not select
 (`other_candidate_original_ids`) without adding them to the plan: selection by
 ID stays the only way a file enters an analysis, but a person reviewing the
 preview can see what else is available. A truncated scan is reported as such
-rather than implying completeness.
+rather than implying completeness. The same two checks (retirement, MD5) run
+again immediately before Core runs, against the manifest's state at that
+moment rather than the one seen at preview: an accepted plan can sit
+unexecuted, and the manifest can change in that window (most plainly, the
+same original being retired through an accepted reconciliation plan). A
+preview-only check would let that plan still run Core on a retired or
+changed original, silently reintroducing the exact risk the guard exists to
+close.

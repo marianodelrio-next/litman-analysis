@@ -323,7 +323,7 @@ def test_preview_rejects_a_registered_original_whose_content_drifted(tmp_path: P
     drive, dossier = _adopted_dossier(tmp_path)
     drive.resources["source"] = replace(drive.resources["source"], md5_checksum="0" * 32)
     analysis = service(drive, tmp_path, settings=_settings(), dossier=dossier)
-    with pytest.raises(HarnessError, match="cambió desde que se registró") as raised:
+    with pytest.raises(HarnessError, match="cambió") as raised:
         analysis.preview("root", ["source"], "assessment")
     assert raised.value.code == "registered_original_changed"
     assert raised.value.details["file_id"] == "source"
@@ -365,6 +365,49 @@ def test_preview_rejects_a_retired_original_until_reactivated(tmp_path: Path):
     assert raised.value.details["file_id"] == "source"
     reconciliation.apply(reconciliation.preview("root", [{"op": "reactivate_original", "file_id": "source"}]).id)
     assert analysis.preview("root", ["source"], "assessment").snapshot == {"source": drive.resources["source"].md5_checksum}
+
+
+def test_execute_rejects_a_registered_original_retired_after_preview(tmp_path: Path):
+    """The manifest can change between an accepted preview and execution; recheck it, not just at preview."""
+    from litman_harness.dossier.reconciliation import ReconciliationService
+
+    drive, dossier = _adopted_dossier(tmp_path)
+    calls: list[Any] = []
+    run = core_run()
+
+    def counted(command, **kwargs):
+        calls.append(command)
+        return run(command, **kwargs)
+
+    analysis = service(drive, tmp_path, counted, settings=_settings(), dossier=dossier)
+    plan = analysis.preview("root", ["source"], "assessment")
+    reconciliation = ReconciliationService(dossier)
+    reconciliation.apply(reconciliation.preview("root", [{"op": "retire_original", "file_id": "source"}]).id)
+    with pytest.raises(HarnessError) as raised:
+        analysis.execute(plan.id)
+    assert raised.value.code == "retired_original_requires_reactivation"
+    assert raised.value.details["file_id"] == "source"
+    assert not calls
+
+
+def test_execute_rejects_a_registered_original_changed_in_the_manifest_after_preview(tmp_path: Path):
+    drive, dossier = _adopted_dossier(tmp_path)
+    calls: list[Any] = []
+    run = core_run()
+
+    def counted(command, **kwargs):
+        calls.append(command)
+        return run(command, **kwargs)
+
+    analysis = service(drive, tmp_path, counted, settings=_settings(), dossier=dossier)
+    plan = analysis.preview("root", ["source"], "assessment")
+    state = dossier.load_state(drive.resources["root"])
+    state.manifest.originals[0]["md5_checksum"] = "0" * 32
+    drive.contents[state.manifest_file.id] = state.manifest.serialize().encode()
+    with pytest.raises(HarnessError) as raised:
+        analysis.execute(plan.id)
+    assert raised.value.code == "registered_original_changed"
+    assert not calls
 
 
 def test_preview_with_candidates_surfaces_unregistered_files_without_selecting_them(tmp_path: Path):

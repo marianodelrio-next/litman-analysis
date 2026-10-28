@@ -29,6 +29,29 @@ if TYPE_CHECKING:  # the publication service imports this module; inject it, nev
 LOCAL_VALIDATED = "local_validated"
 
 
+def _check_registration(identifier: str, current_md5: str | None, registered: dict[str, dict[str, Any]]) -> None:
+    """Reject a selected ID that the manifest shows as retired or drifted; a no-op if unregistered.
+
+    Shared by ``preview`` (against Drive's current content) and the pre-Core recheck in
+    ``_run_core`` (against the plan's locked snapshot): both must refuse the same registered
+    original the same way, whether it changed before or after the plan was accepted.
+    """
+    original = registered.get(identifier)
+    if original is None:
+        return
+    if original.get("status", "active") == "retired":
+        raise HarnessError("retired_original_requires_reactivation",
+                           "Este original está retirado; reactívelo con preview_reconciliation antes de analizarlo",
+                           details={"file_id": identifier})
+    # Same drift comparison as ``status`` (``dossier/service.py:_drift``): any mismatch,
+    # including an unexpectedly missing registered checksum, is drift.
+    if original.get("md5_checksum") != current_md5:
+        raise HarnessError("registered_original_changed",
+                           "El original registrado cambió; revise el expediente con status antes de analizarlo",
+                           details={"file_id": identifier, "registered_md5": original.get("md5_checksum"),
+                                    "current_md5": current_md5})
+
+
 class AnalysisService:
     """Prepare and run Core locally on originals selected inside the connected dossier."""
 
@@ -72,17 +95,7 @@ class AnalysisService:
             item = self.drive.get(identifier)
             validate_original(self.drive, root, item)
             original = registered.get(identifier)
-            if original is not None and original.get("status", "active") == "retired":
-                raise HarnessError("retired_original_requires_reactivation",
-                                   "Este original está retirado; reactívelo con preview_reconciliation antes de "
-                                   "analizarlo", details={"file_id": identifier})
-            # Same drift comparison as ``status`` (``dossier/service.py:_drift``): any mismatch,
-            # including an unexpectedly missing registered checksum, is drift.
-            if original is not None and original.get("md5_checksum") != item.md5_checksum:
-                raise HarnessError("registered_original_changed",
-                                   "El original registrado cambió desde que se registró; revise el expediente "
-                                   "con status antes de analizarlo", details={"file_id": identifier,
-                                   "registered_md5": original.get("md5_checksum"), "current_md5": item.md5_checksum})
+            _check_registration(identifier, item.md5_checksum, registered)
             md5 = require_checksum(item)
             snapshot[item.id] = md5
             actions.append(PlanAction("download_original", item.id, item.name, None, md5,
@@ -169,6 +182,12 @@ class AnalysisService:
         model = run_action.metadata.get("model")
         core.validate_provider(provider)
         root = self._root(plan.root_folder_id)
+        # The manifest can change between an accepted preview and this execution (for example a
+        # retirement); recheck it here too, not only at preview time.
+        registered = self._registered_originals(root)
+        for action in plan.actions:
+            if action.kind == "download_original" and action.resource_id:
+                _check_registration(action.resource_id, action.expected_version, registered)
         verify_originals(self.drive, root, plan)
         workspace = self._new_workspace()
         try:
