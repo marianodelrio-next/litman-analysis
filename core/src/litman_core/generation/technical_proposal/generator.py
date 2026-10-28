@@ -40,7 +40,7 @@ class TechnicalDocumentGenerator:
         _write_json(run_dir / "output" / "pending.json", pending)
         _write_json(run_dir / "output" / "coverage.json", _coverage(plan, content))
         template_path, _ = _template(plan.get("template_id", "next-standard-v1"))
-        output = run_dir / "output" / _document_filename(plan)
+        output = run_dir / "output" / "propuesta_tecnica.docx"
         rendered = render_technical_document(template_path, content, plan, output,
             include_internal_pending=include_pending, include_editorial_guidance=include_guidance,
             body_marker=manifest.get("body_marker", "[[DOCUMENT_BODY]]"),
@@ -99,22 +99,6 @@ def _validate_content(content, plan):
             if set(section.get(key, [])) - set(expected.get("requirements" if key == "requirements_covered" else key, [])): errors.append({"path": f"sections.{section.get('id')}.{key}", "message": label})
     if any(x.get("section_id") is not None and x["section_id"] not in planned for x in content.get("pending", [])): errors.append({"path": "pending", "message": "Un pendiente referencia una sección inexistente"})
     return {"valid": not errors, "errors": errors}
-
-
-def _document_filename(plan: dict) -> str:
-    import re
-    identity = plan["identity"]
-    reference = identity.get("tender_reference") or ""
-    title = identity.get("short_title") or ""
-    pieces = ["Propuesta técnica", str(reference), str(title)]
-    value = " ".join(x.strip() for x in pieces if x and x.strip())
-    value = re.sub(r'[\\/:*?"<>|]+', " ", value)
-    value = re.sub(r"\s+", " ", value).strip(" .")
-    # Límite portable sin cortar la última palabra.
-    if len(value) > 180:
-        shortened = value[:181].rsplit(" ", 1)[0].rstrip(" .")
-        value = shortened or value[:180].rstrip(" .")
-    return (value or "Propuesta técnica") + ".docx"
 
 
 def _all_pending(content, plan):

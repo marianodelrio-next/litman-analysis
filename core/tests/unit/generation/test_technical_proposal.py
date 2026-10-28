@@ -90,12 +90,17 @@ def test_plan_uses_distinct_contextual_subsections_and_fallback_score() -> None:
     assert plan["sections"][0]["score_source"] == "criterion"
 
 
-def test_short_filename_preserves_acronyms_and_meaningful_terms(tmp_path: Path) -> None:
+def test_fixed_filename_preserves_long_tender_identity(tmp_path: Path) -> None:
     value = dossier()
-    value["cabecera"].update(nombre="Aplicaciones de Inteligencia Artificial (IA) aplicada a expedientes de Compras (CARMEN)", expediente="5100073845")
-    dossier_path = tmp_path / "dossier.json"; dossier_path.write_text(json.dumps(value), encoding="utf-8")
+    title = "Servicio de análisis " * 20
+    value["cabecera"].update(nombre=title, expediente="EXP-LONG-1")
+    dossier_path = tmp_path / "dossier.json"
+    dossier_path.write_text(json.dumps(value), encoding="utf-8")
     manifest = generate_documents(dossier_path, output_dir=tmp_path / "run", artifacts=["technical-document"], provider=None)
-    assert Path(manifest["documents"][0]).name == "Propuesta técnica 5100073845 Inteligencia Artificial IA aplicada expedientes Compras CARMEN.docx"
+    path = Path(manifest["documents"][0])
+    assert path.name == "propuesta_tecnica.docx"
+    text = "\n".join(p.text for p in Document(path).paragraphs)
+    assert title.strip() in text and "EXP-LONG-1" in text
 
 
 def test_english_plan_localizes_generated_structure_and_nested_evidence() -> None:
@@ -117,13 +122,6 @@ def test_english_plan_localizes_generated_structure_and_nested_evidence() -> Non
     assert "Explicar de forma verificable" in planned["guidance"]["purpose"]
 
 
-def test_filename_does_not_repeat_compound_reference(tmp_path: Path) -> None:
-    value = dossier()
-    value["cabecera"].update(nombre="Servicio de análisis EXP-1", expediente="EXP-1")
-    dossier_path = tmp_path / "dossier.json"; dossier_path.write_text(json.dumps(value), encoding="utf-8")
-    manifest = generate_documents(dossier_path, output_dir=tmp_path / "run", artifacts=["technical-document"], provider=None)
-    assert Path(manifest["documents"][0]).name == "Propuesta técnica EXP-1 análisis.docx"
-
 
 def test_identity_pending_and_guidance_toggle_are_rendered_from_plan(tmp_path: Path) -> None:
     value = dossier(); value["cabecera"].update(nombre=None, expediente=None)
@@ -134,6 +132,7 @@ def test_identity_pending_and_guidance_toggle_are_rendered_from_plan(tmp_path: P
     assert sum("nombre ni expediente" in item["description"] for item in pending) == 1
     manifest = generate_documents(dossier_path, output_dir=tmp_path / "clean", artifacts=["technical-document"],
                                   provider=None, include_editorial_guidance=False)
+    assert Path(manifest["documents"][0]).name == "propuesta_tecnica.docx"
     clean = Document(manifest["documents"][0])
     assert not any("Guía de redacción" in p.text for p in clean.paragraphs)
     assert all("EEF5F8" not in str(table._tbl.xml) for table in clean.tables)

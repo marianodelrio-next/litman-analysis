@@ -13,8 +13,8 @@ como vista previa y sólo se aplica cuando la persona lo acepta.
 - `diagnose`: comprueba que LitMan, la cuenta de Google, el motor de análisis
   y las API de Google Docs y Google Sheets están listos.
   Ejemplo: "prepara mi equipo" o "¿funciona todo bien?"
-- `setup`: elige qué proveedor (y modelo) usa el análisis de LitMan.
-  Ejemplo: "usa Codex para los análisis"
+- `setup`: elige o cambia el proveedor y el modelo que usa el análisis de LitMan.
+  Ejemplo: "usa Codex para los análisis" o "cambia el modelo de análisis a ..."
 - `identity`: dice con qué cuenta de Google trabaja LitMan.
   Ejemplo: "¿con qué cuenta estás conectado?"
 

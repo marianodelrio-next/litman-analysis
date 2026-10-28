@@ -90,17 +90,42 @@ def test_first_detailed_analysis_converts_one_live_offer_and_reanalysis_keeps_it
     assert offer.mime_type == GOOGLE_DOC_MIME and offer.parents == (manifest.folders["offer"],)
     assert manifest.live_offer["origin_kind"] == "core_conversion"
     technical = next(a for a in first["artifacts"] if a["role"] == "technical_document")
-    assert technical["name"] == "memoria_tecnica.docx"
+    assert technical["name"] == "propuesta_tecnica.docx"
     assert manifest.live_offer["origin_artifact_id"] == technical["file_id"]
     second_analysis = setup.analyse("detailed-analysis")
     plan = setup.publication.preview(second_analysis["operation_id"])
     assert "convert_live_offer" not in [a.kind for a in plan.actions]
-    setup.publication.apply(plan.id)
+    original_content = setup.drive.contents[technical["file_id"]]
+    second = setup.publication.apply(plan.id)
+    repeated = next(a for a in second["artifacts"] if a["role"] == "technical_document")
+    assert repeated["name"] == f"propuesta_tecnica ({second_analysis['completed_at'][:10]}).docx"
+    assert repeated["file_id"] != technical["file_id"]
+    assert setup.drive.resources[technical["file_id"]].name == "propuesta_tecnica.docx"
+    assert setup.drive.contents[technical["file_id"]] == original_content
     manifest = setup.manifest()
     assert len(manifest.analyses) == 2 and manifest.live_offer["document_id"] == offer.id
     assert sum(item.mime_type == GOOGLE_DOC_MIME and manifest.folders["offer"] in item.parents
                for item in setup.drive.resources.values()) == 1
 
+
+
+def test_renamed_live_offer_remains_registered(tmp_path: Path):
+    setup = Setup(tmp_path)
+    setup.publish(setup.analyse("detailed-analysis"))
+    manifest = setup.manifest()
+    offer_id = manifest.live_offer["document_id"]
+    assert setup.drive.resources[offer_id].name == "propuesta_tecnica"
+    setup.drive.rename(offer_id, "Oferta revisada")
+    assert setup.dossier.status("root")["state"] == "adopted"
+    analysis = setup.analyse("detailed-analysis")
+    plan = setup.publication.preview(analysis["operation_id"])
+    assert "convert_live_offer" not in [action.kind for action in plan.actions]
+    setup.publication.apply(plan.id)
+    manifest = setup.manifest()
+    assert manifest.live_offer["document_id"] == offer_id
+    assert setup.drive.resources[offer_id].name == "Oferta revisada"
+    assert sum(item.mime_type == GOOGLE_DOC_MIME and manifest.folders["offer"] in item.parents
+               for item in setup.drive.resources.values()) == 1
 
 def test_existing_live_offer_is_not_replaced_by_conversion(tmp_path: Path):
     setup = Setup(tmp_path, live_offer=True)
@@ -251,7 +276,7 @@ def test_live_offer_registered_after_preview_skips_the_conversion(tmp_path: Path
     assert result["status"] == "succeeded" and manifest.live_offer["document_id"] == "offer-doc"
     assert not any(item.mime_type == GOOGLE_DOC_MIME and manifest.folders["offer"] in item.parents
                    for item in setup.drive.resources.values())
-    assert "memoria_tecnica.docx" in [item["name"] for item in result["artifacts"]]
+    assert "propuesta_tecnica.docx" in [item["name"] for item in result["artifacts"]]
 
 
 def test_only_the_closed_public_catalogue_reaches_drive(tmp_path: Path):

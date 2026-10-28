@@ -15,6 +15,16 @@ LitMan is published as a single product version, shared by Core and Harness; see
 - Dossier status reports changes to registered originals and published files,
   unavailable references, edited context, and incomplete candidate scans.
 
+### Changed
+
+- New detailed analyses use the shorter technical proposal filename
+  `propuesta_tecnica.docx`, reducing the length of generated paths.
+
+### Fixed
+
+- LitMan now explains and handles requests to change the analysis provider or
+  model, including when the default model is in use.
+
 ## [0.4.0] - 2026-10-26
 ### Fixed
 
