@@ -114,6 +114,8 @@ class SummaryService:
         try:
             self._check_sources(root, change.metadata["items"])
         except HarnessError as exc:
+            if exc.code not in ("not_found", "insufficient_permission", "document_outside_tree"):
+                raise
             raise OperationConflict("Una fuente del resumen no está disponible", details={"code": exc.code}) from exc
         accepted_by = self.dossier.performed_by()
         manifest.summary = {"items": change.metadata["items"],

@@ -12,6 +12,7 @@ LitMan is published as a single product version, shared by Core and Harness; see
 
 ### Added
 
+- Accepted reconciliation plans can retire or reactivate originals and repair names and placements of managed files.
 - Dossier status reports changes to registered originals and published files,
   unavailable references, edited context, and incomplete candidate scans.
 

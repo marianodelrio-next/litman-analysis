@@ -104,6 +104,10 @@ class ReconciliationService:
             return resumed
         update = next(a for a in run.plan.actions if a.kind == 'update_manifest')
         base, manifest, version = self.dossier.read_manifest_unchanged(update)
+        # Check every affected resource before performing the first Drive mutation.
+        for action in run.plan.actions:
+            if action.kind in _ACTIONS and action.kind != "retire_original":
+                self._check_action(root, manifest, action)
         for action in run.plan.actions:
             if action.kind not in _ACTIONS:
                 continue
@@ -111,16 +115,7 @@ class ReconciliationService:
             if action.kind == 'retire_original':
                 record['status'] = 'retired'
                 continue
-            item = self.drive.get(action.resource_id)
-            if not belongs_to_root(self.drive, root, item):
-                raise OperationConflict('El recurso ya no está en la licitación', details={'file_id': item.id})
-            metadata = action.metadata
-            target_state = ((action.kind == 'rename_managed' and item.name == action.name and list(item.parents) == metadata['parents'])
-                            or (action.kind in ('place_original', 'return_artifact') and list(item.parents) == [destination]
-                                and item.name == metadata['observed_name']))
-            original_state = item.name == metadata['observed_name'] and list(item.parents) == metadata['parents']
-            if not (original_state or target_state) or (category == 'original' and item.md5_checksum != action.expected_version):
-                raise OperationConflict('El recurso cambió desde la vista previa', details={'file_id': item.id})
+            item, target_state = self._check_action(root, manifest, action)
             if action.kind == 'reactivate_original':
                 if item.md5_checksum != record.get('md5_checksum'):
                     raise OperationConflict('El original cambió', details={'file_id': item.id})
@@ -130,6 +125,7 @@ class ReconciliationService:
                     if not item.capabilities.get('canRename', False):
                         raise OperationConflict('No se puede renombrar', details={'file_id': item.id})
                     self.drive.rename(item.id, action.name)
+                    run.complete(action, {"resource_id": item.id})
                 record['observed_name' if category == 'original' else 'name'] = action.name
             elif action.kind in ('place_original', 'return_artifact'):
                 folder = self.drive.get(destination)
@@ -143,7 +139,41 @@ class ReconciliationService:
                     if not item.capabilities.get('canMoveItemWithinDrive', False):
                         raise OperationConflict('No se puede mover', details={'file_id': item.id})
                     self.drive.move(item.id, destination, item.parents)
+                    run.complete(action, {"resource_id": item.id})
         manifest.history.append({'operation_id': run.plan.operation_id, 'kind': run.plan.kind,
                                  'performed_by': self.dossier.performed_by(), 'completed_at': now()})
         conflict = self.dossier.write_shared_state(run, root, manifest, base, manifest_version=version)
         return self.dossier.shared_result(run, manifest, conflict)
+
+    def _check_action(self, root: Resource, manifest: Manifest, action: PlanAction) -> tuple[Resource, bool]:
+        category, _, destination = _managed(manifest, action.resource_id)
+        try:
+            item = self.drive.get(action.resource_id)
+            if not belongs_to_root(self.drive, root, item):
+                raise OperationConflict("El recurso ya no está en la licitación", details={"file_id": item.id})
+            metadata = action.metadata
+            target = ((action.kind == "rename_managed" and item.name == action.name
+                       and list(item.parents) == metadata["parents"])
+                      or (action.kind in ("place_original", "return_artifact")
+                          and list(item.parents) == [destination] and item.name == metadata["observed_name"]))
+            original = item.name == metadata["observed_name"] and list(item.parents) == metadata["parents"]
+            if not (original or target) or (category == "original" and item.md5_checksum != action.expected_version):
+                raise OperationConflict("El recurso cambió desde la vista previa", details={"file_id": item.id})
+            if action.kind in ("place_original", "return_artifact"):
+                folder = self.drive.get(destination)
+                if not belongs_to_root(self.drive, root, folder) or not folder.capabilities.get("canAddChildren", False):
+                    raise OperationConflict("No se puede usar la carpeta de destino", details={"file_id": item.id})
+                if not target:
+                    strategy = metadata["strategy"] if action.kind == "place_original" else "move"
+                    capability = {"move": "canMoveItemWithinDrive", "copy": "canCopy"}.get(strategy)
+                    if capability and not item.capabilities.get(capability, False):
+                        raise OperationConflict("No se puede aplicar la colocación aceptada", details={"file_id": item.id})
+                    if strategy == "move" and metadata.get("can_copy") and not item.capabilities.get("canCopy", False):
+                        raise OperationConflict("Cambió el permiso de copia", details={"file_id": item.id})
+            if action.kind == "rename_managed" and not target and not item.capabilities.get("canRename", False):
+                raise OperationConflict("No se puede renombrar", details={"file_id": item.id})
+            return item, target
+        except HarnessError as exc:
+            if exc.code in ("not_found", "insufficient_permission"):
+                raise OperationConflict("El recurso ya no está disponible", details={"file_id": action.resource_id}) from exc
+            raise
