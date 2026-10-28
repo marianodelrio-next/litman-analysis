@@ -376,3 +376,33 @@ def test_concurrent_manifest_after_copied_placement_adopts_the_copy_without_dupl
     assert result['manifest']['originals'][0]['copied_from'] == 'source'
     assert result['manifest']['originals'][0]['provenance'] == 'copied'
     assert [identifier for identifier in drive.created if identifier not in before] == new_copies
+
+
+def test_adopt_copy_rejects_a_file_id_already_registered(tmp_path):
+    import pytest
+    from litman_harness.dossier.reconciliation import ReconciliationService
+    from litman_harness.errors import HarnessError
+
+    drive = dossier_drive()
+    service_dossier = ExpedienteService(drive, PlanStore(tmp_path / 'plans'), AtomicSharedState(drive))
+    service_dossier.apply_incorporation(service_dossier.preview_incorporation('root', ['source']).id)
+    service = ReconciliationService(service_dossier)
+    with pytest.raises(HarnessError, match='ya está registrada') as exc:
+        service.preview('root', [{'op': 'adopt_copy', 'file_id': 'source', 'copy_file_id': 'source'}])
+    assert exc.value.code == 'invalid_request'
+
+
+def test_adopt_copy_apply_reports_a_conflict_when_the_copy_vanished(tmp_path):
+    from litman_harness.dossier.reconciliation import ReconciliationService
+
+    drive = dossier_drive()
+    shared = AtomicSharedState(drive)
+    dossier = ExpedienteService(drive, PlanStore(tmp_path / 'plans'), shared)
+    dossier.apply_incorporation(dossier.preview_incorporation('root', ['source']).id)
+    drive.add(Resource('copy-1', 'pliego.pdf', PDF, '1', 123, 'shared', ('root',)), b'pliego')
+    service = ReconciliationService(dossier)
+    plan = service.preview('root', [{'op': 'adopt_copy', 'file_id': 'source', 'copy_file_id': 'copy-1'}])
+    del drive.resources['copy-1']
+    result = service.apply(plan.id)
+    assert result['status'] == 'conflict'
+    assert result['conflict']['file_id'] == 'copy-1'

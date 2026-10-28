@@ -89,7 +89,12 @@ class ReconciliationService:
                     raise HarnessError('insufficient_capability', 'No se puede mover el artefacto')
             copy_checksum = None
             if kind == 'adopt_copy':
-                copy_item = self.drive.get(op['copy_file_id'])
+                copy_id = op['copy_file_id']
+                registered = ({o['file_id'] for o in manifest.originals} |
+                              {a['file_id'] for an in manifest.analyses for a in (an.get('artifacts') or [])})
+                if copy_id in registered:
+                    raise HarnessError('invalid_request', 'La copia ya está registrada', details={'file_id': copy_id})
+                copy_item = self.drive.get(copy_id)
                 if not belongs_to_root(self.drive, root, copy_item):
                     raise HarnessError('document_outside_tree', 'La copia no está dentro de la licitación')
                 if copy_item.md5_checksum != item.md5_checksum:
@@ -129,10 +134,17 @@ class ReconciliationService:
                 record['status'] = 'retired'
                 continue
             if action.kind == 'adopt_copy':
-                copy_item = self.drive.get(action.metadata['copy_file_id'])
-                if (not belongs_to_root(self.drive, root, copy_item) or
-                        copy_item.md5_checksum != action.metadata['copy_checksum']):
-                    raise OperationConflict('La copia registrada cambió', details={'file_id': copy_item.id})
+                copy_id = action.metadata['copy_file_id']
+                try:
+                    copy_item = self.drive.get(copy_id)
+                    if (not belongs_to_root(self.drive, root, copy_item) or
+                            copy_item.md5_checksum != action.metadata['copy_checksum']):
+                        raise OperationConflict('La copia registrada cambió', details={'file_id': copy_id})
+                except HarnessError as exc:
+                    if exc.code in ('not_found', 'insufficient_permission'):
+                        raise OperationConflict('La copia registrada ya no está disponible',
+                                                details={'file_id': copy_id}) from exc
+                    raise
                 record.update(file_id=copy_item.id, copied_from=action.resource_id, provenance='copied')
                 continue
             item, target_state = self._check_action(root, manifest, action)

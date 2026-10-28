@@ -23,6 +23,9 @@ def test_registry_exposes_operations_with_schema_and_kind():
         assert descriptor["description"].startswith(("Consulta", "Mutación"))
     incorporation = registry()["preview_incorporation"].input_schema["properties"]
     assert incorporation["overwrite_context"]["type"] == "boolean"
+    reconciliation_op = registry()["preview_reconciliation"].input_schema["properties"]["operations"]["items"]
+    assert "adopt_copy" in reconciliation_op["properties"]["op"]["enum"]
+    assert "copy_file_id" in reconciliation_op["properties"]
     preview_analysis = registry()["preview_analysis"].input_schema
     assert "provider" not in preview_analysis["properties"]
     setup_schema = registry()["setup"].input_schema
