@@ -329,6 +329,18 @@ def test_preview_rejects_a_registered_original_whose_content_drifted(tmp_path: P
     assert raised.value.details["file_id"] == "source"
 
 
+def test_preview_rejects_a_registered_original_with_no_stored_checksum(tmp_path: Path):
+    """Same drift comparison as ``status``: a missing registered MD5 against a present one is drift too."""
+    drive, dossier = _adopted_dossier(tmp_path)
+    state = dossier.load_state(drive.resources["root"])
+    state.manifest.originals[0]["md5_checksum"] = None
+    drive.contents[state.manifest_file.id] = state.manifest.serialize().encode()
+    analysis = service(drive, tmp_path, settings=_settings(), dossier=dossier)
+    with pytest.raises(HarnessError) as raised:
+        analysis.preview("root", ["source"], "assessment")
+    assert raised.value.code == "registered_original_changed"
+
+
 def test_preview_marks_registered_and_unregistered_selections(tmp_path: Path):
     drive, dossier = _adopted_dossier(tmp_path)
     drive.add(Resource("extra", "nuevo.pdf", PDF, "1", drive_id="shared", parents=("root",),

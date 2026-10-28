@@ -103,12 +103,11 @@ it. Multiple matching resources are a conflict.
 
 `preview_analysis` checks each selected original's membership and, when it is
 a manifest-registered active original, rechecks its current MD5 against the
-manifest's stored value: a drift raises `registered_original_changed` before
-the plan is stored, and the person is pointed at `status` to review it. This
-is one targeted `load_state` read, not a full candidate scan. Each planned
-action also records whether its original is registered or a new,
-explicitly-selected candidate, so analyzing an unregistered file is always
-visible rather than implicit. Analysis downloads only planned originals into a
+manifest's stored value, raising `registered_original_changed` before the plan
+is stored (rationale in [decisions.md](decisions.md)). Each planned action
+also records whether its original is registered or a new, explicitly-selected
+candidate, so analyzing an unregistered file is always visible rather than
+implicit. Analysis downloads only planned originals into a
 private workspace whose input directory is the analysis operation UUID.
 Harness generates Core's minimal configuration and invokes
 `litman-core run --config`; it does not depend on a user-maintained Core

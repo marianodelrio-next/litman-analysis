@@ -72,11 +72,13 @@ class AnalysisService:
             item = self.drive.get(identifier)
             validate_original(self.drive, root, item)
             original = registered.get(identifier)
-            if original is not None and original.get("md5_checksum") not in (None, item.md5_checksum):
+            # Same drift comparison as ``status`` (``dossier/service.py:_drift``): any mismatch,
+            # including an unexpectedly missing registered checksum, is drift.
+            if original is not None and original.get("md5_checksum") != item.md5_checksum:
                 raise HarnessError("registered_original_changed",
                                    "El original registrado cambió desde que se registró; revise el expediente "
                                    "con status antes de analizarlo", details={"file_id": identifier,
-                                   "registered_md5": original["md5_checksum"], "current_md5": item.md5_checksum})
+                                   "registered_md5": original.get("md5_checksum"), "current_md5": item.md5_checksum})
             md5 = require_checksum(item)
             snapshot[item.id] = md5
             actions.append(PlanAction("download_original", item.id, item.name, None, md5,
