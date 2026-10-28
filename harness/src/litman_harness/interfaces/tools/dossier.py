@@ -46,6 +46,13 @@ TOOLS = (
          schema({"plan_id": _PLAN_ID}, ("plan_id",)),
          lambda ctx, args: ctx.services().expediente.apply_incorporation(args["plan_id"]),
          mutates=True, destructive=True),
+    Tool("preview_reconciliation", "Consulta: prepara un plan de reconciliación para aceptación explícita.",
+         schema({"folder_id": _FOLDER_ID, "operations": {"type": "array", "minItems": 1, "maxItems": 20,
+                 "items": {"type": "object"}}}, ("folder_id", "operations")),
+         lambda ctx, args: ctx.services().reconciliation.preview(args["folder_id"], args["operations"]).json()),
+    Tool("apply_reconciliation", "Mutación: aplica el plan de reconciliación aceptado." + _GATE,
+         schema({"plan_id": _PLAN_ID}, ("plan_id",)),
+         lambda ctx, args: ctx.services().reconciliation.apply(args["plan_id"]), mutates=True, destructive=True),
     Tool("preview_publication", "Consulta (no escribe en Drive): recuperación; plan para publicar un análisis local "
                                 "validado que no se publicó (normalmente execute_analysis ya publica).",
          schema({"analysis_operation_id": {"type": "string"}}, ("analysis_operation_id",)),

@@ -122,3 +122,32 @@ def test_v2_retirement_preserves_history_and_excludes_active_sources():
     assert recommend(folder_id='root', state='adopted', manifest=restored)['kind'] == 'incorporate'
     context = render_context(restored, 'Tender')
     assert 'retirad' in context and 'open?id=a' not in context
+
+
+def test_reconciliation_retire_reactivate_and_rename(tmp_path):
+    from litman_harness.dossier.reconciliation import ReconciliationService
+    drive = dossier_drive()
+    drive.resources['source'] = replace(drive.resources['source'], capabilities={'canRename': True})
+    dossier = ExpedienteService(drive, PlanStore(tmp_path / 'plans'), AtomicSharedState(drive))
+    dossier.apply_incorporation(dossier.preview_incorporation('root', ['source']).id)
+    service = ReconciliationService(dossier)
+    plan = service.preview('root', [{'op': 'retire_original', 'file_id': 'source'}])
+    result = service.apply(plan.id)
+    assert result['manifest']['originals'][0]['status'] == 'retired'
+    plan = service.preview('root', [{'op': 'reactivate_original', 'file_id': 'source'}])
+    assert service.apply(plan.id)['manifest']['originals'][0]['status'] == 'active'
+    plan = service.preview('root', [{'op': 'rename_managed', 'file_id': 'source', 'new_name': 'new.pdf'}])
+    result = service.apply(plan.id)
+    assert result['manifest']['originals'][0]['observed_name'] == 'new.pdf'
+    assert drive.get('source').name == 'new.pdf'
+
+
+def test_reconciliation_conflicts_on_changed_name(tmp_path):
+    from litman_harness.dossier.reconciliation import ReconciliationService
+    drive = dossier_drive()
+    dossier = ExpedienteService(drive, PlanStore(tmp_path / 'plans'), AtomicSharedState(drive))
+    dossier.apply_incorporation(dossier.preview_incorporation('root', ['source']).id)
+    service = ReconciliationService(dossier)
+    plan = service.preview('root', [{'op': 'adopt_current_name', 'file_id': 'source'}])
+    drive.resources['source'] = replace(drive.resources['source'], name='other.pdf')
+    assert service.apply(plan.id)['status'] == 'conflict'

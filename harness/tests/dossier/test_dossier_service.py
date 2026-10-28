@@ -122,7 +122,7 @@ def test_new_incorporation_creates_tree_context_and_manifest_once(tmp_path: Path
     assert manifest.originals[0] | {} == {"file_id": "source", "observed_name": "pliego.pdf", "mime_type": PDF,
                                           "size": 123, "drive_version": "4",
                                           "md5_checksum": hashlib.md5(b"pliego").hexdigest(), "sha256": None,
-                                          "provenance": "external", "placement": "in_place"}
+                                          "provenance": "external", "placement": "in_place", "status": "active"}
     assert manifest.live_offer["document_id"] == "offer-doc"
     assert manifest.live_offer["origin_kind"] == "existing_external"
     assert manifest.history[0]["performed_by"] == "person-1@example.test"
