@@ -10,6 +10,7 @@ from ..errors import HarnessError
 from .models import Resource
 
 SCHEMA_VERSION = "litman-dossier-v1"
+SCHEMA_VERSION_V2 = "litman-dossier-v2"
 MANIFEST_NAME = "manifest.json"
 CONTEXT_NAME = "contexto.md"
 PHASES = ("sin_analisis", "analisis_inicial", "analisis_detallado", "oferta_en_preparacion", "entregada")
@@ -69,7 +70,7 @@ class Manifest:
     def load(cls, data: Any) -> "Manifest":
         if not isinstance(data, dict):
             raise HarnessError("invalid_manifest", "manifest.json debe ser un objeto")
-        if data.get("schema_version") != SCHEMA_VERSION:
+        if data.get("schema_version") not in (SCHEMA_VERSION, SCHEMA_VERSION_V2):
             raise HarnessError("unsupported_manifest", "La versión del manifiesto no se puede reescribir",
                                details={"schema_version": data.get("schema_version")})
         required = ("dossier_id", "root_folder_id", "workflow_phase")
@@ -103,6 +104,8 @@ class Manifest:
             ids = _ids(items, key)
             if len(ids) != len(set(ids)) or any(not isinstance(item, str) or not item for item in ids):
                 raise HarnessError("invalid_manifest", f"El manifiesto contiene {label} ausentes o duplicados")
+        if self.schema_version == SCHEMA_VERSION_V2 and any(item.get("status") not in ("active", "retired") for item in self.originals):
+            raise HarnessError("invalid_manifest", "Estado de original desconocido")
         if self.summary is not None:
             self._validate_summary()
         folder_ids = [value for value in self.folders.values() if value]
@@ -128,13 +131,22 @@ class Manifest:
                 or not isinstance(summary.get("based_on_analyses"), list)):
             raise HarnessError("invalid_manifest", "El resumen de la licitación no cumple el contrato v1")
 
-    def summary_sources(self) -> dict[str, str]:
+    def active_originals(self) -> list[dict[str, Any]]:
+        return [item for item in self.originals if item.get("status", "active") == "active"]
+
+    def upgrade(self) -> None:
+        for item in self.originals:
+            item.setdefault("status", "active")
+        self.schema_version = SCHEMA_VERSION_V2
+
+    def summary_sources(self, *, historical: bool = False) -> dict[str, str]:
         """Registered documents a summary line may cite: file_id → kind (original or artifact).
 
         The source of a copied original stays citable: earlier summaries and analyses used its ID.
         """
-        sources = {item["file_id"]: "original" for item in self.originals}
-        sources.update({item["copied_from"]: "original" for item in self.originals
+        originals = self.originals if historical else self.active_originals()
+        sources = {item["file_id"]: "original" for item in originals}
+        sources.update({item["copied_from"]: "original" for item in originals
                         if isinstance(item.get("copied_from"), str)})
         for analysis in self.analyses:
             if analysis.get("status") == "published":
@@ -156,7 +168,7 @@ class Manifest:
     def references(self) -> list[tuple[str, Any]]:
         """Every Drive ID the manifest points to, by kind."""
         refs: list[tuple[str, Any]] = [("folder", value) for value in self.folders.values() if value]
-        refs += [("original", item.get("file_id")) for item in self.originals]
+        refs += [("original", item.get("file_id")) for item in self.active_originals()]
         if self.context_file_id:
             refs.append(("context", self.context_file_id))
         if self.live_offer:

@@ -52,12 +52,12 @@ def render_context(manifest: Manifest, title: str) -> str:
     if not folders:
         lines.append("- Aún no hay carpetas registradas.")
     lines += ["", "## Documentos"]
-    for item in manifest.originals:
+    for item in manifest.active_originals():
         name = _one_line(item.get("observed_name") or item["file_id"])
         lines.append(f"- Original: [{name}]({_link(item['file_id'])})")
     if manifest.live_offer:
         lines.append(f"- Oferta viva: [Google Doc]({_link(manifest.live_offer['document_id'])})")
-    if not manifest.originals and not manifest.live_offer:
+    if not manifest.active_originals() and not manifest.live_offer:
         lines.append("- Aún no hay documentos registrados.")
     lines += ["", "## Resultados"]
     published = [item for item in manifest.analyses if item.get("status") == "published"]
@@ -85,7 +85,10 @@ def _summary_lines(manifest: Manifest) -> list[str]:
         item = by_key.get(key)
         if item is None:
             continue
-        source = f" ([fuente]({_link(item['source_file_id'])}))" if item.get("source_file_id") else ""
+        source_id = item.get("source_file_id")
+        retired = set(manifest.summary_sources(historical=True)) - set(manifest.summary_sources())
+        source = (" (fuente retirada; revisar)" if source_id in retired else
+                  f" ([fuente]({_link(source_id)}))" if source_id else "")
         lines.append(f"- {SUMMARY_LABELS[key]}: {_one_line(item['value'])}{source}")
     lines.append(f"- Propuesto por el asistente y aceptado por {_one_line(summary.get('accepted_by'))}; "
                  "cada línea cita el documento del que procede.")

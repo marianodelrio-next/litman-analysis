@@ -102,3 +102,23 @@ def test_status_propagates_transient_drive_errors(tmp_path, monkeypatch):
     monkeypatch.setattr(drive, 'download', failing_download)
     with pytest.raises(HarnessError, match='temporary'):
         service.status('root')
+
+
+def test_v2_retirement_preserves_history_and_excludes_active_sources():
+    from litman_harness.dossier.manifest import Manifest
+    from litman_harness.dossier.recommendation import recommend
+    from litman_harness.dossier.context import render_context
+
+    manifest = Manifest.new(Resource('root', 'Tender', 'folder', '1'))
+    manifest.originals = [{'file_id': 'a', 'observed_name': 'A', 'md5_checksum': 'hash'}]
+    manifest.summary = {'items': [{'key': 'objeto', 'value': 'X', 'source_file_id': 'a'}], 'based_on_analyses': []}
+    manifest.upgrade()
+    manifest.originals[0]['status'] = 'retired'
+    restored = Manifest.parse(manifest.serialize())
+    assert restored.originals[0]['file_id'] == 'a'
+    assert not restored.active_originals()
+    assert 'a' not in restored.summary_sources()
+    assert ('original', 'a') not in restored.references()
+    assert recommend(folder_id='root', state='adopted', manifest=restored)['kind'] == 'incorporate'
+    context = render_context(restored, 'Tender')
+    assert 'retirad' in context and 'open?id=a' not in context

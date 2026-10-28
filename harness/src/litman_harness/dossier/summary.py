@@ -39,7 +39,7 @@ class SummaryService:
             raise HarnessError("invalid_request", "offset debe ser un entero mayor o igual que 0")
         root = self.dossier.root(folder_id)
         manifest = self._adopted(root)
-        kind = manifest.summary_sources().get(file_id)
+        kind = manifest.summary_sources(historical=True).get(file_id)
         if kind is None:  # decided from the manifest: unregistered IDs never reach Drive
             raise HarnessError("document_not_registered",
                                "Sólo se pueden leer originales registrados o artefactos publicados de esta "

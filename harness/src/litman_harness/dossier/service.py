@@ -240,7 +240,7 @@ class ExpedienteService:
                     raise
                 return False
 
-        for original in manifest.originals:
+        for original in manifest.active_originals():
             identifier = original["file_id"]
             item = resource(identifier)
             if item is None:
@@ -532,7 +532,7 @@ class ExpedienteService:
         if manifest is None:
             return []
         placeable = []
-        for original in manifest.originals:
+        for original in manifest.active_originals():
             if original.get("placement") == "in_place":
                 continue
             try:
@@ -749,6 +749,7 @@ class ExpedienteService:
         carries ``context_conflict``.  Returns that conflict, if any.
         """
         plan = run.plan
+        manifest.upgrade()
         content = render_context(manifest, root.name)
         context_action = self._context_action(plan)
         if context_action.kind == "create_context":
